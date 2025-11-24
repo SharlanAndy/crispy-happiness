@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Eye } from 'lucide-react';
 import { StatCard, InfoSection, Card, DataTable, SearchBar, Button, Tabs } from '../../components/ui';
@@ -29,11 +29,30 @@ export default function AgentDetails() {
     { label: 'Total Bonus Received', value: '1100 U' },
   ];
 
-  const networkData = [
+  const allNetworkData = [
     { id: 'U000001', volume: '35,000.00 U', bonus: '+ 352.00 U', sponsor: '100', join: '01-11-2025 13:00', status: 'Active' },
     { id: 'U000002', volume: '42,500.00 U', bonus: '+ 480.00 U', sponsor: '120', join: '05-12-2025 14:30', status: 'Active' },
     { id: 'U000003', volume: '29,750.00 U', bonus: '+ 310.00 U', sponsor: '90', join: '15-10-2025 09:15', status: 'Active' },
   ];
+
+  // Filter network data based on search term
+  const networkData = useMemo(() => {
+    if (!searchTerm || searchTerm.trim() === '') {
+      return allNetworkData;
+    }
+    
+    const searchLower = searchTerm.toLowerCase().trim();
+    return allNetworkData.filter(item => {
+      return (
+        item.id.toLowerCase().includes(searchLower) ||
+        item.status.toLowerCase().includes(searchLower) ||
+        item.volume.toLowerCase().includes(searchLower) ||
+        item.bonus.toLowerCase().includes(searchLower) ||
+        item.sponsor.toLowerCase().includes(searchLower) ||
+        item.join.toLowerCase().includes(searchLower)
+      );
+    });
+  }, [searchTerm]);
 
   const columns = [
     { key: 'id', label: 'U. ID' },
@@ -86,7 +105,12 @@ export default function AgentDetails() {
           />
           <SearchBar placeholder="Search..." value={searchTerm} onChange={setSearchTerm} className="max-w-sm" />
         </div>
-        <DataTable columns={columns} data={networkData} actions={actions} />
+        <DataTable 
+          columns={columns} 
+          data={networkData} 
+          actions={actions}
+          emptyMessage={searchTerm ? `No network members found matching "${searchTerm}"` : 'No network members available'}
+        />
       </Card>
     </div>
   );

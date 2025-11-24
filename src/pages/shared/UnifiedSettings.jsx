@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { Save, Lock, Mail, Wallet, User, Shield } from 'lucide-react';
 import { Card, FormField, Button, PageHeader } from '../../components/ui';
 
 export default function UnifiedSettings() {
   const { id } = useParams(); // For admin viewing other users' settings
   const location = useLocation();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile');
 
   // Determine context: who is viewing and whose settings
@@ -43,6 +44,32 @@ export default function UnifiedSettings() {
 
   const tabs = getTabs();
 
+  // Determine the back navigation path
+  const getBackPath = () => {
+    if (isAdminView) {
+      // Admin viewing another user's settings - go back to the list page
+      if (isSystemAdmin) {
+        if (entityType === 'agent') return '/system-admin/agents';
+        if (entityType === 'merchant') return '/system-admin/merchants';
+        if (entityType === 'user') return '/system-admin/users';
+      } else if (isT3Admin) {
+        if (entityType === 'merchant') return '/t3-admin/merchants';
+        if (entityType === 'user') return '/t3-admin/users';
+        return '/t3-admin'; // fallback
+      }
+      return '/system-admin'; // fallback
+    } else {
+      // User viewing their own settings - go back to their dashboard
+      if (isAgent) return '/agent';
+      if (isMerchant) return '/merchant';
+      return '/'; // fallback
+    }
+  };
+
+  const handleCancel = () => {
+    navigate(getBackPath());
+  };
+
   const renderContent = () => {
     if (isAdminView) {
       // Admin managing another user's settings
@@ -67,7 +94,7 @@ export default function UnifiedSettings() {
                 </select>
               </FormField>
               <div className="flex justify-end gap-3">
-                <Button variant="secondary">Cancel</Button>
+                <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
                 <Button>Save Changes</Button>
               </div>
             </div>
@@ -100,7 +127,7 @@ export default function UnifiedSettings() {
                 </div>
               </div>
               <div className="flex justify-end gap-3">
-                <Button variant="secondary">Cancel</Button>
+                <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
                 <Button>Update Permissions</Button>
               </div>
             </div>
@@ -124,7 +151,7 @@ export default function UnifiedSettings() {
                 <textarea className="w-full px-3 py-2 rounded-md border bg-background" rows={3} placeholder="Enter reason for suspension..."></textarea>
               </FormField>
               <div className="flex justify-end gap-3">
-                <Button variant="secondary">Cancel</Button>
+                <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
                 <Button variant="danger">Update Status</Button>
               </div>
             </div>
@@ -160,7 +187,7 @@ export default function UnifiedSettings() {
                 </div>
               </FormField>
               <div className="flex justify-end gap-3">
-                <Button variant="secondary">Cancel</Button>
+                <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
                 <Button>Update Wallet</Button>
               </div>
             </div>
@@ -179,7 +206,7 @@ export default function UnifiedSettings() {
                 <input type="password" placeholder="Re-enter new password" className="w-full px-3 py-2 rounded-md border bg-background" />
               </FormField>
               <div className="flex justify-end gap-3">
-                <Button variant="secondary">Cancel</Button>
+                <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
                 <Button>Update Password</Button>
               </div>
             </div>

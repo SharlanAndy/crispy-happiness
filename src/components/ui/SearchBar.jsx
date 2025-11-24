@@ -14,11 +14,18 @@ import { Search } from 'lucide-react';
  */
 export default function SearchBar({
   placeholder = 'Search...',
-  value,
+  value = '',
   onChange,
   onSearch,
   className = ''
 }) {
+  const handleChange = (e) => {
+    const newValue = e.target.value;
+    if (onChange) {
+      onChange(newValue);
+    }
+  };
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && onSearch) {
       onSearch(e.target.value);
@@ -31,8 +38,8 @@ export default function SearchBar({
       <input
         type="text"
         placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange?.(e.target.value)}
+        value={value || ''}
+        onChange={handleChange}
         onKeyDown={handleKeyDown}
         className="w-full pl-9 pr-4 py-2 rounded-lg border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
       />
