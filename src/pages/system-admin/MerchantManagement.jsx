@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, Settings, Trash2, Plus } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, Modal, ConfirmDialog } from '../../components/ui';
@@ -23,16 +23,12 @@ export default function MerchantManagement() {
     { id: 'Mer12347', name: 'Luxury Cars Dealer', type: 'Automotive', state: 'Selangor', join: '06-11-2025 14:30', status: 'Active', tier: 'T3' },
   ];
 
-  // Filter by tier and search term
-  const merchants = allMerchants.filter(m => {
-    const matchesTier = m.tier === activeTier;
-    const matchesSearch = searchTerm === '' ||
-      m.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.state.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesTier && matchesSearch;
-  });
+  // Filter by tier and search term (compact)
+  const merchants = allMerchants.filter(m =>
+    m.tier === activeTier && (
+      searchTerm === '' || ['id', 'name', 'type', 'state'].some(k => m[k].toLowerCase().includes(searchTerm.toLowerCase()))
+    )
+  );
 
   const stats = [
     { label: 'Total T1 Merchants', value: '60', lastUpdate: '17-11-2025' },
@@ -55,100 +51,80 @@ export default function MerchantManagement() {
     // api.merchant.delete(merchant.id);
   };
 
-  const handleSettings = (merchant) => {
-    // TODO: Navigate to settings page or open settings modal
-    console.log('Opening settings for:', merchant.id);
-    // navigate(`/system-admin/merchants/${merchant.id}/settings`);
-  };
 
   const actions = [
-    {
-      icon: <Eye size={16} />,
-      onClick: (row) => navigate(`${isSystemAdmin ? '/system-admin' : '/t3-admin'}/merchants/${row.id}`),
-      tooltip: 'View Details',
-    },
-    {
-      icon: <Settings size={16} />,
-      onClick: (row) => navigate(isSystemAdmin ? `/system-admin/merchants/${row.id}/settings` : `/t3-admin/merchants/${row.id}/settings`),
-      tooltip: 'Settings',
-    },
-    {
-      icon: <Trash2 size={16} />,
-      onClick: (row) => setDeleteConfirm({ isOpen: true, item: row }),
-      variant: 'danger',
-      tooltip: 'Delete',
-    },
+    { icon: <Eye size={16} />, onClick: row => navigate(`${isSystemAdmin ? '/system-admin' : '/t3-admin'}/merchants/${row.id}`), tooltip: 'View Details' },
+    { icon: <Settings size={16} />, onClick: row => navigate(isSystemAdmin ? `/system-admin/merchants/${row.id}/settings` : `/t3-admin/merchants/${row.id}/settings`), tooltip: 'Settings' },
+    { icon: <Trash2 size={16} />, onClick: row => setDeleteConfirm({ isOpen: true, item: row }), variant: 'danger', tooltip: 'Delete' },
   ];
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Merchant Management"
-        description="Manage Merchant Information and Others Details"
-        action={
-          isSystemAdmin && (
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
-            >
-              <Plus size={20} />
-              New Merchant
-            </button>
-          )
-        }
-      />
+    <>
+      <div className="space-y-6">
+        <PageHeader
+          title="Merchant Management"
+          description="Manage Merchant Information and Others Details"
+        />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {stats.map((stat, idx) => (
-          <StatCard key={idx} {...stat} />
-        ))}
-      </div>
-
-      <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-        <div className="p-6 border-b">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Merchant List</h2>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setActiveTier('T1')}
-                className={`px-3 py-1 text-sm border rounded-lg transition-colors ${activeTier === 'T1' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary/50'}`}
-              >
-                T1 Merchant
-              </button>
-              <button
-                onClick={() => setActiveTier('T2')}
-                className={`px-3 py-1 text-sm border rounded-lg transition-colors ${activeTier === 'T2' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary/50'}`}
-              >
-                T2 Merchant
-              </button>
-              <button
-                onClick={() => setActiveTier('T3')}
-                className={`px-3 py-1 text-sm border rounded-lg transition-colors ${activeTier === 'T3' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary/50'}`}
-              >
-                T3 Merchant
-              </button>
-            </div>
-          </div>
-          <SearchBar
-            placeholder="Search Merchant..."
-            value={searchTerm}
-            onChange={setSearchTerm}
-            className="max-w-sm"
-          />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {stats.map((s, i) => <StatCard key={i} {...s} />)}
         </div>
 
-        <DataTable
-          columns={columns}
-          data={merchants}
-          actions={actions}
-          pagination={{
-            currentPage,
-            totalPages: 3,
-            onPageChange: setCurrentPage,
-          }}
-        />
-      </div>
+        <div className="flex">
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+          >
+            <Plus size={20} />
+            New Merchant
+          </button>
+        </div>
 
+        <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+          <div className="p-6 border-b">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Merchant List</h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setActiveTier('T1')}
+                  className={`px-3 py-1 text-sm border rounded-lg transition-colors ${activeTier === 'T1' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary/50'}`}
+                >
+                  T1 Merchant
+                </button>
+                <button
+                  onClick={() => setActiveTier('T2')}
+                  className={`px-3 py-1 text-sm border rounded-lg transition-colors ${activeTier === 'T2' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary/50'}`}
+                >
+                  T2 Merchant
+                </button>
+                <button
+                  onClick={() => setActiveTier('T3')}
+                  className={`px-3 py-1 text-sm border rounded-lg transition-colors ${activeTier === 'T3' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary/50'}`}
+                >
+                  T3 Merchant
+                </button>
+              </div>
+            </div>
+            <SearchBar
+              placeholder="Search Merchant..."
+              value={searchTerm}
+              onChange={setSearchTerm}
+              className="max-w-sm"
+            />
+          </div>
+
+          <DataTable
+            columns={columns}
+            data={merchants}
+            actions={actions}
+            pagination={{
+              currentPage,
+              totalPages: 3,
+              onPageChange: setCurrentPage,
+            }}
+          />
+        </div>
+      </div>
       <Modal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
@@ -299,6 +275,6 @@ export default function MerchantManagement() {
         confirmText="Delete"
         variant="danger"
       />
-    </div>
+    </>
   );
 }

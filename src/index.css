@@ -1,6 +1,37 @@
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* HONOR Sans CN font - if available locally or via CDN */
+@font-face {
+  font-family: 'HONOR Sans CN';
+  font-weight: 400;
+  font-style: normal;
+  src: local('HONOR Sans CN Regular'), url('/fonts/honor-sans-cn-regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'HONOR Sans CN';
+  font-weight: 500;
+  font-style: normal;
+  src: local('HONOR Sans CN Medium'), url('/fonts/honor-sans-cn-medium.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'HONOR Sans CN';
+  font-weight: 600;
+  font-style: normal;
+  src: local('HONOR Sans CN DemiBold'), url('/fonts/honor-sans-cn-demibold.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'HONOR Sans CN';
+  font-weight: 700;
+  font-style: normal;
+  src: local('HONOR Sans CN Bold'), url('/fonts/honor-sans-cn-bold.woff2') format('woff2');
+}
 
 @layer base {
   :root {
@@ -74,4 +105,18 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Fallback for HONOR Sans CN to system fonts */
+.font-honor-sans {
+  font-family: 'HONOR Sans CN', 'Segoe UI', 'Roboto', 'Noto Sans', sans-serif;
+}
+
+/* Utility: hide native scrollbars but keep scrolling functional (cross-browser) */
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Safari and Chrome */
 }
