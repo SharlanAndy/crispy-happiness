@@ -20,12 +20,14 @@ export default function StatCard({ label, value, lastUpdate, variant = 'default'
   };
 
   return (
-    <div className={`bg-card p-6 rounded-xl border shadow-sm ${className}`}>
-      <p className="text-sm font-medium text-muted-foreground mb-2">{label}</p>
-      <h3 className={`text-2xl font-bold ${variantClasses[variant]}`}>{value}</h3>
-      {lastUpdate && (
-        <p className="text-xs text-muted-foreground mt-1">Last Update: {lastUpdate}</p>
-      )}
+    <div className={`p-5 rounded-xl border border-neutral-200 flex flex-col gap-6 ${className}`}>
+      <p className="font-honor-sans font-medium leading-[normal] not-italic text-lg text-black">{label}</p>
+      <div className="flex flex-col gap-1.5 items-start">
+        <h3 className={`font-honor-sans font-bold text-3xl text-black ${variantClasses[variant]}`}>{value}</h3>
+        {lastUpdate && (
+        <p className="font-honor-sans font-medium text-[#868e8d] text-sm">Last Update: {lastUpdate}</p>
+        )}
+      </div>
     </div>
   );
 }
