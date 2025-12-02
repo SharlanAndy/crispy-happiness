@@ -1,0 +1,8 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 15 19" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Vector">
+<path fill-rule="evenodd" clip-rule="evenodd" d="M10.2406 1.375H1.83333C1.5802 1.375 1.375 1.5802 1.375 1.83333V16.5C1.375 16.7531 1.5802 16.9583 1.83333 16.9583H12.8333C13.0865 16.9583 13.2917 16.7531 13.2917 16.5V4.42606C13.2917 4.3045 13.2434 4.18792 13.1574 4.10197L10.5647 1.50924C10.4787 1.42329 10.3622 1.375 10.2406 1.375ZM1.83333 0C0.820811 0 0 0.820812 0 1.83333V16.5C0 17.5125 0.820811 18.3333 1.83333 18.3333H12.8333C13.8459 18.3333 14.6667 17.5125 14.6667 16.5V4.42606C14.6667 3.93983 14.4735 3.47351 14.1297 3.1297L11.537 0.536971C11.1932 0.193154 10.7268 0 10.2406 0H1.83333Z" fill="var(--fill-0, black)"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M11 6.1875H3.66667V4.8125H11V6.1875Z" fill="var(--fill-0, black)"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M11 9.85417H3.66667V8.47917H11V9.85417Z" fill="var(--fill-0, black)"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M9.16667 13.5208H3.66667V12.1458H9.16667V13.5208Z" fill="var(--fill-0, black)"/>
+</g>
+</svg>
