@@ -22,7 +22,7 @@ export default function ActionButton({ icon, onClick, variant = 'default', toolt
     <button
       onClick={onClick}
       title={tooltip}
-      className={`p-1.5 rounded-md transition-colors ${variantClasses[variant]} ${className}`}
+      className={`p-1.5 border border-[#E5E5E5] rounded-md transition-colors ${variantClasses[variant]} ${className}`}
     >
       {icon}
     </button>

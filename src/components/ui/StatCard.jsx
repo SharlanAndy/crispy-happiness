@@ -20,7 +20,7 @@ export default function StatCard({ label, value, lastUpdate, variant = 'default'
   };
 
   return (
-    <div className={`p-5 rounded-xl border border-neutral-200 flex flex-col gap-6 ${className}`}>
+    <div className={`p-5 rounded-xl border border-[#E5E5E5] flex flex-col gap-6 ${className}`}>
       <p className="font-honor-sans font-medium leading-[normal] not-italic text-lg text-black">{label}</p>
       <div className="flex flex-col gap-1.5 items-start">
         <h3 className={`font-honor-sans font-bold text-3xl text-black ${variantClasses[variant]}`}>{value}</h3>

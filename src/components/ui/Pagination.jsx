@@ -1,4 +1,3 @@
-import React from 'react';
 import PropTypes from 'prop-types';
 
 /**
@@ -29,35 +28,38 @@ export default function Pagination({ currentPage, totalPages, onPageChange, maxV
   };
 
   return (
-    <div className="p-4 border-t flex justify-end gap-2">
-      <button
-        onClick={() => onPageChange(currentPage - 1)}
-        disabled={currentPage === 1}
-        className="px-3 py-1 text-sm border rounded hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        Previous
-      </button>
-
-      {getPageNumbers().map((page) => (
+    <div className="p-4 border-t flex justify-end">
+      <div className="flex items-center h-[40px]">
         <button
-          key={page}
-          onClick={() => onPageChange(page)}
-          className={`px-3 py-1 text-sm rounded ${page === currentPage
-              ? 'bg-primary text-primary-foreground'
-              : 'border hover:bg-accent'
-            }`}
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="border border-neutral-200 flex items-center justify-center h-full w-[80px] rounded-tl-[5px] rounded-bl-[5px] text-[16px] text-black hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          {page}
+          Previous
         </button>
-      ))}
 
-      <button
-        onClick={() => onPageChange(currentPage + 1)}
-        disabled={currentPage === totalPages}
-        className="px-3 py-1 text-sm border rounded hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        Next
-      </button>
+        {getPageNumbers().map((page) => (
+          <button
+            key={page}
+            onClick={() => onPageChange(page)}
+            className={`border border-neutral-200 border-l-0 flex items-center justify-center h-full w-[45px] text-[16px] transition-colors ${
+              page === currentPage
+                ? 'bg-black text-white'
+                : 'text-black hover:bg-gray-50'
+            }`}
+          >
+            {page}
+          </button>
+        ))}
+
+        <button
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className="border border-neutral-200 border-l-0 flex items-center justify-center h-full w-[86px] rounded-tr-[5px] rounded-br-[5px] text-[16px] text-black hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          Next
+        </button>
+      </div>
     </div>
   );
 }

@@ -14,3 +14,5 @@ export { default as Card } from './Card';
 export { default as Button } from './Button';
 export { default as EmptyState } from './EmptyState';
 export { default as ConfirmDialog } from './ConfirmDialog';
+export { default as AddMerchantModal } from './AddMerchantModal';
+export { default as ProfitChart } from './ProfitChart';

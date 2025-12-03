@@ -4,34 +4,8 @@
 @tailwind components;
 @tailwind utilities;
 
-/* HONOR Sans CN font - if available locally or via CDN */
-@font-face {
-  font-family: 'HONOR Sans CN';
-  font-weight: 400;
-  font-style: normal;
-  src: local('HONOR Sans CN Regular'), url('/fonts/honor-sans-cn-regular.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'HONOR Sans CN';
-  font-weight: 500;
-  font-style: normal;
-  src: local('HONOR Sans CN Medium'), url('/fonts/honor-sans-cn-medium.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'HONOR Sans CN';
-  font-weight: 600;
-  font-style: normal;
-  src: local('HONOR Sans CN DemiBold'), url('/fonts/honor-sans-cn-demibold.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'HONOR Sans CN';
-  font-weight: 700;
-  font-style: normal;
-  src: local('HONOR Sans CN Bold'), url('/fonts/honor-sans-cn-bold.woff2') format('woff2');
-}
+/* HONOR Sans CN font - Using fallback to system fonts since font files are not available */
+/* If you have the HONOR Sans CN font files, place them in public/fonts/ directory */
 
 @layer base {
   :root {
@@ -107,9 +81,9 @@
   }
 }
 
-/* Fallback for HONOR Sans CN to system fonts */
+/* Use system fonts as fallback for HONOR Sans CN */
 .font-honor-sans {
-  font-family: 'HONOR Sans CN', 'Segoe UI', 'Roboto', 'Noto Sans', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
 }
 
 /* Utility: hide native scrollbars but keep scrolling functional (cross-browser) */

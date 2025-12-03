@@ -33,15 +33,15 @@ export default function SearchBar({
   };
 
   return (
-    <div className={`relative ${className}`}>
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+    <div className={`flex gap-3 items-center ${className}`}>
+      <Search className="shrink-0 text-[#1C1B1F]" size={24} />
       <input
         type="text"
         placeholder={placeholder}
         value={value || ''}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        className="w-full pl-9 pr-4 py-2 rounded-lg border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        className="bg-[#f3f3f5] rounded-md p-3 text-sm text-[#1C1B1F] placeholder:text-[#868e8d] w-full focus:outline-none focus:ring-2 focus:ring-black"
       />
     </div>
   );

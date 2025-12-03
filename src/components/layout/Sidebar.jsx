@@ -18,11 +18,16 @@ const Sidebar = ({ sections }) => {
 
   const NavItem = ({ path, icon, label }) => {
     const Icon = icons[icon];
+    // For dashboard routes, only match exactly. For others, match path and sub-paths
+    const isDashboard = path === '/system-admin' || path === '/t3-admin';
+    const isActive = isDashboard 
+      ? pathname === path 
+      : pathname === path || pathname.startsWith(path + '/');
     return (
       <button
         onClick={() => navigate(path)}
         className={`flex gap-2.5 items-center w-full hover:opacity-80 transition-opacity ${
-          pathname === path || pathname.startsWith(path + '/system-admin') || pathname.startsWith(path + '/t3-admin') ? 'opacity-100' : 'opacity-60'
+          isActive ? 'opacity-100' : 'opacity-60'
         }`}
       >
         <Icon />
