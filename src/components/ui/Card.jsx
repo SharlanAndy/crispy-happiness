@@ -13,14 +13,14 @@ import PropTypes from 'prop-types';
  */
 export default function Card({ title, headerAction, children, className = '', noPadding = false }) {
   return (
-    <div className={`bg-card rounded-xl border shadow-sm overflow-hidden ${className}`}>
+    <div className={`bg-card rounded-xl border border-[#E5E5E5] shadow-sm overflow-hidden p-6 flex flex-col gap-5 ${className}`}>
       {title && (
-        <div className="p-6 border-b flex items-center justify-between">
+        <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">{title}</h2>
           {headerAction && <div>{headerAction}</div>}
         </div>
       )}
-      <div className={noPadding ? '' : 'p-6'}>{children}</div>
+      <div className={noPadding ? '' : ''}>{children}</div>
     </div>
   );
 }

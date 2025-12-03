@@ -19,9 +19,9 @@ export default function InfoSection({ title, items, columns = 2, className = '' 
   };
 
   return (
-    <div className={`bg-card rounded-xl border shadow-sm ${className}`}>
-      <h2 className="text-lg font-semibold border-b p-4">{title}</h2>
-      <div className={`grid ${columnClasses[columns]} gap-4 p-4`}>
+    <div className={`bg-card rounded-xl border border-[#E5E5E5] shadow-sm ${className}`}>
+      <h2 className="text-lg font-semibold border-b border-[#E5E5E5] px-5 py-4">{title}</h2>
+      <div className={`grid ${columnClasses[columns]} gap-4 px-5 py-4`}>
         {items.map((item, idx) => (
           <div key={idx}>
             <p className="text-sm text-muted-foreground mb-1">{item.label}</p>
