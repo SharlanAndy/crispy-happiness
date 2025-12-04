@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Eye, Settings, Trash2 } from 'lucide-react';
-import { StatCard, InfoSection, Card, DataTable, SearchBar, PageHeader, Pagination, ConfirmDialog } from '../../components/ui';
+import { StatCard, InfoSection, Card, DataTable, SearchBar, PageHeader, ConfirmDialog } from '../../components/ui';
 import { filterAndPaginate } from '../../lib/pagination';
 import { STATS, USER_INFO, SPONSOR_INFO, WALLET_ADDRESS_INFO, BONUS_INFO, ALL_NETWORK_DATA } from '../../constant/agentMockData';
 
@@ -9,15 +9,10 @@ const ITEMS_PER_PAGE = 10;
 const NETWORK_SEARCH_KEYS = ['id', 'volume', 'bonus', 'sponsorL1', 'sponsorL2', 'join', 'status', 'referrer'];
 const LEVELS = ['level1', 'level2'];
 
-  // Scroll to top when page changes
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [currentPage]);
-
 const COLUMNS_LEVEL1 = [
   { key: 'id', label: 'Agent ID' },
   { key: 'volume', label: 'Total Volume' },
-  { key: 'bonus', label: 'Bonus Contributed', render: (val) => <span className="text-green-600 font-medium">{val}</span> },
+  { key: 'bonus', label: 'Bonus Contributed', render: (val) => <span className="text-[#166534] font-medium">{val}</span> },
   { key: 'sponsorL1', label: 'Total Sponsor L1' },
   { key: 'sponsorL2', label: 'Total Sponsor L2' },
   { key: 'join', label: 'Join Date' },
@@ -28,7 +23,7 @@ const COLUMNS_LEVEL2 = [
   { key: 'id', label: 'Agent ID' },
   { key: 'referrer', label: 'Referrer' },
   { key: 'volume', label: 'Total Volume' },
-  { key: 'bonus', label: 'Bonus Contributed', render: (val) => <span className="text-green-600 font-medium">{val}</span> },
+  { key: 'bonus', label: 'Bonus Contributed', render: (val) => <span className="text-[#166534] font-medium">{val}</span> },
   { key: 'sponsorL1', label: 'Total Sponsor L1' },
   { key: 'sponsorL2', label: 'Total Sponsor L2' },
   { key: 'join', label: 'Join Date' },
@@ -71,6 +66,19 @@ export default function AgentDetails() {
 
   // Select columns based on active level
   const columns = activeLevel === 'level1' ? COLUMNS_LEVEL1 : COLUMNS_LEVEL2;
+
+  // Calculate total bonus for footer
+  const totalBonus = useMemo(() => {
+    return paginatedData.reduce((sum, item) => {
+      const bonusValue = parseFloat(item.bonus.replace(/[^\d.-]/g, '')) || 0;
+      return sum + bonusValue;
+    }, 0);
+  }, [paginatedData]);
+
+  const footerData = useMemo(() => ({
+    id: 'Total',
+    bonus: <span className="text-[#166534] font-bold">{totalBonus.toLocaleString()} U</span>
+  }), [totalBonus]);
 
   const actions = [{
     icon: <Eye size={16} />,
@@ -132,11 +140,13 @@ export default function AgentDetails() {
               data={paginatedData} 
               actions={actions}
               emptyMessage={searchTerm ? `No network members found matching "${searchTerm}"` : 'No network members available'}
+              footer={footerData}
+              pagination={{
+                currentPage,
+                totalPages,
+                onPageChange: setCurrentPage,
+              }}
             />
-            
-            {totalPages > 1 && (
-              <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
-            )}
           </div>
         </Card>
       </div>

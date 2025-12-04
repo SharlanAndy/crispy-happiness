@@ -18,3 +18,5 @@ export { default as AddMerchantModal } from './AddMerchantModal';
 export { default as AddAgentModal } from './AddAgentModal';
 export { default as ProfitChart } from './ProfitChart';
 export { default as TabButtons } from './TabButtons';
+export { default as MonthlyBonusTable } from './MonthlyBonusTable';
+export { default as BonusListCard } from './BonusListCard';

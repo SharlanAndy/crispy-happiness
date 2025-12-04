@@ -21,6 +21,12 @@ export default function UnifiedSettings() {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const [currentPage] = useState(1);
+
+  // Scroll to top when page changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
   
   // Determine entity type from path
   const entityType = location.pathname.includes('/agents/') ? 'agent' :

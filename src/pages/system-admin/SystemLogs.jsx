@@ -56,7 +56,7 @@ export default function SystemLogs() {
       }
     },
     { key: 'message', label: 'Message' },
-    { key: 'ip', label: 'IP Address', render: (val) => <span className="font-mono text-xs">{val}</span> },
+    { key: 'ip', label: 'IP Address' },
     { key: 'dateTime', label: 'Date & Time' },
     { key: 'status', label: 'Status' },
   ];

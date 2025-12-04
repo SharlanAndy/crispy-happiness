@@ -37,9 +37,9 @@ export default function StatusBadge({ status, variant, small = true }) {
   const sizeClass = small ? 'text-xs px-3 py-1.5 rounded-full' : 'text-md px-3 py-2 rounded-md';
 
   return (
-    <span className={`${sizeClass} font-medium ${variantClasses[autoVariant]}`}>
+    <div className={`${sizeClass} w-fit font-medium ${variantClasses[autoVariant]}`}>
       {status}
-    </span>
+    </div>
   );
 }
 

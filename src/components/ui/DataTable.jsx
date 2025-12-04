@@ -12,13 +12,15 @@ import Pagination from './Pagination';
  * @param {Array} [props.actions] - Action button configurations
  * @param {Object} [props.pagination] - Pagination config
  * @param {string} [props.emptyMessage] - Message when no data
+ * @param {Object} [props.footer] - Footer content for summary row
  */
 export default function DataTable({
   columns,
   data,
   actions,
   pagination,
-  emptyMessage = 'No data available'
+  emptyMessage = 'No data available',
+  footer
 }) {
   return (
     <div className="overflow-hidden">
@@ -77,6 +79,18 @@ export default function DataTable({
               ))
             )}
           </tbody>
+          {footer && data.length > 0 && (
+            <tfoot className="border-t border-neutral-300 bg-[#FAFAFA]">
+              <tr>
+                {columns.map((col, idx) => (
+                  <td key={col.key} className={`px-4 py-3 font-semibold ${col.align === 'right' ? 'text-right' : ''}`}>
+                    {footer[col.key] || (idx === 0 ? '' : '')}
+                  </td>
+                ))}
+                {actions && actions.length > 0 && <td className="px-4 py-3"></td>}
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
 
@@ -116,4 +130,5 @@ DataTable.propTypes = {
     onPageChange: PropTypes.func.isRequired,
   }),
   emptyMessage: PropTypes.string,
+  footer: PropTypes.object,
 };

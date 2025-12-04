@@ -59,7 +59,7 @@ export default function WithdrawalManagement() {
     { key: 'id', label: 'Application ID' },
     { key: 'merchant', label: 'Merchant Order No.' },
     { key: 'amount', label: 'Amount' },
-    { key: 'wallet', label: 'Wallet Address', render: (val) => <span className="font-mono text-xs">{val}</span> },
+    { key: 'wallet', label: 'Wallet Address' },
     { key: 'time', label: 'Application Time' },
     { key: 'ref', label: 'Reference' },
     { key: 'status', label: 'Status' },
@@ -68,7 +68,7 @@ export default function WithdrawalManagement() {
   const historyColumns = [
     { key: 'id', label: 'Transaction ID' },
     { key: 'amount', label: 'Amount' },
-    { key: 'wallet', label: 'Wallet Address', render: (val) => <span className="font-mono text-xs">{val}</span> },
+    { key: 'wallet', label: 'Wallet Address' },
     { key: 'time', label: 'Approve Time' },
     { key: 'status', label: 'Status' },
   ];

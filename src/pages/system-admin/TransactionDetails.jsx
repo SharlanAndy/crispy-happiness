@@ -1,9 +1,11 @@
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { InfoSection, PageHeader } from '../../components/ui';
 import { getTransactionInfoItems, getTransactionReceiver, getTransactionSender, getTransactionInfo, getTransactionBonus, getTransactionOthers } from '../../constant/transactionMockData';
 
 export default function TransactionDetails() {
   const { id } = useParams();
+  const [currentPage] = useState(1);
   
   // Scroll to top when page changes
   useEffect(() => {
