@@ -3,6 +3,11 @@ import { Users, Store, UserCheck, DollarSign, TrendingUp, Activity } from 'lucid
 import { StatCard, Card } from '../../components/ui';
 
 export default function SystemAdminDashboard() {
+  // Scroll to top when page changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
+  
   const stats = [
     {
       label: 'Total Merchants',

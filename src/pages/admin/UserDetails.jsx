@@ -8,6 +8,11 @@ export default function UserDetails() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Scroll to top when page changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
+
   // Determine base path from current location
   const basePath = window.location.pathname.includes('system-admin') ? '/system-admin' : '/t3-admin';
 

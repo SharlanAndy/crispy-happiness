@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Eye, Settings, Trash2 } from 'lucide-react';
 import { StatCard, InfoSection, Card, DataTable, SearchBar, PageHeader, Pagination, ConfirmDialog } from '../../components/ui';
@@ -8,6 +8,11 @@ import { STATS, USER_INFO, SPONSOR_INFO, WALLET_ADDRESS_INFO, BONUS_INFO, ALL_NE
 const ITEMS_PER_PAGE = 10;
 const NETWORK_SEARCH_KEYS = ['id', 'volume', 'bonus', 'sponsorL1', 'sponsorL2', 'join', 'status', 'referrer'];
 const LEVELS = ['level1', 'level2'];
+
+  // Scroll to top when page changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
 
 const COLUMNS_LEVEL1 = [
   { key: 'id', label: 'Agent ID' },
@@ -37,6 +42,11 @@ export default function AgentDetails() {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, item: null });
+
+  // Scroll to top when page changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
 
   const handleSearchChange = (value) => {
     setSearchTerm(value);

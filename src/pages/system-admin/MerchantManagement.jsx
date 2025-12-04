@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, Settings, Trash2, Plus } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, ConfirmDialog, AddMerchantModal } from '../../components/ui';
@@ -21,6 +21,11 @@ export default function MerchantManagement() {
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, item: null });
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTier, setActiveTier] = useState('T1');
+
+  // Scroll to top when page changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
 
   const isSystemAdmin = location.pathname.includes('system-admin');
 

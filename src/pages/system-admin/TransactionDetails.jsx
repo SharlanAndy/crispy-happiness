@@ -4,6 +4,11 @@ import { getTransactionInfoItems, getTransactionReceiver, getTransactionSender, 
 
 export default function TransactionDetails() {
   const { id } = useParams();
+  
+  // Scroll to top when page changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
 
   const sections = [
     { title: 'Transaction Information', items: getTransactionInfoItems(id) },

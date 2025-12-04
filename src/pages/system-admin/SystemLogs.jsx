@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DataTable, SearchBar, PageHeader } from '../../components/ui';
 
 export default function SystemLogs() {
@@ -6,6 +6,11 @@ export default function SystemLogs() {
   const [currentPage, setCurrentPage] = useState(1);
   const [levelFilter, setLevelFilter] = useState('all');
   const [timeFilter, setTimeFilter] = useState('24h');
+
+  // Scroll to top when page changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
 
   const allLogs = [
     { id: '1', level: 'INFO', message: 'User login successful', ip: '192.168.1.1', dateTime: '01-11-2025 13:00', status: '200' },

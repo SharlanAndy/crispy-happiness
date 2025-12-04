@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, Settings, Trash2 } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, ConfirmDialog } from '../../components/ui';
@@ -12,6 +12,11 @@ export default function UserManagement() {
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, item: null });
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Scroll to top when page changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
 
   const allUsers = [
     { id: 'U1234567890', spend: '10,000.00 U', bonus: '10.00 U', join: '01-11-2025 13:00', status: 'Active' },
