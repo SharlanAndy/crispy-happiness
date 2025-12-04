@@ -1,117 +1,145 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Eye } from 'lucide-react';
-import { StatCard, InfoSection, Card, DataTable, SearchBar, Button, Tabs } from '../../components/ui';
+import { Eye, Settings, Trash2 } from 'lucide-react';
+import { StatCard, InfoSection, Card, DataTable, SearchBar, PageHeader, Pagination, ConfirmDialog } from '../../components/ui';
+import { filterAndPaginate } from '../../lib/pagination';
+import { STATS, USER_INFO, SPONSOR_INFO, WALLET_ADDRESS_INFO, BONUS_INFO, ALL_NETWORK_DATA } from '../../constant/agentMockData';
+
+const ITEMS_PER_PAGE = 10;
+const NETWORK_SEARCH_KEYS = ['id', 'volume', 'bonus', 'sponsorL1', 'sponsorL2', 'join', 'status', 'referrer'];
+const LEVELS = ['level1', 'level2'];
+
+const COLUMNS_LEVEL1 = [
+  { key: 'id', label: 'Agent ID' },
+  { key: 'volume', label: 'Total Volume' },
+  { key: 'bonus', label: 'Bonus Contributed', render: (val) => <span className="text-green-600 font-medium">{val}</span> },
+  { key: 'sponsorL1', label: 'Total Sponsor L1' },
+  { key: 'sponsorL2', label: 'Total Sponsor L2' },
+  { key: 'join', label: 'Join Date' },
+  { key: 'status', label: 'Status' },
+];
+
+const COLUMNS_LEVEL2 = [
+  { key: 'id', label: 'Agent ID' },
+  { key: 'referrer', label: 'Referrer' },
+  { key: 'volume', label: 'Total Volume' },
+  { key: 'bonus', label: 'Bonus Contributed', render: (val) => <span className="text-green-600 font-medium">{val}</span> },
+  { key: 'sponsorL1', label: 'Total Sponsor L1' },
+  { key: 'sponsorL2', label: 'Total Sponsor L2' },
+  { key: 'join', label: 'Join Date' },
+  { key: 'status', label: 'Status' },
+];
 
 export default function AgentDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [activeLevel, setActiveLevel] = useState('level1');
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, item: null });
 
-  const stats = [
-    { label: 'Total Referral', value: '23', lastUpdate: '17-11-2025' },
-    { label: 'Total Contributed Volume', value: '10,000.00 USDT', lastUpdate: '17-11-2025' },
-    { label: 'Total Bonus Received', value: '100.00 USDT', lastUpdate: '17-11-2025' },
-  ];
+  const handleSearchChange = (value) => {
+    setSearchTerm(value);
+    setCurrentPage(1);
+  };
 
-  const userInfo = [
-    { label: "User's ID", value: 'A00002' },
-    { label: 'Wallet Address', value: <span className="font-mono text-xs">0xF3A1B2C3D4E5F67890123456789ABCDEF012345</span> },
-    { label: 'Status', value: 'Active' },
-    { label: 'Sponsor By', value: 'A00001' },
-    { label: 'Join Date', value: '01-11-2025 13:00' },
-  ];
+  const handleLevelChange = (level) => {
+    setActiveLevel(level);
+    setCurrentPage(1);
+  };
 
-  const bonusInfo = [
-    { label: 'Current Unclaim Bonus', value: '100 U' },
-    { label: 'Total Claimed Bonus', value: '1000 U' },
-    { label: 'Total Bonus Received', value: '1100 U' },
-  ];
+  // Filter data by level first, then apply search and pagination
+  const filteredByLevel = useMemo(
+    () => ALL_NETWORK_DATA.filter(item => item.level === activeLevel),
+    [activeLevel]
+  );
 
-  const allNetworkData = [
-    { id: 'U000001', volume: '35,000.00 U', bonus: '+ 352.00 U', sponsor: '100', join: '01-11-2025 13:00', status: 'Active' },
-    { id: 'U000002', volume: '42,500.00 U', bonus: '+ 480.00 U', sponsor: '120', join: '05-12-2025 14:30', status: 'Active' },
-    { id: 'U000003', volume: '29,750.00 U', bonus: '+ 310.00 U', sponsor: '90', join: '15-10-2025 09:15', status: 'Active' },
-  ];
+  const { data: paginatedData, totalPages } = useMemo(
+    () => filterAndPaginate(filteredByLevel, searchTerm, NETWORK_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
+    [filteredByLevel, searchTerm, currentPage]
+  );
 
-  // Filter network data based on search term
-  const networkData = useMemo(() => {
-    if (!searchTerm || searchTerm.trim() === '') {
-      return allNetworkData;
-    }
-    
-    const searchLower = searchTerm.toLowerCase().trim();
-    return allNetworkData.filter(item => {
-      return (
-        item.id.toLowerCase().includes(searchLower) ||
-        item.status.toLowerCase().includes(searchLower) ||
-        item.volume.toLowerCase().includes(searchLower) ||
-        item.bonus.toLowerCase().includes(searchLower) ||
-        item.sponsor.toLowerCase().includes(searchLower) ||
-        item.join.toLowerCase().includes(searchLower)
-      );
-    });
-  }, [searchTerm]);
+  // Select columns based on active level
+  const columns = activeLevel === 'level1' ? COLUMNS_LEVEL1 : COLUMNS_LEVEL2;
 
-  const columns = [
-    { key: 'id', label: 'U. ID' },
-    { key: 'volume', label: 'Total Volume' },
-    { key: 'bonus', label: 'Bonus Contributed', render: (val) => <span className="text-green-600 font-medium">{val}</span> },
-    { key: 'sponsor', label: 'Total Sponsor' },
-    { key: 'join', label: 'Join Date' },
-    { key: 'status', label: 'Status' },
-  ];
-
-  const actions = [
-    {
-      icon: <Eye size={16} />,
-      onClick: (row) => console.log('View', row.id),
-      tooltip: 'View',
-    },
-  ];
+  const actions = [{
+    icon: <Eye size={16} />,
+    onClick: (row) => navigate(`/system-admin/agents/${row.id}`),
+    tooltip: 'View Details',
+  }, {
+    icon: <Settings size={16} />,
+    onClick: (row) => navigate(`/system-admin/agents/${row.id}/settings`),
+    tooltip: 'Settings',
+  }, {
+    icon: <Trash2 size={16} />,
+    onClick: (row) => setDeleteConfirm({ isOpen: true, item: row }),
+    variant: 'danger',
+    tooltip: 'Delete',
+  }];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" icon={<ArrowLeft size={20} />} onClick={() => navigate(-1)} />
-        <div>
-          <h1 className="text-2xl font-bold">Agent Details</h1>
-          <p className="text-muted-foreground">Overview the Details of Agent Information</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {stats.map((stat, idx) => (
-          <StatCard key={idx} {...stat} />
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <InfoSection title="User's Information" items={userInfo} columns={1} />
-        <InfoSection title="Bonus" items={bonusInfo} columns={1} />
-      </div>
-
-      <Card title="Network List">
-        <div className="mb-4 flex gap-4">
-          <Tabs
-            tabs={[
-              { id: 'level1', label: 'Level 1' },
-              { id: 'level2', label: 'Level 2' },
-            ]}
-            activeTab={activeLevel}
-            onTabChange={setActiveLevel}
-            variant="pills"
-          />
-          <SearchBar placeholder="Search..." value={searchTerm} onChange={setSearchTerm} className="max-w-sm" />
-        </div>
-        <DataTable 
-          columns={columns} 
-          data={networkData} 
-          actions={actions}
-          emptyMessage={searchTerm ? `No network members found matching "${searchTerm}"` : 'No network members available'}
+    <>
+      <div className="space-y-6">
+        <PageHeader
+          title="Agent Details"
+          description="Overview the Details of Agent Information"
         />
-      </Card>
-    </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {STATS.map((stat, idx) => (
+            <StatCard key={idx} {...stat} />
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <InfoSection title="Agent's Information" items={USER_INFO} columns={1} />
+          <div className="grid grid-rows-1 gap-6">
+            <InfoSection title="Wallet Address" items={WALLET_ADDRESS_INFO} columns={1} />
+            <InfoSection title="Sponsor Information" items={SPONSOR_INFO} columns={1} />
+            <InfoSection title="Bonus" items={BONUS_INFO} columns={1} />
+          </div>
+        </div>
+
+        <Card title="Network List">
+          <div className="flex flex-col gap-6">
+            <div className="flex gap-2 bg-[#ECECF0] rounded-full px-2 py-1.5">
+              {LEVELS.map((level) => (
+                <button
+                  key={level}
+                  onClick={() => handleLevelChange(level)}
+                  className={`py-1.5 px-4 text-lg flex-1 rounded-full transition-colors ${
+                    activeLevel === level ? 'bg-white text-black' : 'hover:bg-white/50'
+                  }`}
+                >
+                  Level {level === 'level1' ? '1' : '2'}
+                </button>
+              ))}
+            </div>
+            <SearchBar placeholder="Search..." value={searchTerm} onChange={handleSearchChange} className="max-w-sm" />
+            
+            <DataTable 
+              columns={columns} 
+              data={paginatedData} 
+              actions={actions}
+              emptyMessage={searchTerm ? `No network members found matching "${searchTerm}"` : 'No network members available'}
+            />
+            
+            {totalPages > 1 && (
+              <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+            )}
+          </div>
+        </Card>
+      </div>
+
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, item: null })}
+        onConfirm={() => handleDelete(deleteConfirm.item)}
+        title="Delete Agent"
+        message={`Are you sure you want to delete agent ${deleteConfirm.item?.id}? This action cannot be undone.`}
+        confirmText="Delete"
+        variant="danger"
+      />
+    </>
   );
 }

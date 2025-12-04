@@ -31,7 +31,7 @@ export default function StatusBadge({ status, variant, small = true }) {
     success: 'bg-[#DCFCE7] text-[#166534]',
     warning: 'bg-[#FDF9C9] text-[#7D4F1F]',
     danger: 'bg-[#F9E3E3] text-[#8B2822]',
-    info: 'bg-blue-100 text-blue-700',
+    info: 'bg-gray-100 text-gray-700',
   };
 
   const sizeClass = small ? 'text-xs px-3 py-1.5 rounded-full' : 'text-md px-3 py-2 rounded-md';

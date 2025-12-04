@@ -15,11 +15,11 @@ export default function AgentManagement() {
   const [currentPage, setCurrentPage] = useState(1);
 
   const allAgents = [
-    { id: 'T1234567890', bonus: '10,000 U', l1: '10', l2: '200', join: '01-11-2025 13:00', status: 'Active' },
-    { id: 'T1234567891', bonus: '15,000 U', l1: '15', l2: '300', join: '01-12-2025 14:00', status: 'Active' },
-    { id: 'T1234567892', bonus: '8,000 U', l1: '8', l2: '150', join: '01-01-2026 09:00', status: 'Active' },
-    { id: 'T1234567893', bonus: '20,000 U', l1: '5', l2: '400', join: '01-03-2026 10:00', status: 'Active' },
-    { id: 'T1234567894', bonus: '12,500 U', l1: '12', l2: '250', join: '01-04-2026 11:00', status: 'Active' },
+    { id: 'A000001', bonus: '10,000 U', l1: '10', l2: '200', join: '01-11-2025 13:00', status: 'Active' },
+    { id: 'A000002', bonus: '15,000 U', l1: '15', l2: '300', join: '01-12-2025 14:00', status: 'Active' },
+    { id: 'A000003', bonus: '8,000 U', l1: '8', l2: '150', join: '01-01-2026 09:00', status: 'Active' },
+    { id: 'A000004', bonus: '20,000 U', l1: '5', l2: '400', join: '01-03-2026 10:00', status: 'Active' },
+    { id: 'A000005', bonus: '12,500 U', l1: '12', l2: '250', join: '01-04-2026 11:00', status: 'Active' },
   ];
 
   // Apply search and pagination
@@ -59,24 +59,20 @@ export default function AgentManagement() {
     setCurrentPage(1);
   };
 
-  const actions = [
-    {
-      icon: <Eye size={16} />,
-      onClick: (row) => navigate(`/system-admin/agents/${row.id}`),
-      tooltip: 'View Details',
-    },
-    {
-      icon: <Settings size={16} />,
-      onClick: (row) => navigate(`/system-admin/agents/${row.id}/settings`),
-      tooltip: 'Settings',
-    },
-    {
-      icon: <Trash2 size={16} />,
-      onClick: (row) => setDeleteConfirm({ isOpen: true, item: row }),
-      variant: 'danger',
-      tooltip: 'Delete',
-    },
-  ];
+  const actions = [{
+    icon: <Eye size={16} />,
+    onClick: (row) => navigate(`/system-admin/agents/${row.id}`),
+    tooltip: 'View Details',
+  }, {
+    icon: <Settings size={16} />,
+    onClick: (row) => navigate(`/system-admin/agents/${row.id}/settings`),
+    tooltip: 'Settings',
+  }, {
+    icon: <Trash2 size={16} />,
+    onClick: (row) => setDeleteConfirm({ isOpen: true, item: row }),
+    variant: 'danger',
+    tooltip: 'Delete',
+  }];
 
   return (
     <>

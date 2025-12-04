@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import { Lock, Mail, Wallet, User, Shield, Building2, Book, Cog, CircleDollarSign } from 'lucide-react';
+import { Lock, Mail, Wallet, User, Shield, Building2, Book, Cog, CircleDollarSign, Gift } from 'lucide-react';
 import { Card, FormField, Button, PageHeader } from '../../components/ui';
 import FormLabel from '../../components/form/FormLabel';
 import TextInput from '../../components/form/TextInput';
 import TextInputWithSuffix from '../../components/form/TextInputWithSuffix';
 import SelectInput from '../../components/form/SelectInput';
 import PasswordInput from '../../components/form/PasswordInput';
+import TextInputWithDropdown from '../../components/form/TextInputWithDropdown';
 import countriesAndStates from '../../constant/countriesAndStates.json';
 import {
   MERCHANT_TYPES,
@@ -100,6 +101,8 @@ export default function UnifiedSettings() {
         return [
           { id: 'profile', label: 'Profile Information', icon: User },
           { id: 'wallet', label: 'Wallet Address', icon: Wallet },
+          { id: 'sponsor', label: 'Sponsor Information', icon: Cog },
+          { id: 'bonus', label: 'Initial Bonus', icon: Gift },
           { id: 'permissions', label: 'Permissions & Access', icon: Shield },
           { id: 'status', label: 'Account Status', icon: Lock },
         ];
@@ -129,30 +132,8 @@ export default function UnifiedSettings() {
 
   const tabs = getTabs();
 
-  // Determine the back navigation path
-  const getBackPath = () => {
-    if (isAdminView) {
-      // Admin viewing another user's settings - go back to the list page
-      if (isSystemAdmin) {
-        if (entityType === 'agent') return '/system-admin/agents';
-        if (entityType === 'merchant') return '/system-admin/merchants';
-        if (entityType === 'user') return '/system-admin/users';
-      } else if (isT3Admin) {
-        if (entityType === 'merchant') return '/t3-admin/merchants';
-        if (entityType === 'user') return '/t3-admin/users';
-        return '/t3-admin'; // fallback
-      }
-      return '/system-admin'; // fallback
-    } else {
-      // User viewing their own settings - go back to their dashboard
-      if (isAgent) return '/agent';
-      if (isMerchant) return '/merchant';
-      return '/'; // fallback
-    }
-  };
-
   const handleCancel = () => {
-    navigate(getBackPath());
+    navigate(-1); // Go back to previous page
   };
 
   const getEntityDisplayName = () => {
@@ -231,6 +212,21 @@ export default function UnifiedSettings() {
       );
     }
 
+    if (field.type === 'dropdown') {
+      return (
+        <FormLabel key={field.name} label={field.label}>
+          <TextInputWithDropdown
+            placeholder={field.placeholder}
+            value={field.value}
+            onChange={field.onChange}
+            dropdownValue={field.dropdownValue}
+            onDropdownChange={field.onDropdownChange}
+            dropdownOptions={field.dropdownOptions}
+          />
+        </FormLabel>
+      );
+    }
+
     // Default: text input
     return (
       <FormLabel key={field.name} label={field.label}>
@@ -287,10 +283,12 @@ export default function UnifiedSettings() {
     },
     sponsor: {
       title: 'Sponsor Settings',
-      fields: [
-        createField('text', 'Sponsor By', 'sponsorBy', { placeholder: 'Insert referral ID here' }),
-        createField('text', 'Fees', 'fees', { placeholder: 'eg:1.2' })
-      ]
+      fields: entityType === 'agent' 
+        ? [createField('text', 'Sponsor By', 'sponsorBy', { placeholder: 'Insert referral ID here' })]
+        : [
+            createField('text', 'Sponsor By', 'sponsorBy', { placeholder: 'Insert referral ID here' }),
+            createField('text', 'Fees', 'fees', { placeholder: 'eg:1.2' })
+          ]
     },
     fees: {
       title: 'Fees Settings',
@@ -302,6 +300,17 @@ export default function UnifiedSettings() {
     currency: {
       title: 'Currency Settings',
       fields: [createField('select', 'Currencies', 'currencies', { placeholder: 'Select Currencies', options: 'CURRENCIES' })]
+    },
+    bonus: {
+      title: 'Initial Bonus Settings',
+      fields: [
+        createField('dropdown', 'Initial Bonus Amount', 'initialBonus', { 
+          placeholder: 'eg: 100',
+          dropdownValue: formData.bonusCurrency || 'USDT',
+          onDropdownChange: (e) => handleInputChange('bonusCurrency', e.target.value),
+          dropdownOptions: ['USDT', 'USDC', 'ETH']
+        })
+      ]
     },
     profile: {
       title: 'Profile Information',
@@ -353,6 +362,7 @@ export default function UnifiedSettings() {
           {activeTab === 'sponsor' && renderSection('sponsor')}
           {activeTab === 'fees' && renderSection('fees')}
           {activeTab === 'currency' && renderSection('currency')}
+          {activeTab === 'bonus' && renderSection('bonus')}
           {activeTab === 'profile' && renderSection('profile')}
 
           {activeTab === 'permissions' && (

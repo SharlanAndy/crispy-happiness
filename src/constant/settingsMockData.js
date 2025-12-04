@@ -74,6 +74,9 @@ export const INITIAL_FORM_DATA = {
   processingFees: '',
   // Currency
   currencies: '',
+  // Bonus
+  initialBonus: '',
+  bonusCurrency: 'USDT',
   // Permissions
   permissions: {
     create_transactions: true,

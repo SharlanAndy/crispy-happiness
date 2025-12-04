@@ -83,7 +83,16 @@ export default function AddAgentModal({ isOpen, onClose, onSubmit }) {
             <FormSection title="Agent's Information">
               {renderField(TextInput, 'Email Address', 'email', { placeholder: 'agent@example.com', type: 'email' })}
               {renderField(PasswordInput, 'Password', 'password', { placeholder: 'Insert password here' })}
-              {renderField(TextInput, 'Wallet Address', 'walletAddress', { placeholder: '0x...', className: 'font-mono text-sm' })}
+            </FormSection>
+
+            {/* Wallet Setup */}
+            <FormSection title="Wallet Setup">
+              {renderField(TextInput, 'Wallet Address', 'walletAddress', { placeholder: 'Insert wallet address here' })}
+            </FormSection>
+
+            {/* Sponsor Setup */}
+            <FormSection title="Sponsor Setup">
+              {renderField(TextInput, 'Sponsor By', 'sponsorBy', { placeholder: 'Insert referral ID here' })}
             </FormSection>
 
             {/* Initial Bonus Settings */}
