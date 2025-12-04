@@ -14,6 +14,7 @@ import SystemAdminDashboard from '../pages/system-admin/Dashboard';
 import MerchantManagement from '../pages/system-admin/MerchantManagement';
 import AgentManagement from '../pages/system-admin/AgentManagement';
 import UserManagement from '../pages/system-admin/UserManagement';
+import TransactionManagement from '../pages/system-admin/TransactionManagement';
 import FeesManagement from '../pages/system-admin/FeesManagement';
 import SystemLogs from '../pages/system-admin/SystemLogs';
 import BonusManagement from '../pages/system-admin/BonusManagement';
@@ -75,6 +76,7 @@ export default function AppRoutes() {
           <Route path="bonus/:id" element={<BonusClaimDetails />} />
           <Route path="fees" element={<FeesManagement />} />
           <Route path="logs" element={<SystemLogs />} />
+          <Route path="transactions" element={<TransactionManagement />} />
           <Route path="transactions/:id" element={<TransactionDetails />} />
         </Route>
 

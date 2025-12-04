@@ -28,7 +28,9 @@ export default function UnifiedSettings() {
       location.pathname.includes('/users/') ? 'user' : null;
   
   // Set initial tab based on entity type
-  const [activeTab, setActiveTab] = useState(entityType === 'agent' ? 'profile' : 'info');
+  const [activeTab, setActiveTab] = useState(
+    (entityType === 'agent' || entityType === 'user') ? 'profile' : 'info'
+  );
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
 
   // Populate form with user data from location state (when navigating from DataTable)
@@ -106,8 +108,17 @@ export default function UnifiedSettings() {
           { id: 'permissions', label: 'Permissions & Access', icon: Shield },
           { id: 'status', label: 'Account Status', icon: Lock },
         ];
+      } else if (entityType === 'user') {
+        // User settings - only show profile, permissions, and status
+        return [
+          { id: 'profile', label: 'Profile Information', icon: User },
+          { id: 'wallet', label: 'Wallet Address', icon: Wallet },
+          { id: 'sponsor', label: 'Sponsor Information', icon: Cog },
+          { id: 'permissions', label: 'Permissions & Access', icon: Shield },
+          { id: 'status', label: 'Account Status', icon: Lock },
+        ];
       } else {
-        // Merchant/User settings - show all tabs
+        // Merchant settings - show all tabs
         return [
           { id: 'info', label: 'Business Information', icon: Book },
           { id: 'business', label: 'Business Address', icon: Building2 },
@@ -283,12 +294,12 @@ export default function UnifiedSettings() {
     },
     sponsor: {
       title: 'Sponsor Settings',
-      fields: entityType === 'agent' 
-        ? [createField('text', 'Sponsor By', 'sponsorBy', { placeholder: 'Insert referral ID here' })]
-        : [
-            createField('text', 'Sponsor By', 'sponsorBy', { placeholder: 'Insert referral ID here' }),
-            createField('text', 'Fees', 'fees', { placeholder: 'eg:1.2' })
-          ]
+      fields: entityType === 'merchant' 
+        ? [
+          createField('text', 'Sponsor By', 'sponsorBy', { placeholder: 'Insert referral ID here' }),
+          createField('text', 'Fees', 'fees', { placeholder: 'eg:1.2' })
+        ]
+        : [createField('text', 'Sponsor By', 'sponsorBy', { placeholder: 'Insert referral ID here' })]
     },
     fees: {
       title: 'Fees Settings',
@@ -314,7 +325,9 @@ export default function UnifiedSettings() {
     },
     profile: {
       title: 'Profile Information',
-      fields: [
+        fields: entityType === 'user' ? [
+          createField('password', 'Password', 'password', { placeholder: 'Insert password here' })
+        ] : [
         createField('email', 'Email', 'email', { placeholder: 'Insert email here' }),
         createField('password', 'Password', 'password', { placeholder: 'Insert password here' })
       ]

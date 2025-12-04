@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, Settings, Trash2 } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, ConfirmDialog } from '../../components/ui';
+import { filterAndPaginate } from '../../lib/pagination';
+
+const ITEMS_PER_PAGE = 10;
+const USER_SEARCH_KEYS = ['id', 'status', 'spend', 'bonus', 'join'];
 
 export default function UserManagement() {
   const navigate = useNavigate();
@@ -17,13 +21,11 @@ export default function UserManagement() {
     { id: 'U1234567894', spend: '7,500.00 U', bonus: '7.50 U', join: '05-11-2025 17:00', status: 'Active' },
   ];
 
-  // Filter users based on search term
-  const users = allUsers.filter(u => {
-    if (searchTerm === '') return true;
-    const searchLower = searchTerm.toLowerCase();
-    return u.id.toLowerCase().includes(searchLower) ||
-      u.status.toLowerCase().includes(searchLower);
-  });
+  // Apply search and pagination
+  const { data: users, totalPages } = useMemo(
+    () => filterAndPaginate(allUsers, searchTerm, USER_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
+    [searchTerm, currentPage]
+  );
 
   const stats = [
     { label: 'Total Active User', value: '23', lastUpdate: '17-11-2025' },
@@ -64,41 +66,44 @@ export default function UserManagement() {
   ];
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="User Management"
-        description="Overview the Details of User Information"
-      />
+    <>
+      <div className="space-y-6">
+        <PageHeader
+          title="User Management"
+          description="Overview the Details of User Information"
+        />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {stats.map((stat, idx) => (
-          <StatCard key={idx} {...stat} />
-        ))}
-      </div>
-
-      <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-        <div className="p-6 border-b">
-          <h2 className="text-lg font-semibold mb-4">User List</h2>
-          <SearchBar
-            placeholder="Search Agent..."
-            value={searchTerm}
-            onChange={setSearchTerm}
-            className="max-w-sm"
-          />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {stats.map((stat, idx) => (
+            <StatCard key={idx} {...stat} />
+          ))}
         </div>
 
-        <DataTable
-          columns={columns}
-          data={users}
-          actions={actions}
-          pagination={{
-            currentPage,
-            totalPages: 3,
-            onPageChange: setCurrentPage,
-          }}
-        />
-      </div>
+        <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+          <div className="p-6">
+            <div className="flex flex-col gap-6">
+              <h2 className="text-lg font-semibold ">User List</h2>
+              <SearchBar
+                placeholder="Search User..."
+                value={searchTerm}
+                onChange={setSearchTerm}
+                className="max-w-sm"
+              />
 
+              <DataTable
+                columns={columns}
+                data={users}
+                actions={actions}
+                pagination={{
+                  currentPage,
+                  totalPages,
+                  onPageChange: setCurrentPage,
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
       <ConfirmDialog
         isOpen={deleteConfirm.isOpen}
         onClose={() => setDeleteConfirm({ isOpen: false, item: null })}
@@ -108,6 +113,6 @@ export default function UserManagement() {
         confirmText="Delete"
         variant="danger"
       />
-    </div>
+    </>
   );
 }

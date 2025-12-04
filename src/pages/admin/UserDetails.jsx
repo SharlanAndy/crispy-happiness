@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Eye } from 'lucide-react';
-import { InfoSection, Card, DataTable, SearchBar, Button } from '../../components/ui';
+import { ArrowLeft, Badge, Eye } from 'lucide-react';
+import { InfoSection, Card, DataTable, SearchBar, Button, PageHeader } from '../../components/ui';
 
 export default function UserDetails() {
   const { id } = useParams();
@@ -13,13 +13,23 @@ export default function UserDetails() {
 
   const userInfo = [
     { label: "User's ID", value: 'A00002' },
+    { label: "Password", value: '********' },
     { label: 'Join Date', value: '01-11-2025 13:00' },
-    { label: 'Sponsor By', value: 'A00001' },
+    { label: 'Status', value: 'Active', badge: true },
+  ];
+
+  const sponsorInfo = [
+    { label: 'Sponsor By', value: 'A00001' }
+  ];
+
+  const walletAddressInfo = [
+    { label: 'Wallet Address', value: '0xF3A1B2C3D4E5F67890123456789ABCDEF012345' }
+  ];
+
+  const fundsInfo = [
     { label: 'Current Unclaim Funds', value: '100 U' },
     { label: 'Total Claimed Funds', value: '1000 U' },
     { label: 'Total Incoming Funds', value: '1100 U' },
-    { label: 'Wallet Address', value: <span className="font-mono text-xs">0xF3A1B2C3D4E5F67890123456789ABCDEF012345</span> },
-    { label: 'Status', value: <span className="text-green-600 font-medium">Active</span> },
   ];
 
   const allTransactions = [
@@ -57,15 +67,19 @@ export default function UserDetails() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" icon={<ArrowLeft size={20} />} onClick={() => navigate(-1)} />
-        <div>
-          <h1 className="text-2xl font-bold">User Details</h1>
-          <p className="text-muted-foreground">Overview the Details of User Information</p>
+      <PageHeader
+        title="User Details"
+        description="Overview the Details of User Information"
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <InfoSection title="User's Information" items={userInfo} columns={1} />
+        <div className="grid grid-rows-1 gap-6">
+          <InfoSection title="Sponsor Information" items={sponsorInfo} columns={1} />
+          <InfoSection title="Wallet Address Information" items={walletAddressInfo} columns={1} />
+          <InfoSection title="Funds Information" items={fundsInfo} columns={1} />
         </div>
       </div>
-
-      <InfoSection title="User's Information Funds" items={userInfo} columns={2} />
 
       <Card title="Transaction History">
         <div className="mb-4">

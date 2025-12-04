@@ -105,7 +105,7 @@ export default function MerchantManagement() {
 
         {/* Merchant List Section */}
         <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-          <div className="p-6 border-b">
+          <div className="p-6">
             <div className="flex flex-col gap-6">
               <h2 className="text-lg font-semibold">Merchant List</h2>
               
