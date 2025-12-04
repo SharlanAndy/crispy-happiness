@@ -21,6 +21,8 @@ import BonusManagement from '../pages/system-admin/BonusManagement';
 import BonusClaimDetails from '../pages/system-admin/BonusClaimDetails';
 import AgentDetails from '../pages/system-admin/AgentDetails';
 import TransactionDetails from '../pages/system-admin/TransactionDetails';
+import CurrencyManagement from '../pages/system-admin/CurrencyManagement';
+import CurrencyForm from '../pages/admin/CurrencyForm';
 
 // T3 Admin Pages
 import T3AdminDashboard from '../pages/t3-admin/Dashboard';
@@ -78,6 +80,10 @@ export default function AppRoutes() {
           <Route path="logs" element={<SystemLogs />} />
           <Route path="transactions" element={<TransactionManagement />} />
           <Route path="transactions/:id" element={<TransactionDetails />} />
+          <Route path="currency" element={<CurrencyManagement />} />
+          <Route path="currency/add" element={<CurrencyForm />} />
+          <Route path="currency/:id/view" element={<CurrencyForm />} />
+          <Route path="currency/:id/edit" element={<CurrencyForm />} />
         </Route>
 
         <Route path="t3-admin">

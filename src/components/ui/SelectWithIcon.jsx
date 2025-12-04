@@ -19,7 +19,7 @@ export default function SelectWithIcon({ value, onChange, options, icon, classNa
         <select
           value={value}
           onChange={onChange}
-          className="flex items-center gap-2 bg-[#f3f3f5] rounded-md p-3 text-sm text-[#1C1B1F] placeholder:text-[#868e8d] min-w-[348px] pr-10  cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-black"
+          className="flex items-center gap-2 bg-[#f3f3f5] rounded-md p-3 text-sm text-[#1C1B1F] placeholder:text-[#868e8d] min-w-[348px] pr-10 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-black"
         >
           {options.map(option => (
             <option key={option.value} value={option.value}>

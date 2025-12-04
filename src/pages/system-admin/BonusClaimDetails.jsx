@@ -1,10 +1,15 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
-import { InfoSection, Button, PageHeader } from '../../components/ui';
+import { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import { InfoSection, PageHeader } from '../../components/ui';
 
 export default function BonusClaimDetails() {
   const { id } = useParams();
-  const navigate = useNavigate();
+  const [currentPage] = useState(1);
+
+  // Scroll to top when page changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
 
   const claimInfo = [
     { label: 'Transaction ID', value: id || 'tx-a1b2c3d4' },
