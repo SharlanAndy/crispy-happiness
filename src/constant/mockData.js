@@ -57,7 +57,7 @@ export const MERCHANT_BUSINESS_INFO = [
   { label: 'Company Name', value: 'Food Merchant Sdn Bhd' },
   { label: 'SSM Number', value: '202591231345' },
   { label: "Merchant's Type", value: 'F&B' },
-  { label: 'Status', value: <span className="px-3 py-1 rounded-md bg-green-100 text-green-700 text-sm font-medium">Active</span> },
+  { label: 'Status', value: 'Active', badge: true }
 ];
 
 export const MERCHANT_ADDRESS_INFO = [

@@ -54,5 +54,5 @@ export const ALL_MERCHANTS = [
   { id: 'Mer12367', name: 'Premium Car Service U', type: 'Automotive', state: 'Kuala Lumpur', join: '27-11-2025 09:00', status: 'Active', tier: 'T3' },
   { id: 'Mer12368', name: 'High-end Restaurant V', type: 'F&B', state: 'Selangor', join: '28-11-2025 15:45', status: 'Active', tier: 'T3' },
   { id: 'Mer12369', name: 'Jewelry Store W', type: 'Fashion', state: 'Kuala Lumpur', join: '29-11-2025 11:00', status: 'Active', tier: 'T3' },
-  { id: 'Mer12370', name: 'Luxury Resort X', type: 'Hospitality', state: 'Penang', join: '30-11-2025 14:30', status: 'Active', tier: 'T3' },
+  { id: 'Mer12370', name: 'Luxury Resort X', type: 'Hospitality', state: 'Penang', join: '30-11-2025 14:30', status: 'Inactive', tier: 'T3' },
 ];
