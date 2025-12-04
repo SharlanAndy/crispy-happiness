@@ -15,5 +15,6 @@ export { default as Button } from './Button';
 export { default as EmptyState } from './EmptyState';
 export { default as ConfirmDialog } from './ConfirmDialog';
 export { default as AddMerchantModal } from './AddMerchantModal';
+export { default as AddAgentModal } from './AddAgentModal';
 export { default as ProfitChart } from './ProfitChart';
 export { default as TabButtons } from './TabButtons';

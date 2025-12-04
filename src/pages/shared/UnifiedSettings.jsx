@@ -20,7 +20,14 @@ export default function UnifiedSettings() {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('info');
+  
+  // Determine entity type from path
+  const entityType = location.pathname.includes('/agents/') ? 'agent' :
+    location.pathname.includes('/merchants/') ? 'merchant' :
+      location.pathname.includes('/users/') ? 'user' : null;
+  
+  // Set initial tab based on entity type
+  const [activeTab, setActiveTab] = useState(entityType === 'agent' ? 'profile' : 'info');
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
 
   // Populate form with user data from location state (when navigating from DataTable)
@@ -84,26 +91,32 @@ export default function UnifiedSettings() {
   // Determine if admin is viewing another user's settings
   const isAdminView = (isSystemAdmin || isT3Admin) && id;
 
-  // Determine entity type from path
-  const entityType = location.pathname.includes('/agents/') ? 'agent' :
-    location.pathname.includes('/merchants/') ? 'merchant' :
-      location.pathname.includes('/users/') ? 'user' : null;
-
   // Role-based tab configuration
   const getTabs = () => {
     if (isAdminView) {
       // Admin viewing another user's settings
-      return [
-        { id: 'info', label: 'Business Information', icon: Book },
-        { id: 'business', label: 'Business Address', icon: Building2 },
-        { id: 'wallet', label: 'Wallet Address', icon: Wallet },
-        { id: 'sponsor', label: 'Sponsor Information', icon: Cog },
-        { id: 'fees', label: 'Fees Information', icon: Cog },
-        { id: 'currency', label: 'Currency Information', icon: CircleDollarSign },
-        { id: 'profile', label: 'Profile Information', icon: User },
-        { id: 'permissions', label: 'Permissions & Access', icon: Shield },
-        { id: 'status', label: 'Account Status', icon: Lock },
-      ];
+      if (entityType === 'agent') {
+        // Agent settings - only show profile, permissions, and status
+        return [
+          { id: 'profile', label: 'Profile Information', icon: User },
+          { id: 'wallet', label: 'Wallet Address', icon: Wallet },
+          { id: 'permissions', label: 'Permissions & Access', icon: Shield },
+          { id: 'status', label: 'Account Status', icon: Lock },
+        ];
+      } else {
+        // Merchant/User settings - show all tabs
+        return [
+          { id: 'info', label: 'Business Information', icon: Book },
+          { id: 'business', label: 'Business Address', icon: Building2 },
+          { id: 'wallet', label: 'Wallet Address', icon: Wallet },
+          { id: 'sponsor', label: 'Sponsor Information', icon: Cog },
+          { id: 'fees', label: 'Fees Information', icon: Cog },
+          { id: 'currency', label: 'Currency Information', icon: CircleDollarSign },
+          { id: 'profile', label: 'Profile Information', icon: User },
+          { id: 'permissions', label: 'Permissions & Access', icon: Shield },
+          { id: 'status', label: 'Account Status', icon: Lock },
+        ];
+      }
     } else {
       // User viewing their own settings
       return [
@@ -304,11 +317,19 @@ export default function UnifiedSettings() {
     const section = formSections[sectionKey];
     if (!section) return null;
 
+    // Get appropriate ID label based on entity type
+    const getIdLabel = () => {
+      if (entityType === 'agent') return 'Agent ID';
+      if (entityType === 'merchant') return 'Merchant ID';
+      if (entityType === 'user') return 'User ID';
+      return 'ID';
+    };
+
     return (
       <div className="space-y-6">
         <h2 className="text-lg font-semibold">{getEntityDisplayName()} {section.title}</h2>
         {sectionKey === 'profile' && (
-          <FormField label="User ID">
+          <FormField label={getIdLabel()}>
             <input type="text" value={id} readOnly className="w-full px-3 py-2 rounded-md bg-secondary/50 border-none" />
           </FormField>
         )}
