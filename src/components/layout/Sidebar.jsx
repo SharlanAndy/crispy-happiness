@@ -1,12 +1,15 @@
 import { useNavigate, useLocation } from 'react-router-dom';
+import Admin from '../icons/Admin';
 import Agent from '../icons/Agent';
 import Bonus from '../icons/Bonus';
+import Currency from '../icons/Currency';
 import Dashboard from '../icons/Dashboard';
 import Fees from '../icons/Fees';
+import History from '../icons/History';
 import Log from '../icons/Log';
+import Manage from '../icons/Manage';
 import Merchant from '../icons/Merchant';
 import Settings from '../icons/Settings';
-import Currency from '../icons/Currency';
 import Transaction from '../icons/Transaction';
 import User from '../icons/User';
 
@@ -14,7 +17,7 @@ const Sidebar = ({ sections }) => {
   const { pathname } = useLocation();
   const navigate = useNavigate();
 
-  const icons = { Agent, Bonus, Dashboard, Fees, Log, Merchant, Settings, Currency, Transaction, User };
+  const icons = { Admin, Agent, Bonus, Currency, Dashboard, Fees, History, Log, Manage, Merchant, Settings, Transaction, User};
 
   const NavItem = ({ path, icon, label }) => {
     const Icon = icons[icon];

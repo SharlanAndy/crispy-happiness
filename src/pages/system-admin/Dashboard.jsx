@@ -1,8 +1,9 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
 import { Users, Store, UserCheck, DollarSign, TrendingUp, Activity } from 'lucide-react';
-import { StatCard, Card } from '../../components/ui';
+import { Card } from '../../components/ui';
 
 export default function SystemAdminDashboard() {
+  const [currentPage] = useState(1);
   // Scroll to top when page changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });

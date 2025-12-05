@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, ArrowDownToLine } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader } from '../../components/ui';
 import { filterAndPaginate } from '../../lib/pagination';
@@ -32,8 +32,13 @@ const ALL_TRANSACTIONS = [
 
 export default function TransactionManagement() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Detect if accessed from T3 Admin or System Admin
+  const isT3Admin = location.pathname.startsWith('/t3-admin');
+  const basePath = isT3Admin ? '/t3-admin' : '/system-admin';
 
   // Scroll to top when page changes
   useEffect(() => {
@@ -81,11 +86,11 @@ export default function TransactionManagement() {
     document.body.removeChild(link);
   };
 
-  const actions = [{
+  const actions = useMemo(() => [{
     icon: <Eye size={16} />,
-    onClick: (row) => navigate(`/system-admin/transactions/${row.id}`),
+    onClick: (row) => navigate(`${basePath}/transactions/${row.id}`),
     tooltip: 'View Details',
-  }];
+  }], [navigate, basePath]);
 
   return (
     <div className="space-y-6">

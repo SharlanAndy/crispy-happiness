@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Badge, Eye } from 'lucide-react';
-import { InfoSection, Card, DataTable, SearchBar, Button, PageHeader } from '../../components/ui';
+import { Eye } from 'lucide-react';
+import { InfoSection, Card, DataTable, SearchBar, PageHeader } from '../../components/ui';
 
 export default function UserDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [currentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Scroll to top when page changes

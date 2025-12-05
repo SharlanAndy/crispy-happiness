@@ -27,7 +27,7 @@ export default function Modal({ isOpen, onClose, title, children, footer, size =
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className={`bg-background rounded-xl w-full ${sizeClasses[size]} max-h-[90vh] overflow-y-auto`}>
         {title && (
-          <div className="p-6 border-b flex items-center justify-between sticky top-0 bg-background z-10">
+          <div className="flex items-center justify-between py-4 px-6 sticky top-0 bg-background z-10">
             <h2 className="text-xl font-bold">{title}</h2>
             <button
               onClick={onClose}
@@ -38,10 +38,10 @@ export default function Modal({ isOpen, onClose, title, children, footer, size =
           </div>
         )}
 
-        <div className="p-6">{children}</div>
+        <div className="py-4 px-6">{children}</div>
 
         {footer && (
-          <div className="p-6 border-t flex justify-end gap-3 sticky bottom-0 bg-background">
+          <div className="py-4 px-6 flex justify-end gap-3 sticky bottom-0 bg-background">
             {footer}
           </div>
         )}

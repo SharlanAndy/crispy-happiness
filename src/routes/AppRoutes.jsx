@@ -88,14 +88,14 @@ export default function AppRoutes() {
 
         <Route path="t3-admin">
           <Route index element={<T3AdminDashboard />} />
-          <Route path="merchants" element={<MerchantManagement />} />
-          <Route path="merchants/:id" element={<MerchantDetails />} />
-          <Route path="merchants/:id/settings" element={<UnifiedSettings />} />
+          <Route path="merchant-details" element={<MerchantDetails />} />
           <Route path="users" element={<UserManagement />} />
           <Route path="users/:id" element={<UserDetails />} />
           <Route path="users/:id/settings" element={<UnifiedSettings />} />
           <Route path="withdrawals" element={<WithdrawalManagement />} />
           <Route path="withdrawals/:id" element={<WithdrawalDetails />} />
+          <Route path="transactions" element={<TransactionManagement />} />
+          <Route path="transactions/:id" element={<TransactionDetails />} />
           <Route path="accounts" element={<AccountManagement />} />
           <Route path="accounts/:id" element={<AccountDetails />} />
           <Route path="api-settings" element={<APISettings />} />

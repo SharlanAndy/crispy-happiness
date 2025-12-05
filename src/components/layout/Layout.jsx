@@ -1,4 +1,3 @@
-import React from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { authService } from '../../services/authService';
 import { LogOut, User, Wallet, LayoutDashboard, Users, FileText, Settings, CreditCard, Network } from 'lucide-react';

@@ -48,13 +48,13 @@ export default function AdminLayout() {
       title: 'Transaction', 
       items: [
         { path: '/t3-admin/transactions', icon: 'Transaction', label: 'Transaction' },
-        { path: '/t3-admin/withdrawals', icon: 'Fees', label: 'Withdraw Management' },
-        { path: '/t3-admin/withdraw-history', icon: 'Bonus', label: 'Withdraw History' }
+        { path: '/t3-admin/withdrawals', icon: 'Manage', label: 'Withdraw Management' },
+        { path: '/t3-admin/withdraw-history', icon: 'History', label: 'Withdraw History' }
       ]
     },
     { title: 'Setting', items: [
-      { path: '/t3-admin/accounts', icon: 'Settings', label: 'Admin Management' },
-      { path: '/t3-admin/merchant-details', icon: 'Settings', label: 'Merchant Details' },
+      { path: '/t3-admin/accounts', icon: 'Admin', label: 'Admin Management' },
+      { path: '/t3-admin/merchant-details', icon: 'Merchant', label: 'Merchant Details' },
       { path: '/t3-admin/api-settings', icon: 'Settings', label: 'API Setting & Log Setting' },
     ] }
   ];
