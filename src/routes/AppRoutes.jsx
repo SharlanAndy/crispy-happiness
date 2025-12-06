@@ -1,5 +1,4 @@
-import React from 'react';
-import { Routes, Route, Navigate, Link } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 
 // Auth
 import Login from '../pages/Login';
@@ -27,6 +26,7 @@ import CurrencyForm from '../pages/admin/CurrencyForm';
 // T3 Admin Pages
 import T3AdminDashboard from '../pages/t3-admin/Dashboard';
 import WithdrawalManagement from '../pages/t3-admin/WithdrawalManagement';
+import WithdrawalHistory from '../pages/t3-admin/WithdrawalHistory';
 
 // Admin Shared Pages
 import MerchantDetails from '../pages/admin/MerchantDetails';
@@ -94,6 +94,7 @@ export default function AppRoutes() {
           <Route path="users/:id/settings" element={<UnifiedSettings />} />
           <Route path="withdrawals" element={<WithdrawalManagement />} />
           <Route path="withdrawals/:id" element={<WithdrawalDetails />} />
+          <Route path="withdrawal-history" element={<WithdrawalHistory />} />
           <Route path="transactions" element={<TransactionManagement />} />
           <Route path="transactions/:id" element={<TransactionDetails />} />
           <Route path="accounts" element={<AccountManagement />} />

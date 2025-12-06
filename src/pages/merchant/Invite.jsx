@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { QrCode, Copy, Share2, Download } from 'lucide-react';
 import { Card, FormField, Button, PageHeader } from '../../components/ui';

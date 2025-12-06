@@ -1,6 +1,55 @@
-import React, { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Copy, RefreshCw, Save } from 'lucide-react';
-import { Card, FormField, Button, PageHeader } from '../../components/ui';
+import { Card, FormField, Button, PageHeader, DataTable } from '../../components/ui';
+import { filterAndPaginate } from '../../lib/pagination';
+
+const ITEMS_PER_PAGE = 10;
+const LOG_SEARCH_KEYS = ['endpoint', 'status', 'ip'];
+
+const EXAMPLE_JSON = {
+  status: 200,
+  data: {
+    transaction_id: "tx_123456",
+    amount: 100.00,
+    currency: "USDT",
+    status: "completed"
+  }
+};
+
+const ALL_LOGS = [
+  { date: '01-11-2025 13:00', endpoint: 'POST /api/v1/transactions', status: '200 OK', ip: '192.168.1.1' },
+  { date: '01-11-2025 13:05', endpoint: 'POST /api/v1/users', status: '201 Created', ip: '192.168.1.2' },
+  { date: '01-11-2025 13:10', endpoint: 'GET /api/v1/orders', status: '404 Not Found', ip: '192.168.1.3' },
+  { date: '01-11-2025 13:15', endpoint: 'GET /api/v1/transactions', status: '200 OK', ip: '192.168.1.1' },
+  { date: '01-11-2025 13:20', endpoint: 'PUT /api/v1/users/123', status: '200 OK', ip: '192.168.1.4' },
+  { date: '01-11-2025 13:25', endpoint: 'DELETE /api/v1/orders/456', status: '500 Error', ip: '192.168.1.5' },
+];
+
+const LOG_COLUMNS = [
+  { key: 'date', label: 'Date' },
+  { key: 'endpoint', label: 'Endpoint' },
+  { 
+    key: 'status', 
+    label: 'Status',
+    render: (value) => {
+      const isSuccess = value.startsWith('2');
+      const isClientError = value.startsWith('4');
+      const isServerError = value.startsWith('5');
+      
+      let colorClass = 'bg-gray-100 text-gray-700';
+      if (isSuccess) colorClass = 'bg-green-100 text-green-700';
+      else if (isClientError) colorClass = 'bg-yellow-100 text-yellow-700';
+      else if (isServerError) colorClass = 'bg-red-100 text-red-700';
+      
+      return (
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}>
+          {value}
+        </span>
+      );
+    }
+  },
+  { key: 'ip', label: 'IP Address' },
+];
 
 export default function APISettings() {
   const [keys, setKeys] = useState({
@@ -9,16 +58,24 @@ export default function APISettings() {
     merchantKey: 'XyZ123!@#456',
     callbackUrl: 'https://your-website.com/api/callback'
   });
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
+
+  // Paginate logs
+  const { data: logs, totalPages } = useMemo(
+    () => filterAndPaginate(ALL_LOGS, '', LOG_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
+    [currentPage]
+  );
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    // TODO: Show toast notification
     console.log('Copied to clipboard:', text);
   };
 
   const handleCreateNewKey = () => {
-    // TODO: Call API to generate new keys
-    console.log('Creating new API keys...');
     const newKeys = {
       ...keys,
       apiKey: 'prod_' + Math.random().toString(36).substr(2, 16),
@@ -29,15 +86,27 @@ export default function APISettings() {
   };
 
   const handleSave = () => {
-    // TODO: Call API to save callback URL
     console.log('Saving API settings...', keys);
   };
 
-  const logs = [
-    { date: '01-11-2025 13:00', endpoint: 'POST /api/v1/transactions', status: '200 OK', ip: '192.168.1.1' },
-    { date: '01-11-2025 13:05', endpoint: 'POST /api/v1/users', status: '201 Created', ip: '192.168.1.2' },
-    { date: '01-11-2025 13:10', endpoint: 'GET /api/v1/orders', status: '404 Not Found', ip: '192.168.1.3' },
-  ];
+  const KeyInput = ({ label, value, onCopy }) => (
+    <FormField label={label}>
+      <div className="flex gap-2">
+        <input 
+          type="text" 
+          value={value} 
+          readOnly 
+          className="flex-1 px-3 py-2 rounded-md bg-secondary/50 border-none text-sm" 
+        />
+        <button 
+          onClick={onCopy} 
+          className="p-2 hover:bg-accent rounded-md"
+        >
+          <Copy size={18} />
+        </button>
+      </div>
+    </FormField>
+  );
 
   return (
     <div className="space-y-6">
@@ -46,12 +115,11 @@ export default function APISettings() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card title="Key's Information">
           <div className="space-y-4">
-            <FormField label="API Key">
-              <div className="flex gap-2">
-                <input type="text" value={keys.apiKey} readOnly className="flex-1 px-3 py-2 rounded-md bg-secondary/50 border-none font-mono text-sm" />
-                <button onClick={() => copyToClipboard(keys.apiKey)} className="p-2 hover:bg-accent rounded-md"><Copy size={18} /></button>
-              </div>
-            </FormField>
+            <KeyInput 
+              label="API Key" 
+              value={keys.apiKey} 
+              onCopy={() => copyToClipboard(keys.apiKey)} 
+            />
 
             <FormField label="Backed URL">
               <input
@@ -63,41 +131,35 @@ export default function APISettings() {
             </FormField>
 
             <div className="grid grid-cols-2 gap-4">
-              <FormField label="Secret Key">
-                <div className="flex gap-2">
-                  <input type="text" value={keys.secretKey} readOnly className="flex-1 px-3 py-2 rounded-md bg-secondary/50 border-none font-mono text-sm" />
-                  <button onClick={() => copyToClipboard(keys.secretKey)} className="p-2 hover:bg-accent rounded-md"><Copy size={18} /></button>
-                </div>
-              </FormField>
-              <FormField label="Merchant Key">
-                <div className="flex gap-2">
-                  <input type="text" value={keys.merchantKey} readOnly className="flex-1 px-3 py-2 rounded-md bg-secondary/50 border-none font-mono text-sm" />
-                  <button onClick={() => copyToClipboard(keys.merchantKey)} className="p-2 hover:bg-accent rounded-md"><Copy size={18} /></button>
-                </div>
-              </FormField>
+              <KeyInput 
+                label="Secret Key" 
+                value={keys.secretKey} 
+                onCopy={() => copyToClipboard(keys.secretKey)} 
+              />
+              <KeyInput 
+                label="Merchant Key" 
+                value={keys.merchantKey} 
+                onCopy={() => copyToClipboard(keys.merchantKey)} 
+              />
             </div>
 
             <div className="flex gap-3 pt-4">
-              <Button onClick={handleCreateNewKey} variant="secondary" icon={<RefreshCw size={18} />} className="flex-1">Create New Key</Button>
-              <Button onClick={handleSave} icon={<Save size={18} />} className="flex-1">Save</Button>
+              <Button onClick={handleCreateNewKey} variant="secondary" icon={<RefreshCw size={18} />} className="flex-1">
+                Create New Key
+              </Button>
+              <Button onClick={handleSave} icon={<Save size={18} />} className="flex-1">
+                Save
+              </Button>
             </div>
           </div>
         </Card>
 
         <Card title="Example JSON Response">
           <pre className="bg-secondary/50 p-4 rounded-lg text-xs font-mono overflow-x-auto">
-            {`{
-  "status": 200,
-  "data": {
-    "transaction_id": "tx_123456",
-    "amount": 100.00,
-    "currency": "USDT",
-    "status": "completed"
-  }
-}`}
+            {JSON.stringify(EXAMPLE_JSON, null, 2)}
           </pre>
           <button
-            onClick={() => copyToClipboard(`{\n  "status": 200,\n  "data": {\n    "transaction_id": "tx_123456",\n    "amount": 100.00,\n    "currency": "USDT",\n    "status": "completed"\n  }\n}`)}
+            onClick={() => copyToClipboard(JSON.stringify(EXAMPLE_JSON, null, 2))}
             className="mt-4 text-sm text-primary hover:underline flex items-center gap-1"
           >
             <Copy size={14} /> Copy JSON
@@ -106,30 +168,15 @@ export default function APISettings() {
       </div>
 
       <Card title="API Logs">
-        <table className="w-full text-sm text-left">
-          <thead className="bg-secondary/50 text-muted-foreground font-medium">
-            <tr>
-              <th className="px-6 py-3">Date</th>
-              <th className="px-6 py-3">Endpoint</th>
-              <th className="px-6 py-3">Status</th>
-              <th className="px-6 py-3">IP Address</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {logs.map((log, i) => (
-              <tr key={i} className="hover:bg-accent/50">
-                <td className="px-6 py-4">{log.date}</td>
-                <td className="px-6 py-4 font-mono text-xs">{log.endpoint}</td>
-                <td className="px-6 py-4">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${log.status.startsWith('2') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                    {log.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4">{log.ip}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          columns={LOG_COLUMNS}
+          data={logs}
+          pagination={{
+            currentPage,
+            totalPages,
+            onPageChange: setCurrentPage,
+          }}
+        />
       </Card>
     </div>
   );

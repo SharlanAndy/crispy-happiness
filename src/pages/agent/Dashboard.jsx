@@ -1,4 +1,3 @@
-import React from 'react';
 import { Users, DollarSign, TrendingUp, Network } from 'lucide-react';
 import { Card } from '../../components/ui';
 

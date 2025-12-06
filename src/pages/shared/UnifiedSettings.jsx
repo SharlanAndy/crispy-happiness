@@ -109,7 +109,7 @@ export default function UnifiedSettings() {
         return [
           { id: 'profile', label: 'Profile Information', icon: User },
           { id: 'wallet', label: 'Wallet Address', icon: Wallet },
-          { id: 'sponsor', label: 'Sponsor Information', icon: Cog },
+          { id: 'referral', label: 'Referral Information', icon: Cog },
           { id: 'bonus', label: 'Initial Bonus', icon: Gift },
           { id: 'permissions', label: 'Permissions & Access', icon: Shield },
           { id: 'status', label: 'Account Status', icon: Lock },
@@ -119,7 +119,7 @@ export default function UnifiedSettings() {
         return [
           { id: 'profile', label: 'Profile Information', icon: User },
           { id: 'wallet', label: 'Wallet Address', icon: Wallet },
-          { id: 'sponsor', label: 'Sponsor Information', icon: Cog },
+          { id: 'referral', label: 'Referral Information', icon: Cog },
           { id: 'permissions', label: 'Permissions & Access', icon: Shield },
           { id: 'status', label: 'Account Status', icon: Lock },
         ];
@@ -129,7 +129,7 @@ export default function UnifiedSettings() {
           { id: 'info', label: 'Business Information', icon: Book },
           { id: 'business', label: 'Business Address', icon: Building2 },
           { id: 'wallet', label: 'Wallet Address', icon: Wallet },
-          { id: 'sponsor', label: 'Sponsor Information', icon: Cog },
+          { id: 'referral', label: 'Referral Information', icon: Cog },
           { id: 'fees', label: 'Fees Information', icon: Cog },
           { id: 'currency', label: 'Currency Information', icon: CircleDollarSign },
           { id: 'profile', label: 'Profile Information', icon: User },
@@ -298,14 +298,18 @@ export default function UnifiedSettings() {
       title: 'Wallet Settings',
       fields: [createField('text', 'Wallet Address', 'walletAddress', { placeholder: 'Insert wallet address here' })]
     },
-    sponsor: {
-      title: 'Sponsor Settings',
+    referral: {
+      title: 'Referral Settings',
       fields: entityType === 'merchant' 
         ? [
-          createField('text', 'Sponsor By', 'sponsorBy', { placeholder: 'Insert referral ID here' }),
-          createField('text', 'Fees', 'fees', { placeholder: 'eg:1.2' })
+          createField('text', 'Referral By', 'referralBy', { placeholder: 'Insert referral ID here' }),
+          createField('text', 'Referral Fees', 'referralFees', { placeholder: 'eg:1.2' }),
+          createField('text', 'Remarks', 'referralRemarks', { placeholder: 'Additional remarks' })
         ]
-        : [createField('text', 'Sponsor By', 'sponsorBy', { placeholder: 'Insert referral ID here' })]
+        : [
+          createField('text', 'Referral By', 'referralBy', { placeholder: 'Insert referral ID here' }),
+          createField('text', 'Remarks', 'referralRemarks', { placeholder: 'Additional remarks' })
+        ]
     },
     fees: {
       title: 'Fees Settings',
@@ -378,7 +382,7 @@ export default function UnifiedSettings() {
           {activeTab === 'info' && renderSection('info')}
           {activeTab === 'business' && renderSection('business')}
           {activeTab === 'wallet' && renderSection('wallet')}
-          {activeTab === 'sponsor' && renderSection('sponsor')}
+          {activeTab === 'referral' && renderSection('referral')}
           {activeTab === 'fees' && renderSection('fees')}
           {activeTab === 'currency' && renderSection('currency')}
           {activeTab === 'bonus' && renderSection('bonus')}

@@ -1,160 +1,150 @@
-import React, { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, Check, X } from 'lucide-react';
-import { StatCard, DataTable, SearchBar, PageHeader, Tabs, ConfirmDialog } from '../../components/ui';
+import { StatCard, DataTable, SearchBar, PageHeader, ConfirmDialog, VerificationModal } from '../../components/ui';
+import { filterAndPaginate } from '../../lib/pagination';
+
+const ITEMS_PER_PAGE = 10;
+const SEARCH_KEYS = ['id', 'merchant', 'wallet', 'ref'];
+
+const STATS = [
+  { label: 'Current Withdraw Application', value: '10', lastUpdate: '17-11-2025' },
+  { label: 'Total Withdraw Approve', value: '100', lastUpdate: '17-11-2025' },
+  { label: 'Total Withdraw Amount', value: '10,000.00 USDT', lastUpdate: '17-11-2025' },
+];
+
+const ALL_WITHDRAWALS = [
+  { id: 'AP123455551', merchant: 'mo12345', amount: '10,000.00 U', wallet: '0xF3A....12345', time: '01-11-2025 13:00', ref: 'Test123', status: 'Pending' },
+  { id: 'AP123455552', merchant: 'mo12346', amount: '15,500.75 U', wallet: '0xF3A....12346', time: '02-11-2025 14:00', ref: 'Test456', status: 'Pending' },
+  { id: 'AP123455553', merchant: 'mo12347', amount: '8,250.00 U', wallet: '0xF3A....12347', time: '03-11-2025 15:00', ref: 'Test789', status: 'Pending' },
+  { id: 'AP123455554', merchant: 'mo12348', amount: '5,000.00 U', wallet: '0xF3A....12348', time: '04-11-2025 10:00', ref: 'Test101', status: 'Pending' },
+  { id: 'AP123455555', merchant: 'mo12349', amount: '12,750.50 U', wallet: '0xF3A....12349', time: '05-11-2025 11:00', ref: 'Test202', status: 'Pending' },
+];
+
+const COLUMNS = [
+  { key: 'id', label: 'Application ID' },
+  { key: 'merchant', label: 'Merchant Order No.' },
+  { key: 'amount', label: 'Amount' },
+  { key: 'wallet', label: 'Wallet Address' },
+  { key: 'time', label: 'Application Time' },
+  { key: 'ref', label: 'Reference' },
+  { key: 'status', label: 'Status' },
+];
 
 export default function WithdrawalManagement() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('pending');
   const [searchTerm, setSearchTerm] = useState('');
-  const [actionConfirm, setActionConfirm] = useState({ isOpen: false, action: null, item: null });
+  const [approveModal, setApproveModal] = useState({ isOpen: false, item: null });
+  const [rejectConfirm, setRejectConfirm] = useState({ isOpen: false, item: null });
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const stats = [
-    { label: 'Current Withdraw Application', value: '10', lastUpdate: '17-11-2025' },
-    { label: 'Total Withdraw Approve', value: '100', lastUpdate: '17-11-2025' },
-    { label: 'Total Withdraw Amount', value: '10,000.00 USDT', lastUpdate: '17-11-2025' },
-  ];
+  // Scroll to top when page changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
 
-  const allPendingWithdrawals = [
-    { id: 'ap123455551', merchant: 'mo12345', amount: '10,000.00 U', wallet: '0xF3A....12345', time: '01-11-2025 13:00', ref: 'Test123', status: 'Pending' },
-    { id: 'ap123455552', merchant: 'mo12346', amount: '15,500.75 U', wallet: '0xF3A....12346', time: '02-11-2025 14:00', ref: 'Test456', status: 'Pending' },
-    { id: 'ap123455553', merchant: 'mo12347', amount: '8,250.00 U', wallet: '0xF3A....12347', time: '03-11-2025 15:00', ref: 'Test789', status: 'Pending' },
-  ];
+  const { data: withdrawals, totalPages } = useMemo(
+    () => filterAndPaginate(ALL_WITHDRAWALS, searchTerm, SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
+    [searchTerm, currentPage]
+  );
 
-  const allHistoryWithdrawals = [
-    { id: 'ap123455551', amount: '10,000.00 U', wallet: '0xF3A....12345', time: '01-11-2025 13:00', status: 'Approve' },
-    { id: 'ap123455552', amount: '5,500.00 U', wallet: '0xA1B....67890', time: '01-12-2025 09:30', status: 'Approve' },
-    { id: 'ap123455553', amount: '15,750.00 U', wallet: '0xE2C....23456', time: '01-13-2025 11:15', status: 'Reject' },
-  ];
-
-  // Filter based on search term
-  const pendingWithdrawals = allPendingWithdrawals.filter(w => {
-    if (searchTerm === '') return true;
-    const searchLower = searchTerm.toLowerCase();
-    return w.id.toLowerCase().includes(searchLower) ||
-      w.merchant?.toLowerCase().includes(searchLower) ||
-      w.wallet.toLowerCase().includes(searchLower) ||
-      w.ref?.toLowerCase().includes(searchLower);
-  });
-
-  const historyWithdrawals = allHistoryWithdrawals.filter(w => {
-    if (searchTerm === '') return true;
-    const searchLower = searchTerm.toLowerCase();
-    return w.id.toLowerCase().includes(searchLower) ||
-      w.wallet.toLowerCase().includes(searchLower) ||
-      w.status.toLowerCase().includes(searchLower);
-  });
-
-  const handleApprove = (item) => {
-    console.log('Approving withdrawal:', item.id);
-    // TODO: api.withdrawal.approve(item.id);
+  const handleSearchChange = (value) => {
+    setSearchTerm(value);
+    setCurrentPage(1);
   };
 
-  const handleReject = (item) => {
-    console.log('Rejecting withdrawal:', item.id);
-    // TODO: api.withdrawal.reject(item.id, { reason: 'Invalid wallet' });
+  const handleApproveWithVerification = (credentials) => {
+    console.log('Approving withdrawal:', approveModal.item?.id, 'with credentials:', credentials);
+    setApproveModal({ isOpen: false, item: null });
+    // TODO: api.withdrawal.approve(approveModal.item.id, credentials);
   };
 
-  const pendingColumns = [
-    { key: 'id', label: 'Application ID' },
-    { key: 'merchant', label: 'Merchant Order No.' },
-    { key: 'amount', label: 'Amount' },
-    { key: 'wallet', label: 'Wallet Address' },
-    { key: 'time', label: 'Application Time' },
-    { key: 'ref', label: 'Reference' },
-    { key: 'status', label: 'Status' },
-  ];
+  const handleReject = () => {
+    console.log('Rejecting withdrawal:', rejectConfirm.item?.id);
+    setRejectConfirm({ isOpen: false, item: null });
+    // TODO: api.withdrawal.reject(rejectConfirm.item.id, { reason: 'Invalid wallet' });
+  };
 
-  const historyColumns = [
-    { key: 'id', label: 'Transaction ID' },
-    { key: 'amount', label: 'Amount' },
-    { key: 'wallet', label: 'Wallet Address' },
-    { key: 'time', label: 'Approve Time' },
-    { key: 'status', label: 'Status' },
-  ];
-
-  const pendingActions = [
+  const actions = useMemo(() => [
     {
       icon: <Eye size={16} />,
-      onClick: (row) => navigate(`/t3-admin/withdrawals/${row.id}`),
+      onClick: (row) => navigate(`/t3-admin/withdrawals/${row.id}`, { 
+        state: { returnPath: '/t3-admin/withdrawals' } 
+      }),
       tooltip: 'View Details',
     },
     {
       icon: <Check size={16} />,
-      onClick: (row) => setActionConfirm({ isOpen: true, action: 'approve', item: row }),
+      onClick: (row) => setApproveModal({ isOpen: true, item: row }),
       tooltip: 'Approve',
       variant: 'success',
     },
     {
       icon: <X size={16} />,
-      onClick: (row) => setActionConfirm({ isOpen: true, action: 'reject', item: row }),
+      onClick: (row) => setRejectConfirm({ isOpen: true, item: row }),
       tooltip: 'Reject',
       variant: 'danger',
     },
-  ];
-
-  const historyActions = [
-    {
-      icon: <Eye size={16} />,
-      onClick: (row) => navigate(`/t3-admin/withdrawals/${row.id}`),
-      tooltip: 'View Details',
-    },
-  ];
+  ], [navigate]);
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Withdrawal Management"
-        description="Overview the Details of Withdraw Information"
-      />
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {stats.map((stat, idx) => (
-          <StatCard key={idx} {...stat} />
-        ))}
-      </div>
-
-      <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-        <Tabs
-          tabs={[
-            { id: 'pending', label: 'Withdrawal Applications List' },
-            { id: 'history', label: 'Withdrawal History' },
-          ]}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
+    <>
+      <div className="space-y-6">
+        <PageHeader
+          title="Withdrawal Management"
+          description="Overview the Details of Withdraw Information"
         />
 
-        <div className="p-6 border-b">
-          <SearchBar
-            placeholder="Search Agent..."
-            value={searchTerm}
-            onChange={setSearchTerm}
-            className="max-w-sm"
-          />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {STATS.map((stat, idx) => (
+            <StatCard key={idx} {...stat} />
+          ))}
         </div>
 
-        <DataTable
-          columns={activeTab === 'pending' ? pendingColumns : historyColumns}
-          data={activeTab === 'pending' ? pendingWithdrawals : historyWithdrawals}
-          actions={activeTab === 'pending' ? pendingActions : historyActions}
-        />
+        <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+          <div className="p-6">
+            <div className="flex flex-col gap-6">
+              <h2 className="text-lg font-semibold">Withdrawal Applications List</h2>
+              <SearchBar
+                placeholder="Search Application..."
+                value={searchTerm}
+                onChange={handleSearchChange}
+                className="max-w-sm"
+              />
+              <DataTable
+                columns={COLUMNS}
+                data={withdrawals}
+                actions={actions}
+                pagination={{
+                  currentPage,
+                  totalPages,
+                  onPageChange: setCurrentPage,
+                }}
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
-      <ConfirmDialog
-        isOpen={actionConfirm.isOpen}
-        onClose={() => setActionConfirm({ isOpen: false, action: null, item: null })}
-        onConfirm={() => {
-          if (actionConfirm.action === 'approve') {
-            handleApprove(actionConfirm.item);
-          } else {
-            handleReject(actionConfirm.item);
-          }
-        }}
-        title={actionConfirm.action === 'approve' ? 'Approve Withdrawal' : 'Reject Withdrawal'}
-        message={`Are you sure you want to ${actionConfirm.action} withdrawal ${actionConfirm.item?.id}?`}
-        confirmText={actionConfirm.action === 'approve' ? 'Approve' : 'Reject'}
-        variant={actionConfirm.action === 'approve' ? 'info' : 'danger'}
+      {/* Approval Verification Modal */}
+      <VerificationModal
+        isOpen={approveModal.isOpen}
+        onClose={() => setApproveModal({ isOpen: false, item: null })}
+        onConfirm={handleApproveWithVerification}
+        title="Verification"
+        message={`Please verify your credentials to approve withdrawal ${approveModal.item?.id}`}
       />
-    </div>
+
+      {/* Reject Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={rejectConfirm.isOpen}
+        onClose={() => setRejectConfirm({ isOpen: false, item: null })}
+        onConfirm={handleReject}
+        title="Reject Withdrawal"
+        message={`Are you sure you want to reject withdrawal ${rejectConfirm.item?.id}?`}
+        confirmText="Reject"
+        variant="danger"
+      />
+    </>
   );
 }

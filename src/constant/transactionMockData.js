@@ -29,6 +29,11 @@ export const MOCK_TRANSACTION_INFO = {
   netProfit: '10.00 USDT',
 };
 
+export const MOCK_TRANSACTION_REFERRAL = {
+  referralFees: '2.00 USDT',
+  receiverWalletAddress: 'F0x32Be3...d$C53',
+};
+
 export const MOCK_TRANSACTION_BONUS = {
   level1: '2.00 USDT',
   level2: '1.00 USDT',
@@ -77,6 +82,13 @@ export function getTransactionInfo(id, transaction = MOCK_TRANSACTION_INFO) {
     { label: 'Platform Fees', value: transaction.platformFees },
     { label: 'Processing Fees', value: transaction.processingFees },
     { label: 'Net Profit', value: transaction.netProfit },
+  ];
+}
+
+export function getTransactionReferral(transaction = MOCK_TRANSACTION_REFERRAL) {
+  return [
+    { label: 'Referral Fees', value: transaction.referralFees },
+    { label: 'Receiver Wallet Address', value: transaction.receiverWalletAddress },
   ];
 }
 

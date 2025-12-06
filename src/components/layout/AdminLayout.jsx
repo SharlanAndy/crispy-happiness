@@ -49,7 +49,7 @@ export default function AdminLayout() {
       items: [
         { path: '/t3-admin/transactions', icon: 'Transaction', label: 'Transaction' },
         { path: '/t3-admin/withdrawals', icon: 'Manage', label: 'Withdraw Management' },
-        { path: '/t3-admin/withdraw-history', icon: 'History', label: 'Withdraw History' }
+        { path: '/t3-admin/withdrawal-history', icon: 'History', label: 'Withdraw History' }
       ]
     },
     { title: 'Setting', items: [
@@ -61,7 +61,11 @@ export default function AdminLayout() {
 
   const sections = user.role === 'system-admin' ? systemSections : t3Sections;
   const allItems = sections.flatMap(section => section.items);
-  const currentTitle = allItems.find(i => i.path === location.pathname)?.label || 'Dashboard';
+  
+  // Check for returnPath in location state for details pages
+  const returnPath = location.state?.returnPath;
+  const activePath = returnPath || location.pathname;
+  const currentTitle = allItems.find(i => i.path === activePath)?.label || 'Dashboard';
 
   return (
     <div className="bg-white min-h-screen">

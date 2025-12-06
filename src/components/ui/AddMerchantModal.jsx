@@ -145,10 +145,11 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
               {renderField(TextInput, 'Wallet Address', 'walletAddress', { placeholder: 'Insert wallet address here' })}
             </FormSection>
 
-            {/* Sponsor Setup */}
-            <FormSection title="Sponsor Setup">
-              {renderField(TextInput, 'Sponsor By', 'sponsorBy', { placeholder: 'Insert referral ID here' })}
-              {renderField(TextInput, 'Fees', 'fees', { placeholder: 'eg:1.2' })}
+            {/* Referral Setup */}
+            <FormSection title="Referral Setup">
+              {renderField(TextInput, 'Referral By', 'referralBy', { placeholder: 'Insert referral ID here' })}
+              {renderField(TextInput, 'Referral Fees', 'referralFees', { placeholder: 'eg:1.2' })}
+              {renderField(TextInput, 'Remarks', 'referralRemarks', { placeholder: 'Additional remarks' })}
             </FormSection>
 
             {/* Fees Setup */}

@@ -20,3 +20,5 @@ export { default as ProfitChart } from './ProfitChart';
 export { default as TabButtons } from './TabButtons';
 export { default as MonthlyBonusTable } from './MonthlyBonusTable';
 export { default as BonusListCard } from './BonusListCard';
+export { default as TransferModal } from './TransferModal';
+export { default as VerificationModal } from './VerificationModal';

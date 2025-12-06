@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Save, Lock, Mail, Wallet } from 'lucide-react';
+import { useState } from 'react';
+import { Lock, Mail, Wallet } from 'lucide-react';
 import { Card, FormField, Button, PageHeader, Tabs } from '../../components/ui';
 
 export default function Settings() {

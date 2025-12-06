@@ -14,18 +14,31 @@ import Transaction from '../icons/Transaction';
 import User from '../icons/User';
 
 const Sidebar = ({ sections }) => {
-  const { pathname } = useLocation();
+  const location = useLocation();
+  const { pathname } = location;
   const navigate = useNavigate();
 
   const icons = { Admin, Agent, Bonus, Currency, Dashboard, Fees, History, Log, Manage, Merchant, Settings, Transaction, User};
 
   const NavItem = ({ path, icon, label }) => {
     const Icon = icons[icon];
+    // Check if we have a returnPath from location state (for details pages)
+    const returnPath = location.state?.returnPath;
+    
     // For dashboard routes, only match exactly. For others, match path and sub-paths
     const isDashboard = path === '/system-admin' || path === '/t3-admin';
-    const isActive = isDashboard 
-      ? pathname === path 
-      : pathname === path || pathname.startsWith(path + '/');
+    
+    let isActive;
+    if (returnPath) {
+      // If there's a returnPath, use it to determine active state
+      isActive = path === returnPath || returnPath.startsWith(path + '/');
+    } else {
+      // Normal matching logic
+      isActive = isDashboard 
+        ? pathname === path 
+        : pathname === path || pathname.startsWith(path + '/');
+    }
+    
     return (
       <button
         onClick={() => navigate(path)}

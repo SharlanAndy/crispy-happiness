@@ -71,6 +71,13 @@ export default function UserDetails() {
     },
   ];
 
+  // Calculate totals for footer
+  const footerData = {
+    total: transactions.reduce((sum, t) => sum + parseFloat(t.total.replace(' U', '')), 0).toFixed(2) + ' U',
+    fees: transactions.reduce((sum, t) => sum + parseFloat(t.fees.replace(' U', '')), 0).toFixed(2) + ' U',
+    net: transactions.reduce((sum, t) => sum + parseFloat(t.net.replace(' U', '')), 0).toFixed(2) + ' U',
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -91,7 +98,7 @@ export default function UserDetails() {
         <div className="mb-4">
           <SearchBar placeholder="Search Transaction..." value={searchTerm} onChange={setSearchTerm} className="max-w-sm" />
         </div>
-        <DataTable columns={columns} data={transactions} actions={actions} />
+        <DataTable columns={columns} data={transactions} actions={actions} footer={footerData} />
       </Card>
     </div>
   );

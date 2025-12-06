@@ -1,4 +1,3 @@
-import React from 'react';
 import { Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
 import Sidebar from './Sidebar';

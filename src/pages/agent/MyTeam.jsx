@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Search, Copy, User, ChevronRight } from 'lucide-react';
 import { Card, SearchBar, PageHeader } from '../../components/ui';
 

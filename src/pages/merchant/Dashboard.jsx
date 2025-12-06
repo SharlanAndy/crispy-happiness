@@ -1,7 +1,6 @@
-import React from 'react';
 import { TrendingUp, DollarSign, ArrowDownLeft, QrCode, Wallet, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { StatCard, Card, Button } from '../../components/ui';
+import { Card, Button } from '../../components/ui';
 
 export default function MerchantDashboard() {
   const navigate = useNavigate();

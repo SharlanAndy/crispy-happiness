@@ -11,7 +11,7 @@ import {
   MERCHANT_BUSINESS_INFO,
   MERCHANT_ADDRESS_INFO,
   MERCHANT_WALLET_INFO,
-  MERCHANT_SPONSOR_INFO,
+  MERCHANT_REFERRAL_INFO,
   MERCHANT_FEES_INFO,
   MERCHANT_CURRENCY_INFO,
   MOCK_TRANSACTIONS,
@@ -40,7 +40,7 @@ export default function MerchantDetails() {
     confirm: ''
   });
 
-  // Check if accessed from T3 Admin (will hide Sponsor, Fees, Currencies sections)
+  // Check if accessed from T3 Admin (will hide Referral, Fees, Currencies sections)
   const isT3Admin = location.pathname.startsWith('/t3-admin');
 
   // Filter merchant info - remove email and password for T3 Admin
@@ -194,8 +194,8 @@ export default function MerchantDetails() {
             </div>
             <div className="grid grid-cols-1 gap-6">
               <InfoSection
-                title="Sponsor"
-                items={MERCHANT_SPONSOR_INFO}
+                title="Referral"
+                items={MERCHANT_REFERRAL_INFO}
                 columns={1}
               />
               <InfoSection

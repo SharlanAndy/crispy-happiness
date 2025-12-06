@@ -15,19 +15,20 @@ const STATS = [
 const COLUMNS = [
   { key: 'id', label: 'Trans. ID' },
   { key: 'type', label: 'Type' },
-  { key: 'orderno', label: 'Merchant Order No.' },
+  { key: 'merchantOrderNo', label: 'Merchant Order No.' },
   { key: 'amount', label: 'Amount' },
-  { key: 'netprofit', label: 'Net Profit' },
+  { key: 'net', label: 'Net Profit', render: (value) => <span className="font-bold">{value}</span> },
   { key: 'bonus', label: 'Bonus' },
+  { key: 'referralFees', label: 'Referral Fees' },
   { key: 'time', label: 'Time' },
   { key: 'reference', label: 'Reference' },
   { key: 'status', label: 'Status' },
 ];
 
 const ALL_TRANSACTIONS = [
-  { id: 'T000001', type: 'Payment', orderno: 'M1234567890', amount: '500.00 U', netprofit: '50.00 U', bonus: '5.00 U', time: '01-11-2025 13:00', reference: 'Ref001', status: 'Success' },
-  { id: 'T000002', type: 'Payment', orderno: 'M1234567890', amount: '500.00 U', netprofit: '50.00 U', bonus: '5.00 U', time: '01-11-2025 13:00', reference: 'Ref001', status: 'Pending' },
-  { id: 'T000003', type: 'Payment', orderno: 'M1234567890', amount: '500.00 U', netprofit: '50.00 U', bonus: '5.00 U', time: '01-11-2025 13:00', reference: 'Ref001', status: 'Failed' },
+  { id: 'T000001', type: 'Payment', merchantOrderNo: 'M1234567890', amount: '500.00 U', net: '50.00 U', bonus: '5.00 U', referralFees: '2.00 U', time: '01-11-2025 13:00', reference: 'Ref001', status: 'Success' },
+  { id: 'T000002', type: 'Payment', merchantOrderNo: 'M1234567890', amount: '500.00 U', net: '50.00 U', bonus: '5.00 U', referralFees: '2.00 U', time: '01-11-2025 13:00', reference: 'Ref001', status: 'Pending' },
+  { id: 'T000003', type: 'Payment', merchantOrderNo: 'M1234567890', amount: '500.00 U', net: '50.00 U', bonus: '5.00 U', referralFees: '2.00 U', time: '01-11-2025 13:00', reference: 'Ref001', status: 'Failed' },
 ];
 
 export default function TransactionManagement() {

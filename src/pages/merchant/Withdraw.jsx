@@ -1,4 +1,3 @@
-import React from 'react';
 import { Wallet, History } from 'lucide-react';
 import { StatCard, Card, FormField, Button, PageHeader } from '../../components/ui';
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Download } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, Button } from '../../components/ui';
 
