@@ -103,7 +103,7 @@ export default function Login() {
           <p className="font-medium mb-2">Authorized Access Only</p>
           <div className="grid grid-cols-2 gap-2 text-left bg-secondary/50 p-3 rounded-lg">
             <div>Admin: admin/password</div>
-            <div>T3: t3admin/password</div>
+            <div>T3: t3_admin/admin123</div>
             <div>Merchant: merchant/password</div>
             <div>Agent: agent/password</div>
           </div>

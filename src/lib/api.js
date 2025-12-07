@@ -1,11 +1,12 @@
 // Configuration for API connection
 const API_CONFIG = {
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
-  useMock: true, // Set to false to use real API
+  baseURL: import.meta.env.VITE_API_URL || '/api', // Use relative path to leverage Vite proxy
+  useMock: false, // Set to false to test real API endpoints
   timeout: 10000,
+  fallbackToMock: false, // Disable fallback to see real API errors
 };
 
-// Generic fetch wrapper
+// Generic fetch wrapper with fallback to mock
 async function request(endpoint, options = {}) {
   if (API_CONFIG.useMock) {
     console.warn(`[Mock API] Request to ${endpoint} intercepted.`);
@@ -27,12 +28,20 @@ async function request(endpoint, options = {}) {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'API Error' }));
-      throw new Error(error.message || `Error ${response.status}`);
+      console.error(`API Error [${response.status}]:`, JSON.stringify(error, null, 2));
+      throw new Error(error.message || error.error || `Error ${response.status}`);
     }
 
     return await response.json();
   } catch (error) {
     console.error('API Request Failed:', error);
+    
+    // Fallback to mock if enabled
+    if (API_CONFIG.fallbackToMock) {
+      console.warn(`[Fallback] API request failed for ${endpoint}, will use mock data instead.`);
+      return null; // Return null to let service handle mock fallback
+    }
+    
     throw error;
   }
 }
@@ -332,12 +341,171 @@ export const api = {
   },
 
   // ============================================================================
-  // ACCOUNT MODULE (T3 Admin)
+  // T3 ADMIN MODULE
+  // ============================================================================
+  t3admin: {
+    // Authentication
+    /**
+     * T3Admin login.
+     * @param {Object} credentials - { username, password }
+     * @returns {Promise<Object>} { success, message, data: { token, token_expires_at, admin_type } }
+     */
+    login: (credentials) => request('/t3admin/auth/login', { method: 'POST', body: JSON.stringify(credentials) }),
+
+    /**
+     * Get T3Admin profile.
+     * Headers: Authorization: Bearer <token>
+     * @returns {Promise<Object>} Admin profile data
+     */
+    getProfile: () => request('/t3admin/auth/profile', { method: 'GET' }),
+
+    // Dashboard
+    /**
+     * Get T3Admin dashboard statistics.
+     * Headers: Authorization: Bearer <token>
+     * @returns {Promise<Object>} { success, data: { total_incoming_funds, monthly_incoming_funds, total_outgoing_funds, monthly_outgoing_funds, total_users } }
+     */
+    getDashboard: () => request('/t3admin/dashboard', { method: 'GET' }),
+
+    // User Management
+    /**
+     * Get user list.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} params - { page, search }
+     * @returns {Promise<Object>} { success, data: [...], page, limit }
+     */
+    getUsers: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`/t3admin/users?${query}`, { method: 'GET' });
+    },
+
+    /**
+     * Get user details.
+     * Headers: Authorization: Bearer <token>
+     * @param {string} id - User ID (with or without 'U' prefix)
+     * @returns {Promise<Object>} { success, data: { id, username, wallet_address, status, created_at, total_incoming_funds, total_outgoing_funds, current_unclaim_funds, total_claimed_funds } }
+     */
+    getUserDetails: (id) => request(`/t3admin/users/${id}`, { method: 'GET' }),
+
+    // Account Management (Finance Accounts)
+    /**
+     * Get list of T3 admin accounts.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} params - { page, search }
+     * @returns {Promise<Object>} { success, data: [...], page, limit }
+     */
+    getAccounts: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`/t3admin/accounts?${query}`, { method: 'GET' });
+    },
+
+    /**
+     * Create a new finance account.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} data - { username, email, password, wallet_address }
+     * @returns {Promise<Object>} { success, message, data: { id, username, email } }
+     */
+    createAccount: (data) => request('/t3admin/accounts', { method: 'POST', body: JSON.stringify(data) }),
+
+    /**
+     * Get account details.
+     * Headers: Authorization: Bearer <token>
+     * @param {string} id - Account ID
+     * @returns {Promise<Object>} Account details
+     */
+    getAccountDetails: (id) => request(`/t3admin/accounts/${id}`, { method: 'GET' }),
+
+    // Withdrawal Management
+    /**
+     * Get pending withdrawal applications.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} params - { page, search, status }
+     * @returns {Promise<Object>} { success, data: [...], page, limit }
+     */
+    getWithdrawalApplications: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`/t3admin/withdrawals/applications?${query}`, { method: 'GET' });
+    },
+
+    /**
+     * Get withdrawal history.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} params - { page, status }
+     * @returns {Promise<Object>} { success, data: [...], page, limit }
+     */
+    getWithdrawalHistory: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`/t3admin/withdrawals/history?${query}`, { method: 'GET' });
+    },
+
+    /**
+     * Get withdrawal details.
+     * Headers: Authorization: Bearer <token>
+     * @param {string} id - Withdrawal ID or application_id
+     * @returns {Promise<Object>} Withdrawal details
+     */
+    getWithdrawalDetails: (id) => request(`/t3admin/withdrawals/${id}`, { method: 'GET' }),
+
+    /**
+     * Approve a withdrawal.
+     * Headers: Authorization: Bearer <token>
+     * @param {string} id - Withdrawal ID or application_id
+     * @returns {Promise<Object>} { success, message }
+     */
+    approveWithdrawal: (id) => request(`/t3admin/withdrawals/${id}/approve`, { method: 'POST' }),
+
+    /**
+     * Reject a withdrawal.
+     * Headers: Authorization: Bearer <token>
+     * @param {string} id - Withdrawal ID or application_id
+     * @returns {Promise<Object>} { success, message }
+     */
+    rejectWithdrawal: (id) => request(`/t3admin/withdrawals/${id}/reject`, { method: 'POST' }),
+
+    // API Keys & Logs
+    /**
+     * Get API keys list.
+     * Headers: Authorization: Bearer <token>
+     * @returns {Promise<Object>} { success, data: [...] }
+     */
+    getAPIKeys: () => request('/t3admin/api-keys', { method: 'GET' }),
+
+    /**
+     * Create a new API key.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} data - { key_name, backend_url, merchant_key }
+     * @returns {Promise<Object>} { success, message, data: { id, key_name, api_key, secret_key, merchant_key, backend_url } }
+     */
+    createAPIKey: (data) => request('/t3admin/api-keys', { method: 'POST', body: JSON.stringify(data) }),
+
+    /**
+     * Get API logs.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} params - { page, search }
+     * @returns {Promise<Object>} { success, data: [...], page, limit }
+     */
+    getAPILogs: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`/t3admin/api-logs?${query}`, { method: 'GET' });
+    },
+
+    /**
+     * Update callback settings.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} data - { backend_url, key_id }
+     * @returns {Promise<Object>} { success, message }
+     */
+    updateCallbackSettings: (data) => request('/t3admin/callback-settings', { method: 'PUT', body: JSON.stringify(data) }),
+  },
+
+  // ============================================================================
+  // ACCOUNT MODULE (T3 Admin) - Legacy, use t3admin.getAccounts instead
   // ============================================================================
   account: {
     /**
      * Get list of finance accounts.
      * Headers: Authorization: Bearer <token>
+     * @deprecated Use api.t3admin.getAccounts instead
      */
     list: () => request('/admin-accounts', { method: 'GET' }),
 
@@ -345,6 +513,7 @@ export const api = {
      * Create a new finance account.
      * Headers: Authorization: Bearer <token>
      * @param {Object} data - { "username": "...", "password": "...", "email": "...", "walletAddress": "..." }
+     * @deprecated Use api.t3admin.createAccount instead
      */
     create: (data) => request('/admin-accounts', { method: 'POST', body: JSON.stringify(data) }),
 
@@ -352,6 +521,7 @@ export const api = {
      * Get account details.
      * Headers: Authorization: Bearer <token>
      * @param {string} id - Account ID.
+     * @deprecated Use api.t3admin.getAccountDetails instead
      */
     get: (id) => request(`/admin-accounts/${id}`, { method: 'GET' }),
   },

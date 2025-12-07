@@ -3,7 +3,7 @@ import AppRoutes from './routes/AppRoutes';
 
 function App() {
   return (
-    <BrowserRouter basename="/crispy-happiness">
+    <BrowserRouter>
       <AppRoutes />
     </BrowserRouter>
   );
