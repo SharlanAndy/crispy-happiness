@@ -27,5 +27,22 @@ export default defineConfig({
         },
       },
     },
-  }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // React core libraries
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          // Chart library (recharts is large)
+          'charts': ['recharts'],
+          // Icons library
+          'icons': ['lucide-react'],
+          // QR Code library
+          'qrcode': ['qrcode.react'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 600, // Increase limit to 600KB to reduce warnings
+  },
 })
