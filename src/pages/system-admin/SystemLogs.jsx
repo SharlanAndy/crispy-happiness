@@ -1,23 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { DataTable, PageHeader } from '../../components/ui';
+import { api } from '../../lib/api';
 
 const ITEMS_PER_PAGE = 10;
-
-const ALL_LOGS = [
-  { dateTime: '01-11-2025 13:00', level: 'INFO', source: 'Auth Service', endpoint: '/api/login', status: '200', ip: '192.168.1.1' },
-  { dateTime: '01-11-2025 13:05', level: 'WARNING', source: 'Auth Service', endpoint: '/api/login', status: '401', ip: '192.168.1.2' },
-  { dateTime: '01-11-2025 13:10', level: 'ERROR', source: 'Database', endpoint: '/api/query', status: '500', ip: '192.168.1.3' },
-  { dateTime: '01-11-2025 13:15', level: 'INFO', source: 'Merchant Service', endpoint: '/api/merchant/create', status: '201', ip: '192.168.1.1' },
-  { dateTime: '01-11-2025 13:20', level: 'INFO', source: 'Withdrawal Service', endpoint: '/api/withdrawal/approve', status: '200', ip: '192.168.1.4' },
-  { dateTime: '01-11-2025 13:25', level: 'ERROR', source: 'Payment Gateway', endpoint: '/api/payment/process', status: '500', ip: '192.168.1.5' },
-  { dateTime: '01-11-2025 13:30', level: 'INFO', source: 'Agent Service', endpoint: '/api/agent/register', status: '201', ip: '192.168.1.6' },
-  { dateTime: '01-11-2025 13:35', level: 'WARNING', source: 'API Gateway', endpoint: '/api/rate-limit', status: '429', ip: '192.168.1.7' },
-  { dateTime: '01-11-2025 13:40', level: 'INFO', source: 'Transaction Service', endpoint: '/api/transaction/complete', status: '200', ip: '192.168.1.8' },
-  { dateTime: '01-11-2025 13:45', level: 'ERROR', source: 'External API', endpoint: '/api/external/call', status: '504', ip: '192.168.1.9' },
-  { dateTime: '01-11-2025 13:50', level: 'INFO', source: 'Auth Service', endpoint: '/api/logout', status: '200', ip: '192.168.1.1' },
-  { dateTime: '01-11-2025 13:55', level: 'WARNING', source: 'Auth Service', endpoint: '/api/validate', status: '403', ip: '192.168.1.10' },
-];
 
 const LEVEL_COLORS = {
   INFO: 'bg-[#DCFCE7] text-[#166534]',
@@ -34,23 +20,56 @@ const FILTERS = [
 export default function SystemLogs() {
   const [currentPage, setCurrentPage] = useState(1);
   const [filters, setFilters] = useState(FILTERS.map(f => f.default));
+  const [loading, setLoading] = useState(true);
+  const [logsData, setLogsData] = useState([]);
+
+  // Fetch logs data
+  useEffect(() => {
+    const fetchLogs = async () => {
+      try {
+        setLoading(true);
+        const [dateRange, levelFilter, statusFilter] = filters;
+        const params = {
+          page: currentPage,
+          ...(dateRange !== '24h' && { date_range: dateRange }),
+          ...(levelFilter !== 'all' && { level: levelFilter }),
+          ...(statusFilter !== 'all' && { status: statusFilter }),
+        };
+        const result = await api.systemadmin.getLogs(params);
+        if (result && result.success) {
+          const transformed = result.data.map(log => ({
+            dateTime: log.created_at ? new Date(log.created_at).toLocaleString('en-GB') : 'N/A',
+            level: log.level || 'INFO',
+            source: log.source || 'N/A',
+            endpoint: log.event_endpoint || 'N/A',
+            status: log.status || 'N/A',
+            ip: log.ip_address || 'N/A'
+          }));
+          setLogsData(transformed);
+        } else {
+          setLogsData([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch logs:', error);
+        setLogsData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLogs();
+  }, [currentPage, filters]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
 
   const { logs, totalPages } = useMemo(() => {
-    const [, levelFilter, statusFilter] = filters;
-    const filtered = ALL_LOGS.filter(log => 
-      (levelFilter === 'all' || log.level === levelFilter) &&
-      (statusFilter === 'all' || log.status === statusFilter)
-    );
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
     return { 
-      logs: filtered.slice(start, start + ITEMS_PER_PAGE), 
-      totalPages: Math.ceil(filtered.length / ITEMS_PER_PAGE) 
+      logs: logsData.slice(start, start + ITEMS_PER_PAGE), 
+      totalPages: Math.ceil(logsData.length / ITEMS_PER_PAGE) 
     };
-  }, [filters, currentPage]);
+  }, [logsData, currentPage]);
 
   const columns = [
     { key: 'dateTime', label: 'Time' },
@@ -94,7 +113,17 @@ export default function SystemLogs() {
               </div>
             ))}
           </div>
-          <DataTable columns={columns} data={logs} pagination={{ currentPage, totalPages, onPageChange: setCurrentPage }} />
+          {loading ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">Loading logs...</p>
+            </div>
+          ) : logs.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No logs found</p>
+            </div>
+          ) : (
+            <DataTable columns={columns} data={logs} pagination={{ currentPage, totalPages, onPageChange: setCurrentPage }} />
+          )}
         </div>
       </div>
     </div>

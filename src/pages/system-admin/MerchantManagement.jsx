@@ -3,12 +3,12 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, Settings, Trash2, Plus } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, ConfirmDialog, AddMerchantModal } from '../../components/ui';
 import { filterAndPaginate } from '../../lib/pagination';
+import { api } from '../../lib/api';
 import {
   MERCHANT_STATS,
   MERCHANT_COLUMNS,
   MERCHANT_TIERS,
   MERCHANT_SEARCH_KEYS,
-  ALL_MERCHANTS,
 } from '../../constant/merchantMockData';
 
 const ITEMS_PER_PAGE = 10;
@@ -21,18 +21,60 @@ export default function MerchantManagement() {
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, item: null });
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTier, setActiveTier] = useState('T1');
+  const [loading, setLoading] = useState(true);
+  const [merchantsData, setMerchantsData] = useState([]);
+  const [dashboardData, setDashboardData] = useState(null);
+
+  const isSystemAdmin = location.pathname.includes('system-admin');
+
+  // Fetch merchants data
+  useEffect(() => {
+    const fetchMerchants = async () => {
+      try {
+        setLoading(true);
+        const [merchantsResult, dashboardResult] = await Promise.all([
+          api.systemadmin.getMerchants({ page: 1 }), // Fetch all, filter client-side
+          api.systemadmin.getDashboard()
+        ]);
+
+        if (merchantsResult && merchantsResult.success) {
+          const transformed = merchantsResult.data.map(m => ({
+            id: m.id,
+            merchant_id: m.merchant_id || `MER${m.id}`,
+            company_name: m.company_name || 'N/A',
+            type: m.type || 'N/A',
+            state: m.state || '',
+            join_date: m.join_date ? new Date(m.join_date).toLocaleString('en-GB') : 'N/A',
+            status: m.status || 'Active',
+            tier: m.type === 't1' || m.type === 'merchant' ? 'T1' : m.type === 't2' ? 'T2' : m.type === 't3' ? 'T3' : 'T1'
+          }));
+          setMerchantsData(transformed);
+        } else {
+          setMerchantsData([]);
+        }
+
+        if (dashboardResult && dashboardResult.success) {
+          setDashboardData(dashboardResult.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch merchants:', error);
+        setMerchantsData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMerchants();
+  }, []);
 
   // Scroll to top when page changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
 
-  const isSystemAdmin = location.pathname.includes('system-admin');
-
   // Filter merchants by tier first
   const tierFilteredMerchants = useMemo(
-    () => ALL_MERCHANTS.filter(m => m.tier === activeTier),
-    [activeTier]
+    () => merchantsData.filter(m => m.tier === activeTier),
+    [merchantsData, activeTier]
   );
 
   // Apply search and pagination
@@ -94,7 +136,11 @@ export default function MerchantManagement() {
 
         {/* Stats Section */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {MERCHANT_STATS.map((stat, i) => <StatCard key={i} {...stat} />)}
+          {dashboardData ? [
+            { label: 'Total T1 Merchants', value: dashboardData.total_t1_merchants?.toString() || '0', lastUpdate: new Date().toLocaleDateString('en-GB') },
+            { label: 'Total T2 Merchants', value: dashboardData.total_t2_merchants?.toString() || '0', lastUpdate: new Date().toLocaleDateString('en-GB') },
+            { label: 'Total T3 Merchants', value: dashboardData.total_t3_merchants?.toString() || '0', lastUpdate: new Date().toLocaleDateString('en-GB') },
+          ].map((stat, i) => <StatCard key={i} {...stat} />) : MERCHANT_STATS.map((stat, i) => <StatCard key={i} {...stat} />)}
         </div>
 
         {/* New Merchant Button */}
@@ -138,16 +184,26 @@ export default function MerchantManagement() {
               />
 
               {/* Data Table */}
-              <DataTable
-                columns={MERCHANT_COLUMNS}
-                data={merchants}
-                actions={actions}
-                pagination={{
-                  currentPage,
-                  totalPages,
-                  onPageChange: setCurrentPage,
-                }}
-              />
+              {loading ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Loading merchants...</p>
+                </div>
+              ) : merchants.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No merchants found</p>
+                </div>
+              ) : (
+                <DataTable
+                  columns={MERCHANT_COLUMNS}
+                  data={merchants}
+                  actions={actions}
+                  pagination={{
+                    currentPage,
+                    totalPages,
+                    onPageChange: setCurrentPage,
+                  }}
+                />
+              )}
             </div>
           </div>
         </div>

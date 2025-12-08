@@ -4,16 +4,7 @@ import { api } from '../lib/api';
 const MOCK_USERS = [
   {
     id: 'sysadmin1',
-    username: 'admin',
-    password: 'password',
-    role: 'system-admin',
-    name: 'System Admin',
-    email: 'admin@nbn.com',
-    token: 'mock-token-admin'
-  },
-  {
-    id: 'sysadmin2',
-    username: 'system',
+    username: 'system_admin',
     password: 'admin123',
     role: 'system-admin',
     name: 'System Admin',
@@ -38,24 +29,6 @@ const MOCK_USERS = [
     name: 'T3 Admin User',
     email: 't3@nbn.com',
     token: 'mock-token-t3'
-  },
-  {
-    id: 'merchant1',
-    username: 'merchant',
-    password: 'password',
-    role: 'merchant',
-    name: 'Food Merchant Sdn Bhd',
-    email: 'merchant@food.com',
-    token: 'mock-token-merchant'
-  },
-  {
-    id: 'agent1',
-    username: 'agent',
-    password: 'password',
-    role: 'agent',
-    name: 'Agent Smith',
-    email: 'agent@nbn.com',
-    token: 'mock-token-agent'
   }
 ];
 
@@ -63,6 +36,9 @@ export const authService = {
   login: async (username, password) => {
     // Check if this is a T3 admin login (use API endpoint)
     const isT3Admin = username === 't3_admin' || username === 't3admin' || username.toLowerCase().includes('t3');
+    
+    // Check if this is a System admin login (use API endpoint)
+    const isSystemAdmin = username === 'system_admin' || username === 'system' || username.toLowerCase().includes('system');
     
     if (isT3Admin) {
       // T3 Admin: Always use API endpoint (regardless of useMock setting)
@@ -116,8 +92,60 @@ export const authService = {
       } catch (error) {
         throw new Error(error.message || 'Invalid credentials');
       }
+    } else if (isSystemAdmin) {
+      // System Admin: Always use API endpoint (regardless of useMock setting)
+      try {
+        const response = await api.systemadmin.login({ username, password });
+        if (response && response.success && response.data) {
+          const token = response.data.token;
+          localStorage.setItem('token', token);
+          
+          // Fetch profile after login to get full user data
+          try {
+            const profileResponse = await api.systemadmin.getProfile();
+            if (profileResponse && profileResponse.success && profileResponse.data) {
+              const profile = profileResponse.data;
+              const userData = {
+                id: profile.id || username,
+                username: profile.username || username,
+                role: 'system-admin',
+                email: profile.email || `${username}@nbn.com`,
+                first_name: profile.first_name,
+                last_name: profile.last_name,
+                phone: profile.phone,
+                admin_type: profile.admin_type,
+                character: profile.character,
+                wallet_address: profile.wallet_address,
+                status: profile.status,
+                last_login: profile.last_login,
+                created_at: profile.created_at,
+                token: token
+              };
+              localStorage.setItem('user', JSON.stringify(userData));
+              localStorage.setItem('systemadmin_profile', JSON.stringify(profile)); // Store full profile
+              return userData;
+            }
+          } catch (profileError) {
+            console.warn('Failed to fetch profile after login, using basic data:', profileError);
+          }
+          
+          // Fallback to basic data if profile fetch fails
+          const userData = {
+            id: username,
+            username: username,
+            role: 'system-admin',
+            email: `${username}@nbn.com`,
+            token: token
+          };
+          localStorage.setItem('user', JSON.stringify(userData));
+          return userData;
+        }
+        throw new Error(response.message || 'Invalid credentials');
+      } catch (error) {
+        throw new Error(error.message || 'Invalid credentials');
+      }
     } else {
-      // Non-T3 Admin: Always use mock data (system-admin, merchant, agent)
+      // Other roles: Always use mock data (if any remain)
       // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 500));
       // Support login by username or email

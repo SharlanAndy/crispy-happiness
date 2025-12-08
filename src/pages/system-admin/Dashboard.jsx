@@ -1,42 +1,96 @@
 import { useState, useEffect } from 'react';
 import { Users, Store, UserCheck, DollarSign, TrendingUp, Activity } from 'lucide-react';
 import { Card } from '../../components/ui';
+import { api } from '../../lib/api';
 
 export default function SystemAdminDashboard() {
   const [currentPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState(null);
+
+  // Fetch dashboard data
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        setLoading(true);
+        const result = await api.systemadmin.getDashboard();
+        if (result && result.success) {
+          setDashboardData(result.data);
+        } else {
+          setDashboardData(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch dashboard:', error);
+        setDashboardData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboard();
+  }, []);
+
   // Scroll to top when page changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
   
-  const stats = [
+  const stats = dashboardData ? [
     {
       label: 'Total Merchants',
-      value: '124',
-      lastUpdate: '60 T1, 30 T2, 34 T3',
+      value: (dashboardData.total_t1_merchants + dashboardData.total_t2_merchants + dashboardData.total_t3_merchants).toString(),
+      lastUpdate: `${dashboardData.total_t1_merchants} T1, ${dashboardData.total_t2_merchants} T2, ${dashboardData.total_t3_merchants} T3`,
       icon: Store,
       trend: '+12%'
     },
     {
       label: 'Active Agents',
-      value: '45',
-      lastUpdate: 'Active across 5 regions',
+      value: dashboardData.total_active_agents?.toString() || '0',
+      lastUpdate: 'Active agents',
       icon: UserCheck,
       trend: '+12%'
     },
     {
       label: 'Total Users',
-      value: '1,234',
-      lastUpdate: 'New users this month: 156',
+      value: dashboardData.total_users?.toString() || '0',
+      lastUpdate: 'Active users',
       icon: Users,
       trend: '+12%'
     },
     {
       label: 'Total Volume',
-      value: '1.2M USDT',
-      lastUpdate: 'Daily avg: 45k USDT',
+      value: `${(dashboardData.total_fees_collected || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`,
+      lastUpdate: `${dashboardData.total_transactions || 0} transactions`,
       icon: DollarSign,
       trend: '+12%'
+    },
+  ] : [
+    {
+      label: 'Total Merchants',
+      value: '0',
+      lastUpdate: 'No data',
+      icon: Store,
+      trend: '+0%'
+    },
+    {
+      label: 'Active Agents',
+      value: '0',
+      lastUpdate: 'No data',
+      icon: UserCheck,
+      trend: '+0%'
+    },
+    {
+      label: 'Total Users',
+      value: '0',
+      lastUpdate: 'No data',
+      icon: Users,
+      trend: '+0%'
+    },
+    {
+      label: 'Total Volume',
+      value: '0 USDT',
+      lastUpdate: 'No data',
+      icon: DollarSign,
+      trend: '+0%'
     },
   ];
 

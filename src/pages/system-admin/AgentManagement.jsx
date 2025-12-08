@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Eye, Settings, Trash2, Plus } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, ConfirmDialog, AddAgentModal } from '../../components/ui';
 import { filterAndPaginate } from '../../lib/pagination';
+import { api } from '../../lib/api';
 
 const ITEMS_PER_PAGE = 10;
 const AGENT_SEARCH_KEYS = ['id', 'status', 'bonus', 'l1', 'l2', 'join'];
@@ -13,29 +14,64 @@ export default function AgentManagement() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [agentsData, setAgentsData] = useState([]);
+  const [dashboardData, setDashboardData] = useState(null);
+
+  // Fetch agents data
+  useEffect(() => {
+    const fetchAgents = async () => {
+      try {
+        setLoading(true);
+        const [agentsResult, dashboardResult] = await Promise.all([
+          api.systemadmin.getAgents({ page: 1 }), // Fetch all, filter client-side
+          api.systemadmin.getDashboard()
+        ]);
+
+        if (agentsResult && agentsResult.success) {
+          const transformed = agentsResult.data.map(a => ({
+            id: a.id || 'N/A',
+            bonus: `${(a.bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+            l1: (a.level1 || 0).toString(),
+            l2: (a.level2 || 0).toString(),
+            join: a.join_time ? new Date(a.join_time).toLocaleString('en-GB') : 'N/A',
+            status: a.status || 'Active'
+          }));
+          setAgentsData(transformed);
+        } else {
+          setAgentsData([]);
+        }
+
+        if (dashboardResult && dashboardResult.success) {
+          setDashboardData(dashboardResult.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch agents:', error);
+        setAgentsData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAgents();
+  }, []);
 
   // Scroll to top when page changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
 
-  const allAgents = [
-    { id: 'A000001', bonus: '10,000 U', l1: '10', l2: '200', join: '01-11-2025 13:00', status: 'Active' },
-    { id: 'A000002', bonus: '15,000 U', l1: '15', l2: '300', join: '01-12-2025 14:00', status: 'Active' },
-    { id: 'A000003', bonus: '8,000 U', l1: '8', l2: '150', join: '01-01-2026 09:00', status: 'Active' },
-    { id: 'A000004', bonus: '20,000 U', l1: '5', l2: '400', join: '01-03-2026 10:00', status: 'Active' },
-    { id: 'A000005', bonus: '12,500 U', l1: '12', l2: '250', join: '01-04-2026 11:00', status: 'Active' },
-  ];
-
   // Apply search and pagination
   const { data: agents, totalPages } = useMemo(
-    () => filterAndPaginate(allAgents, searchTerm, AGENT_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
-    [searchTerm, currentPage]
+    () => filterAndPaginate(agentsData, searchTerm, AGENT_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
+    [agentsData, searchTerm, currentPage]
   );
 
-  const stats = [
-    { label: 'Total Active Agent', value: '23', lastUpdate: '17-11-2025' },
-    { label: 'Total Bonus Distributed', value: '10,000.00 USDT', lastUpdate: '17-11-2025' },
+  const stats = dashboardData ? [
+    { label: 'Total Active Agent', value: dashboardData.total_active_agents?.toString() || '0', lastUpdate: new Date().toLocaleDateString('en-GB') },
+    { label: 'Total Bonus Distributed', value: `${(dashboardData.total_bonus_distributed || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, lastUpdate: new Date().toLocaleDateString('en-GB') },
+  ] : [
+    { label: 'Total Active Agent', value: '0', lastUpdate: 'No data' },
+    { label: 'Total Bonus Distributed', value: '0.00 USDT', lastUpdate: 'No data' },
   ];
 
   const columns = [
@@ -118,16 +154,26 @@ export default function AgentManagement() {
               />
 
               {/* Data Table */}
-              <DataTable
-                columns={columns}
-                data={agents}
-                actions={actions}
-                pagination={{
-                  currentPage,
-                  totalPages,
-                  onPageChange: setCurrentPage,
-                }}
-              />
+              {loading ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Loading agents...</p>
+                </div>
+              ) : agents.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No agents found</p>
+                </div>
+              ) : (
+                <DataTable
+                  columns={columns}
+                  data={agents}
+                  actions={actions}
+                  pagination={{
+                    currentPage,
+                    totalPages,
+                    onPageChange: setCurrentPage,
+                  }}
+                />
+              )}
             </div>
           </div>
         </div>

@@ -5,6 +5,7 @@ import { StatCard, PageHeader, ConfirmDialog, BonusListCard } from '../../compon
 import SelectWithIcon from '../../components/ui/SelectWithIcon';
 import MonthlyBonusTable from '../../components/ui/MonthlyBonusTable';
 import { filterAndPaginate } from '../../lib/pagination';
+import { api } from '../../lib/api';
 
 const ITEMS_PER_PAGE = 10;
 const TRANSACTION_SEARCH_KEYS = ['id', 'wallet', 'status'];
@@ -18,6 +19,12 @@ export default function BonusManagement() {
   const [searchTermUnclaim, setSearchTermUnclaim] = useState('');
   const [activeBonus, setActiveBonus] = useState('System');
   const [activeBonusUnclaim, setActiveBonusUnclaim] = useState('System');
+  const [loading, setLoading] = useState(true);
+  const [loadingUnclaim, setLoadingUnclaim] = useState(true);
+  const [loadingMonthly, setLoadingMonthly] = useState(true);
+  const [bonusClaimsData, setBonusClaimsData] = useState([]);
+  const [bonusUnclaimsData, setBonusUnclaimsData] = useState([]);
+  const [monthlyData, setMonthlyData] = useState(null);
 
   // Generate month options for the past 12 months
   const getMonthOptions = () => {
@@ -40,12 +47,97 @@ export default function BonusManagement() {
   
   const selectedMonthLabel = monthOptions.find(m => m.value === selectedMonth)?.label || monthOptions[0]?.label;
 
+  // Fetch bonus claims
+  useEffect(() => {
+    const fetchBonusClaims = async () => {
+      try {
+        setLoading(true);
+        const result = await api.systemadmin.getBonusClaims({ page: 1 });
+        if (result && result.success) {
+          const transformed = result.data.map(b => ({
+            id: `tx-${b.id}`,
+            wallet: b.referral_id ? `0x${b.referral_id.slice(0, 5)}....${b.referral_id.slice(-5)}` : 'N/A',
+            bonus: `${(b.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+            fees: '10.00 USDT', // TODO: Get from API if available
+            net: `${(b.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+            time: b.claimed_at ? new Date(b.claimed_at).toLocaleString('en-GB') : (b.created_at ? new Date(b.created_at).toLocaleString('en-GB') : 'N/A'),
+            status: 'Success',
+            bonusTier: b.type || 'System'
+          }));
+          setBonusClaimsData(transformed);
+        } else {
+          setBonusClaimsData([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch bonus claims:', error);
+        setBonusClaimsData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchBonusClaims();
+  }, []);
+
+  // Fetch bonus unclaims
+  useEffect(() => {
+    const fetchBonusUnclaims = async () => {
+      try {
+        setLoadingUnclaim(true);
+        const result = await api.systemadmin.getBonusUnclaims({ page: 1 });
+        if (result && result.success) {
+          const transformed = result.data.map(b => ({
+            id: b.referral_id || `U${b.user_id}`,
+            bonus: `${(b.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+            update: b.created_at ? new Date(b.created_at).toLocaleString('en-GB') : 'N/A',
+            status: 'Pending',
+            bonusTier: b.type || 'System'
+          }));
+          setBonusUnclaimsData(transformed);
+        } else {
+          setBonusUnclaimsData([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch bonus unclaims:', error);
+        setBonusUnclaimsData([]);
+      } finally {
+        setLoadingUnclaim(false);
+      }
+    };
+    fetchBonusUnclaims();
+  }, []);
+
+  // Fetch monthly bonus
+  useEffect(() => {
+    const fetchMonthlyBonus = async () => {
+      try {
+        setLoadingMonthly(true);
+        const result = await api.systemadmin.getMonthlyBonus({ month: selectedMonth });
+        if (result && result.success) {
+          setMonthlyData(result.data);
+        } else {
+          setMonthlyData(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch monthly bonus:', error);
+        setMonthlyData(null);
+      } finally {
+        setLoadingMonthly(false);
+      }
+    };
+    fetchMonthlyBonus();
+  }, [selectedMonth]);
+
   // Scroll to top when page changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage, currentPageUnclaim]);
 
-  // Mock data with month for filtering
+  // Transform monthly data for display
+  const monthlyDataDisplay = monthlyData ? [
+    { member: 'System', distributed: `${(monthlyData.total_bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`, claim: `${(monthlyData.total_claimed || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`, unclaim: `${(monthlyData.total_unclaimed || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U` },
+  ] : [];
+
+  // Mock data with month for filtering (fallback)
   const MONTHLY_DATA = {
     '2025-12': [
       { member: 'System', distributed: '12,000.00 U', claim: '6,000.00 U', unclaim: '6,000.00 U' },
@@ -77,13 +169,14 @@ export default function BonusManagement() {
     ],
   };
 
-  const monthlyData = MONTHLY_DATA[selectedMonth] || [];
+  const monthlyDataFallback = MONTHLY_DATA[selectedMonth] || [];
+  const monthlyDataFinal = monthlyDataDisplay.length > 0 ? monthlyDataDisplay : monthlyDataFallback;
 
   const handleMonthChange = (e) => setSelectedMonth(e.target.value);
 
   // Calculate totals
   const calculateTotal = (key) => 
-    monthlyData.reduce((sum, row) => sum + (parseFloat(row[key].replace(/[^\d.-]/g, '')) || 0), 0);
+    monthlyDataFinal.reduce((sum, row) => sum + (parseFloat(row[key].replace(/[^\d.-]/g, '')) || 0), 0);
 
   const totalDistributed = calculateTotal('distributed');
   const totalClaim = calculateTotal('claim');
@@ -108,23 +201,6 @@ export default function BonusManagement() {
     },
   ];
 
-  const bonusClaimList = [
-    { id: 'tx-a1b2c3d4', wallet: '0xF3A....12345', bonus: '10,000.00 U', fees: '10.00 USDT', net: '10.00 USDT', time: '01-11-2025 13:00', status: 'Success', bonusTier: 'System' },
-    { id: 'tx-e5f6g7h8', wallet: '0xF4B....67890', bonus: '15,500.00 U', fees: '20.00 USDT', net: '20.00 USDT', time: '02-12-2025 14:30', status: 'Success', bonusTier: 'Partner' },
-    { id: 'tx-i9j0k1l2', wallet: '0xF5C....13579', bonus: '25,750.00 U', fees: '50.00 USDT', net: '50.00 USDT', time: '03-13-2025 15:45', status: 'Success', bonusTier: 'Agent' },
-    { id: 'tx-m3n4o5p6', wallet: '0xF6D....24680', bonus: '8,200.00 U', fees: '8.00 USDT', net: '8.00 USDT', time: '04-14-2025 10:15', status: 'Success', bonusTier: 'System' },
-    { id: 'tx-q7r8s9t0', wallet: '0xF7E....97531', bonus: '12,300.00 U', fees: '12.00 USDT', net: '12.00 USDT', time: '05-15-2025 16:20', status: 'Success', bonusTier: 'Merchant' },
-    { id: 'tx-u1v2w3x4', wallet: '0xF8F....86420', bonus: '5,600.00 U', fees: '5.00 USDT', net: '5.00 USDT', time: '06-16-2025 11:30', status: 'Success', bonusTier: 'User' },
-  ];
-
-  const bonusUnclaimList = [
-    { id: 'U000001', bonus: '10,000.00 U', update: '01-11-2025 13:00', status: 'Pending', bonusTier: 'System' },
-    { id: 'U000002', bonus: '15,500.00 U', update: '02-11-2025 14:30', status: 'Pending', bonusTier: 'Partner' },
-    { id: 'U000003', bonus: '7,250.00 U', update: '03-11-2025 09:45', status: 'Pending', bonusTier: 'Agent' },
-    { id: 'U000004', bonus: '9,800.00 U', update: '04-12-2025 15:20', status: 'Pending', bonusTier: 'System' },
-    { id: 'U000005', bonus: '13,400.00 U', update: '05-13-2025 12:10', status: 'Pending', bonusTier: 'Merchant' },
-    { id: 'U000006', bonus: '6,700.00 U', update: '06-14-2025 09:30', status: 'Pending', bonusTier: 'User' },
-  ];
 
   const handleApprove = (item) => {
     console.log('Approving bonus:', item.id);
@@ -134,13 +210,13 @@ export default function BonusManagement() {
   const BONUS_TIERS = ['System', 'Partner', 'Agent', 'Merchant', 'User'];
 
   // Filter by bonus tier first, then search and paginate
-  const filteredClaimList = bonusClaimList.filter(item => item.bonusTier === activeBonus);
+  const filteredClaimList = bonusClaimsData.filter(item => item.bonusTier === activeBonus);
   const { data: claimList, totalPages } = useMemo(
     () => filterAndPaginate(filteredClaimList, searchTerm, TRANSACTION_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
     [filteredClaimList, searchTerm, currentPage]
   );
 
-  const filteredUnclaimList = bonusUnclaimList.filter(item => item.bonusTier === activeBonusUnclaim);
+  const filteredUnclaimList = bonusUnclaimsData.filter(item => item.bonusTier === activeBonusUnclaim);
   const { data: unclaimList, totalPages: totalPagesUnclaim } = useMemo(
     () => filterAndPaginate(filteredUnclaimList, searchTermUnclaim, ['id', 'status'], currentPageUnclaim, ITEMS_PER_PAGE),
     [filteredUnclaimList, searchTermUnclaim, currentPageUnclaim]
@@ -244,11 +320,17 @@ export default function BonusManagement() {
               options={monthOptions}
               icon={<Calendar size={24} />}
             />
-            <MonthlyBonusTable
-              data={monthlyData}
-              totals={{ totalDistributed, totalClaim, totalUnclaim }}
-              emptyMessage={`No data available for ${selectedMonthLabel}`}
-            />
+            {loadingMonthly ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Loading monthly bonus data...</p>
+              </div>
+            ) : (
+              <MonthlyBonusTable
+                data={monthlyDataFinal}
+                totals={{ totalDistributed, totalClaim, totalUnclaim }}
+                emptyMessage={`No data available for ${selectedMonthLabel}`}
+              />
+            )}
           </div>
         </div>
 

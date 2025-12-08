@@ -499,6 +499,194 @@ export const api = {
   },
 
   // ============================================================================
+  // SYSTEM ADMIN MODULE
+  // ============================================================================
+  systemadmin: {
+    // Authentication
+    /**
+     * System Admin login.
+     * @param {Object} credentials - { username, password }
+     * @returns {Promise<Object>} { success, message, data: { token, token_expires_at, admin_type } }
+     */
+    login: (credentials) => request('/systemadmin/auth/login', { method: 'POST', body: JSON.stringify(credentials) }),
+
+    /**
+     * Get System Admin profile.
+     * Headers: Authorization: Bearer <token>
+     * @returns {Promise<Object>} Admin profile data
+     */
+    getProfile: () => request('/systemadmin/auth/profile', { method: 'GET' }),
+
+    // Dashboard
+    /**
+     * Get System Admin dashboard statistics.
+     * Headers: Authorization: Bearer <token>
+     * @returns {Promise<Object>} Dashboard stats
+     */
+    getDashboard: () => request('/systemadmin/dashboard', { method: 'GET' }),
+
+    // Merchant Management
+    /**
+     * Get merchant list.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} params - { page, search, tier }
+     * @returns {Promise<Object>} { success, data: [...], page, limit }
+     */
+    getMerchants: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`/systemadmin/merchants?${query}`, { method: 'GET' });
+    },
+
+    /**
+     * Create a new merchant.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} data - Merchant data
+     * @returns {Promise<Object>} { success, message, data: {...} }
+     */
+    createMerchant: (data) => request('/systemadmin/merchants', { method: 'POST', body: JSON.stringify(data) }),
+
+    /**
+     * Get merchant details.
+     * Headers: Authorization: Bearer <token>
+     * @param {string} id - Merchant ID
+     * @returns {Promise<Object>} Merchant details
+     */
+    getMerchantDetails: (id) => request(`/systemadmin/merchants/${id}`, { method: 'GET' }),
+
+    // Agent Management
+    /**
+     * Get agent list.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} params - { page, search }
+     * @returns {Promise<Object>} { success, data: [...], page, limit }
+     */
+    getAgents: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`/systemadmin/agents?${query}`, { method: 'GET' });
+    },
+
+    /**
+     * Get agent details.
+     * Headers: Authorization: Bearer <token>
+     * @param {string} id - Agent ID
+     * @returns {Promise<Object>} Agent details
+     */
+    getAgentDetails: (id) => request(`/systemadmin/agents/${id}`, { method: 'GET' }),
+
+    // User Management
+    /**
+     * Get user list.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} params - { page, search }
+     * @returns {Promise<Object>} { success, data: [...], page, limit }
+     */
+    getUsers: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`/systemadmin/users?${query}`, { method: 'GET' });
+    },
+
+    /**
+     * Get user details.
+     * Headers: Authorization: Bearer <token>
+     * @param {string} id - User ID
+     * @returns {Promise<Object>} User details
+     */
+    getUserDetails: (id) => request(`/systemadmin/users/${id}`, { method: 'GET' }),
+
+    // Transaction Management
+    /**
+     * Get transaction overview/statistics.
+     * Headers: Authorization: Bearer <token>
+     * @returns {Promise<Object>} Transaction overview stats
+     */
+    getTransactionOverview: () => request('/systemadmin/transactions/overview', { method: 'GET' }),
+
+    /**
+     * Get transaction list.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} params - { page, search, status, type }
+     * @returns {Promise<Object>} { success, data: [...], page, limit }
+     */
+    getTransactions: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`/systemadmin/transactions?${query}`, { method: 'GET' });
+    },
+
+    /**
+     * Get transaction details.
+     * Headers: Authorization: Bearer <token>
+     * @param {string} id - Transaction ID
+     * @returns {Promise<Object>} Transaction details
+     */
+    getTransactionDetails: (id) => request(`/systemadmin/transactions/${id}`, { method: 'GET' }),
+
+    // Bonus Management
+    /**
+     * Get bonus claims.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} params - { page, search }
+     * @returns {Promise<Object>} Bonus claims list
+     */
+    getBonusClaims: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`/systemadmin/bonus/claims?${query}`, { method: 'GET' });
+    },
+
+    /**
+     * Get bonus unclaims.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} params - { page, search }
+     * @returns {Promise<Object>} Bonus unclaims list
+     */
+    getBonusUnclaims: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`/systemadmin/bonus/unclaims?${query}`, { method: 'GET' });
+    },
+
+    /**
+     * Get monthly bonus data.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} params - { month (YYYY-MM) }
+     * @returns {Promise<Object>} Monthly bonus distribution
+     */
+    getMonthlyBonus: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`/systemadmin/bonus/monthly?${query}`, { method: 'GET' });
+    },
+
+    // Fees Management
+    /**
+     * Get fees list.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} params - { page, search }
+     * @returns {Promise<Object>} Fees list
+     */
+    getFees: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`/systemadmin/fees?${query}`, { method: 'GET' });
+    },
+
+    /**
+     * Get fees statistics.
+     * Headers: Authorization: Bearer <token>
+     * @returns {Promise<Object>} Fees statistics
+     */
+    getFeesStatistics: () => request('/systemadmin/fees/statistics', { method: 'GET' }),
+
+    // System Logs
+    /**
+     * Get system logs.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} params - { page, level, dateRange, status }
+     * @returns {Promise<Object>} { success, data: [...], page, limit }
+     */
+    getLogs: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`/systemadmin/logs?${query}`, { method: 'GET' });
+    },
+  },
+
+  // ============================================================================
   // ACCOUNT MODULE (T3 Admin) - Legacy, use t3admin.getAccounts instead
   // ============================================================================
   account: {

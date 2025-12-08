@@ -3,37 +3,73 @@ import { useNavigate } from 'react-router-dom';
 import { Eye } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader } from '../../components/ui';
 import { filterAndPaginate } from '../../lib/pagination';
+import { api } from '../../lib/api';
 
 const ITEMS_PER_PAGE = 10;
-const TRANSACTION_SEARCH_KEYS = ['id', 'type', 'orderno', 'status', 'reference'];
+const TRANSACTION_SEARCH_KEYS = ['id', 'wallet', 'amount', 'fees', 'status'];
 
 export default function FeesManagement() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [feesData, setFeesData] = useState([]);
+  const [feesStats, setFeesStats] = useState(null);
+
+  // Fetch fees data
+  useEffect(() => {
+    const fetchFees = async () => {
+      try {
+        setLoading(true);
+        const [feesResult, statsResult] = await Promise.all([
+          api.systemadmin.getFees({ page: 1 }), // Fetch all, filter client-side
+          api.systemadmin.getFeesStatistics()
+        ]);
+
+        if (feesResult && feesResult.success) {
+          const transformed = feesResult.data.map(f => ({
+            id: `tx-${f.id}`,
+            wallet: f.username ? `0x${f.username.slice(0, 5)}....${f.username.slice(-5)}` : 'N/A',
+            amount: `${(f.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+            fees: `${(f.fee_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`,
+            time: f.created_at ? new Date(f.created_at).toLocaleString('en-GB') : 'N/A',
+            status: f.status || 'Success'
+          }));
+          setFeesData(transformed);
+        } else {
+          setFeesData([]);
+        }
+
+        if (statsResult && statsResult.success) {
+          setFeesStats(statsResult.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch fees:', error);
+        setFeesData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchFees();
+  }, []);
 
   // Scroll to top when page changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
 
-  const allTransactions = [
-    { id: 'tx-a1b2c3d4', wallet: '0xF3A....12345', amount: '10,000.00 U', fees: '10.00 USDT', time: '01-11-2025 13:00', status: 'Success' },
-    { id: 'tx-e5f6g7h8', wallet: '0xF4B....67890', amount: '15,500.00 U', fees: '20.00 USDT', time: '02-12-2025 14:30', status: 'Success' },
-    { id: 'tx-i9j0k1l2', wallet: '0xF5C....13579', amount: '25,750.00 U', fees: '50.00 USDT', time: '03-13-2025 15:45', status: 'Success' },
-    { id: 'tx-m3n4o5p6', wallet: '0xF6D....24680', amount: '30,000.00 U', fees: '100.00 USDT', time: '04-14-2025 10:15', status: 'Success' },
-    { id: 'tx-q7r8s9t0', wallet: '0xF7E....35791', amount: '5,000.00 U', fees: '5.00 USDT', time: '05-15-2025 11:00', status: 'Success' },
-  ];
-
   // Apply search and pagination
   const { data: transactions, totalPages } = useMemo(
-    () => filterAndPaginate(allTransactions, searchTerm, TRANSACTION_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
-    [searchTerm, currentPage]
+    () => filterAndPaginate(feesData, searchTerm, TRANSACTION_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
+    [feesData, searchTerm, currentPage]
   );
 
-  const stats = [
-    { label: 'Total Fees Collect', value: '100,000.00 USDT', lastUpdate: '17-11-2025' },
-    { label: 'Monthly Fees Collect', value: '100,000.00 USDT', lastUpdate: '17-11-2025' },
+  const stats = feesStats ? [
+    { label: 'Total Fees Collect', value: `${(feesStats.total_fees || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, lastUpdate: new Date().toLocaleDateString('en-GB') },
+    { label: 'Monthly Fees Collect', value: `${(feesStats.monthly_fees || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, lastUpdate: new Date().toLocaleDateString('en-GB') },
+  ] : [
+    { label: 'Total Fees Collect', value: '0.00 USDT', lastUpdate: 'No data' },
+    { label: 'Monthly Fees Collect', value: '0.00 USDT', lastUpdate: 'No data' },
   ];
 
   const columns = [
@@ -75,16 +111,26 @@ export default function FeesManagement() {
               className="max-w-sm"
             />
 
-            <DataTable
-              columns={columns}
-              data={transactions}
-              actions={actions}
-              pagination={{
-                currentPage,
-                totalPages,
-                onPageChange: setCurrentPage,
-              }}
-            />
+            {loading ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Loading fees...</p>
+              </div>
+            ) : transactions.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No fees found</p>
+              </div>
+            ) : (
+              <DataTable
+                columns={columns}
+                data={transactions}
+                actions={actions}
+                pagination={{
+                  currentPage,
+                  totalPages,
+                  onPageChange: setCurrentPage,
+                }}
+              />
+            )}
           </div>
         </div>
       </div>

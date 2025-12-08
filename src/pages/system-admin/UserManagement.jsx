@@ -4,6 +4,7 @@ import { Eye, Settings, Trash2, ArrowRightLeft } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, ConfirmDialog, TransferModal } from '../../components/ui';
 import { filterAndPaginate } from '../../lib/pagination';
 import { t3Service } from '../../services/t3Service';
+import { api } from '../../lib/api';
 
 const ITEMS_PER_PAGE = 10;
 const USER_SEARCH_KEYS = ['id', 'status', 'spend', 'bonus', 'join'];
@@ -23,40 +24,55 @@ export default function UserManagement() {
   const isT3Admin = location.pathname.startsWith('/t3-admin');
   const basePath = isT3Admin ? '/t3-admin' : '/system-admin';
 
-  // Fetch users data for T3 Admin
+  // Fetch users data for T3 Admin or System Admin
   useEffect(() => {
     const fetchUsers = async () => {
-      if (!isT3Admin) {
-        // System admin uses mock data for now
-        setUsersData([
-          { id: 'U1234567890', walletId: '0x123456789abcdef', amount: '10,000.00 U', spend: '10,000.00 U', bonus: '10.00 U', join: '01-11-2025 13:00', status: 'Active' },
-          { id: 'U1234567891', walletId: '0x234567890abcdef', amount: '5,000.00 U', spend: '5,000.00 U', bonus: '5.00 U', join: '02-11-2025 14:00', status: 'Active' },
-        ]);
-        setLoading(false);
-        return;
-      }
-
       try {
         setLoading(true);
-        // Fetch all users (no search param - using client-side fuzzy search)
-        const [usersResult, dashboardResult] = await Promise.all([
-          t3Service.getUsers({ page: 1, search: '' }), // Fetch all, filter client-side
-          t3Service.getDashboard()
-        ]);
+        if (isT3Admin) {
+          // Fetch all users (no search param - using client-side fuzzy search)
+          const [usersResult, dashboardResult] = await Promise.all([
+            t3Service.getUsers({ page: 1, search: '' }), // Fetch all, filter client-side
+            t3Service.getDashboard()
+          ]);
 
-        if (usersResult.success) {
-          const transformed = usersResult.data.map(user => ({
-            id: user.id,
-            walletId: user.wallet_id || 'N/A',
-            amount: `${(user.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
-            join: user.join_time ? new Date(user.join_time).toLocaleString('en-GB') : 'N/A',
-            status: user.status || 'Active'
-          }));
-          setUsersData(transformed);
-        }
+          if (usersResult.success) {
+            const transformed = usersResult.data.map(user => ({
+              id: user.id,
+              walletId: user.wallet_id || 'N/A',
+              amount: `${(user.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+              join: user.join_time ? new Date(user.join_time).toLocaleString('en-GB') : 'N/A',
+              status: user.status || 'Active'
+            }));
+            setUsersData(transformed);
+          }
 
-        if (dashboardResult.success) {
-          setStatsData(dashboardResult.data);
+          if (dashboardResult.success) {
+            setStatsData(dashboardResult.data);
+          }
+        } else {
+          // System Admin - fetch from systemadmin API
+          const [usersResult, dashboardResult] = await Promise.all([
+            api.systemadmin.getUsers({ page: 1 }), // Fetch all, filter client-side
+            api.systemadmin.getDashboard()
+          ]);
+
+          if (usersResult && usersResult.success) {
+            const transformed = usersResult.data.map(user => ({
+              id: user.id || 'N/A',
+              spend: `${(user.total_spend || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+              bonus: `${(user.total_bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+              join: user.join_time ? new Date(user.join_time).toLocaleString('en-GB') : 'N/A',
+              status: user.status || 'Active'
+            }));
+            setUsersData(transformed);
+          } else {
+            setUsersData([]);
+          }
+
+          if (dashboardResult && dashboardResult.success) {
+            setStatsData(dashboardResult.data);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch users:', error);
