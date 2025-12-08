@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Eye, Check, X } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, ConfirmDialog, VerificationModal } from '../../components/ui';
 import { filterAndPaginate } from '../../lib/pagination';
+import { t3Service } from '../../services/t3Service';
 
 const ITEMS_PER_PAGE = 10;
 const SEARCH_KEYS = ['id', 'merchant', 'wallet', 'ref'];
@@ -37,6 +38,52 @@ export default function WithdrawalManagement() {
   const [approveModal, setApproveModal] = useState({ isOpen: false, item: null });
   const [rejectConfirm, setRejectConfirm] = useState({ isOpen: false, item: null });
   const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [withdrawalsData, setWithdrawalsData] = useState([]);
+  const [statsData, setStatsData] = useState(null);
+
+  // Fetch withdrawals data
+  useEffect(() => {
+    const fetchWithdrawals = async () => {
+      try {
+        setLoading(true);
+        // Fetch all applications (no search param - using client-side fuzzy search)
+        const result = await t3Service.getWithdrawalApplications({ 
+          page: 1, 
+          search: '', // Fetch all, filter client-side
+          status: 'pending'
+        });
+        
+        if (result.success) {
+          const transformed = result.data.map(w => ({
+            id: w.application_id || w.id?.toString(),
+            merchant: w.merchant_order_no || 'N/A',
+            amount: `${(w.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+            wallet: w.wallet_address ? `${w.wallet_address.substring(0, 6)}....${w.wallet_address.substring(w.wallet_address.length - 5)}` : 'N/A',
+            time: w.created_at ? new Date(w.created_at).toLocaleString('en-GB') : 'N/A',
+            ref: w.reference || 'N/A',
+            status: w.status || 'Pending',
+            rawData: w // Keep raw data for API calls
+          }));
+          setWithdrawalsData(transformed);
+          
+          // Calculate stats
+          const totalPending = result.data.length;
+          const totalAmount = result.data.reduce((sum, w) => sum + (w.amount || 0), 0);
+          setStatsData({
+            pending: totalPending,
+            totalAmount: totalAmount
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch withdrawals:', error);
+        setWithdrawalsData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchWithdrawals();
+  }, [currentPage, searchTerm]);
 
   // Scroll to top when page changes
   useEffect(() => {
@@ -44,8 +91,8 @@ export default function WithdrawalManagement() {
   }, [currentPage]);
 
   const { data: withdrawals, totalPages } = useMemo(
-    () => filterAndPaginate(ALL_WITHDRAWALS, searchTerm, SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
-    [searchTerm, currentPage]
+    () => filterAndPaginate(withdrawalsData, searchTerm, SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
+    [withdrawalsData, searchTerm, currentPage]
   );
 
   const handleSearchChange = (value) => {
@@ -53,16 +100,80 @@ export default function WithdrawalManagement() {
     setCurrentPage(1);
   };
 
-  const handleApproveWithVerification = (credentials) => {
-    console.log('Approving withdrawal:', approveModal.item?.id, 'with credentials:', credentials);
-    setApproveModal({ isOpen: false, item: null });
-    // TODO: api.withdrawal.approve(approveModal.item.id, credentials);
+  const handleApproveWithVerification = async (credentials) => {
+    const withdrawalId = approveModal.item?.rawData?.application_id || approveModal.item?.id;
+    if (!withdrawalId) return;
+
+    try {
+      const result = await t3Service.approveWithdrawal(withdrawalId);
+      if (result.success) {
+        alert('Withdrawal approved successfully!');
+        // Refresh the list
+        const refreshResult = await t3Service.getWithdrawalApplications({ 
+          page: currentPage, 
+          search: searchTerm,
+          status: 'pending'
+        });
+        if (refreshResult.success) {
+          const transformed = refreshResult.data.map(w => ({
+            id: w.application_id || w.id?.toString(),
+            merchant: w.merchant_order_no || 'N/A',
+            amount: `${(w.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+            wallet: w.wallet_address ? `${w.wallet_address.substring(0, 6)}....${w.wallet_address.substring(w.wallet_address.length - 5)}` : 'N/A',
+            time: w.created_at ? new Date(w.created_at).toLocaleString('en-GB') : 'N/A',
+            ref: w.reference || 'N/A',
+            status: w.status || 'Pending',
+            rawData: w
+          }));
+          setWithdrawalsData(transformed);
+        }
+      } else {
+        alert('Failed to approve withdrawal. Please try again.');
+      }
+    } catch (error) {
+      console.error('Failed to approve withdrawal:', error);
+      alert('Failed to approve withdrawal. Please try again.');
+    } finally {
+      setApproveModal({ isOpen: false, item: null });
+    }
   };
 
-  const handleReject = () => {
-    console.log('Rejecting withdrawal:', rejectConfirm.item?.id);
-    setRejectConfirm({ isOpen: false, item: null });
-    // TODO: api.withdrawal.reject(rejectConfirm.item.id, { reason: 'Invalid wallet' });
+  const handleReject = async () => {
+    const withdrawalId = rejectConfirm.item?.rawData?.application_id || rejectConfirm.item?.id;
+    if (!withdrawalId) return;
+
+    try {
+      const result = await t3Service.rejectWithdrawal(withdrawalId);
+      if (result.success) {
+        alert('Withdrawal rejected successfully!');
+        // Refresh the list
+        const refreshResult = await t3Service.getWithdrawalApplications({ 
+          page: currentPage, 
+          search: searchTerm,
+          status: 'pending'
+        });
+        if (refreshResult.success) {
+          const transformed = refreshResult.data.map(w => ({
+            id: w.application_id || w.id?.toString(),
+            merchant: w.merchant_order_no || 'N/A',
+            amount: `${(w.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+            wallet: w.wallet_address ? `${w.wallet_address.substring(0, 6)}....${w.wallet_address.substring(w.wallet_address.length - 5)}` : 'N/A',
+            time: w.created_at ? new Date(w.created_at).toLocaleString('en-GB') : 'N/A',
+            ref: w.reference || 'N/A',
+            status: w.status || 'Pending',
+            rawData: w
+          }));
+          setWithdrawalsData(transformed);
+        }
+      } else {
+        alert('Failed to reject withdrawal. Please try again.');
+      }
+    } catch (error) {
+      console.error('Failed to reject withdrawal:', error);
+      alert('Failed to reject withdrawal. Please try again.');
+    } finally {
+      setRejectConfirm({ isOpen: false, item: null });
+    }
   };
 
   const actions = useMemo(() => [
@@ -96,9 +207,21 @@ export default function WithdrawalManagement() {
         />
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {STATS.map((stat, idx) => (
-            <StatCard key={idx} {...stat} />
-          ))}
+          <StatCard 
+            label="Current Withdraw Application" 
+            value={statsData?.pending?.toString() || '0'} 
+            lastUpdate={new Date().toLocaleDateString('en-GB')} 
+          />
+          <StatCard 
+            label="Total Withdraw Approve" 
+            value="N/A" 
+            lastUpdate={new Date().toLocaleDateString('en-GB')} 
+          />
+          <StatCard 
+            label="Total Withdraw Amount" 
+            value={`${(statsData?.totalAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`} 
+            lastUpdate={new Date().toLocaleDateString('en-GB')} 
+          />
         </div>
 
         <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
@@ -111,16 +234,22 @@ export default function WithdrawalManagement() {
                 onChange={handleSearchChange}
                 className="max-w-sm"
               />
-              <DataTable
-                columns={COLUMNS}
-                data={withdrawals}
-                actions={actions}
-                pagination={{
-                  currentPage,
-                  totalPages,
-                  onPageChange: setCurrentPage,
-                }}
-              />
+              {loading ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Loading withdrawals...</p>
+                </div>
+              ) : (
+                <DataTable
+                  columns={COLUMNS}
+                  data={withdrawals}
+                  actions={actions}
+                  pagination={{
+                    currentPage,
+                    totalPages,
+                    onPageChange: setCurrentPage,
+                  }}
+                />
+              )}
             </div>
           </div>
         </div>

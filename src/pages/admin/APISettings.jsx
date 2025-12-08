@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Copy, RefreshCw, Save } from 'lucide-react';
-import { Card, FormField, Button, PageHeader, DataTable } from '../../components/ui';
+import { Card, FormField, Button, PageHeader, DataTable, SearchBar } from '../../components/ui';
 import { filterAndPaginate } from '../../lib/pagination';
+import { t3Service } from '../../services/t3Service';
 
 const ITEMS_PER_PAGE = 10;
-const LOG_SEARCH_KEYS = ['endpoint', 'status', 'ip'];
+const LOG_SEARCH_KEYS = ['date', 'endpoint', 'status', 'ip'];
 
 const EXAMPLE_JSON = {
   status: 200,
@@ -16,14 +17,7 @@ const EXAMPLE_JSON = {
   }
 };
 
-const ALL_LOGS = [
-  { date: '01-11-2025 13:00', endpoint: 'POST /api/v1/transactions', status: '200 OK', ip: '192.168.1.1' },
-  { date: '01-11-2025 13:05', endpoint: 'POST /api/v1/users', status: '201 Created', ip: '192.168.1.2' },
-  { date: '01-11-2025 13:10', endpoint: 'GET /api/v1/orders', status: '404 Not Found', ip: '192.168.1.3' },
-  { date: '01-11-2025 13:15', endpoint: 'GET /api/v1/transactions', status: '200 OK', ip: '192.168.1.1' },
-  { date: '01-11-2025 13:20', endpoint: 'PUT /api/v1/users/123', status: '200 OK', ip: '192.168.1.4' },
-  { date: '01-11-2025 13:25', endpoint: 'DELETE /api/v1/orders/456', status: '500 Error', ip: '192.168.1.5' },
-];
+// Removed ALL_LOGS mock data - using real API data only
 
 const LOG_COLUMNS = [
   { key: 'date', label: 'Date' },
@@ -59,15 +53,60 @@ export default function APISettings() {
     callbackUrl: 'https://your-website.com/api/callback'
   });
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [apiKeys, setApiKeys] = useState([]);
+  const [logsData, setLogsData] = useState([]);
+  const [selectedKeyId, setSelectedKeyId] = useState(null);
+
+  // Fetch API keys and logs
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [keysResult, logsResult] = await Promise.all([
+          t3Service.getAPIKeys(),
+          t3Service.getAPILogs({ page: 1 }) // Fetch all logs, paginate client-side
+        ]);
+
+        if (keysResult.success && keysResult.data && keysResult.data.length > 0) {
+          const firstKey = keysResult.data[0];
+          setKeys({
+            apiKey: firstKey.api_key || firstKey.api_key_full || 'prod_****************ab12',
+            secretKey: firstKey.secret_key || 'XyZ123!@#456',
+            merchantKey: firstKey.merchant_key || 'XyZ123!@#456',
+            callbackUrl: firstKey.backend_url || 'https://your-website.com/api/callback'
+          });
+          setApiKeys(keysResult.data);
+          setSelectedKeyId(firstKey.id);
+        }
+
+        if (logsResult.success) {
+          const transformed = logsResult.data.map(log => ({
+            date: log.created_at ? new Date(log.created_at).toLocaleString('en-GB') : '',
+            endpoint: log.event_endpoint || '',
+            status: `${log.status} ${log.status === '200' ? 'OK' : log.status === '201' ? 'Created' : log.status === '404' ? 'Not Found' : log.status === '500' ? 'Error' : ''}`,
+            ip: log.ip_address || ''
+          }));
+          setLogsData(transformed);
+        }
+      } catch (error) {
+        console.error('Failed to fetch API settings:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [currentPage]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
 
-  // Paginate logs
+  // Apply client-side search and pagination (local fuzzy search)
   const { data: logs, totalPages } = useMemo(
-    () => filterAndPaginate(ALL_LOGS, '', LOG_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
-    [currentPage]
+    () => filterAndPaginate(logsData, searchTerm, LOG_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
+    [logsData, searchTerm, currentPage]
   );
 
   const copyToClipboard = (text) => {
@@ -75,18 +114,60 @@ export default function APISettings() {
     console.log('Copied to clipboard:', text);
   };
 
-  const handleCreateNewKey = () => {
-    const newKeys = {
-      ...keys,
-      apiKey: 'prod_' + Math.random().toString(36).substr(2, 16),
-      secretKey: Math.random().toString(36).substr(2, 12),
-      merchantKey: Math.random().toString(36).substr(2, 12),
-    };
-    setKeys(newKeys);
+  const handleCreateNewKey = async () => {
+    const keyName = prompt('Enter a name for this API key:');
+    if (!keyName) return;
+
+    try {
+      const result = await t3Service.createAPIKey({
+        key_name: keyName,
+        backend_url: keys.callbackUrl,
+        merchant_key: keys.merchantKey
+      });
+
+      if (result.success && result.data) {
+        // Show the new key (secret_key is only shown once)
+        alert(`API Key created!\nAPI Key: ${result.data.api_key}\nSecret Key: ${result.data.secret_key}\n\nPlease save the secret key - it won't be shown again!`);
+        
+        // Refresh keys list
+        const keysResult = await t3Service.getAPIKeys();
+        if (keysResult.success && keysResult.data && keysResult.data.length > 0) {
+          const latestKey = keysResult.data[keysResult.data.length - 1];
+          setKeys({
+            apiKey: latestKey.api_key || latestKey.api_key_full || 'prod_****************ab12',
+            secretKey: result.data.secret_key, // Show the secret only from creation response
+            merchantKey: latestKey.merchant_key || 'XyZ123!@#456',
+            callbackUrl: latestKey.backend_url || 'https://your-website.com/api/callback'
+          });
+          setApiKeys(keysResult.data);
+          setSelectedKeyId(latestKey.id);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to create API key:', error);
+      alert('Failed to create API key. Please try again.');
+    }
   };
 
-  const handleSave = () => {
-    console.log('Saving API settings...', keys);
+  const handleSave = async () => {
+    if (!selectedKeyId) {
+      alert('No API key selected');
+      return;
+    }
+
+    try {
+      const result = await t3Service.updateCallbackSettings({
+        backend_url: keys.callbackUrl,
+        key_id: selectedKeyId
+      });
+
+      if (result.success) {
+        alert('Callback settings updated successfully!');
+      }
+    } catch (error) {
+      console.error('Failed to update callback settings:', error);
+      alert('Failed to update callback settings. Please try again.');
+    }
   };
 
   const KeyInput = ({ label, value, onCopy }) => (
@@ -107,6 +188,17 @@ export default function APISettings() {
       </div>
     </FormField>
   );
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="API Setting & Logs" description="Overview of all merchants-related configurations and activity logs." />
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">Loading API settings...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -168,6 +260,17 @@ export default function APISettings() {
       </div>
 
       <Card title="API Logs">
+        <div className="mb-4">
+          <SearchBar
+            placeholder="Search logs by endpoint, status, IP..."
+            value={searchTerm}
+            onChange={(value) => {
+              setSearchTerm(value);
+              setCurrentPage(1);
+            }}
+            className="max-w-sm"
+          />
+        </div>
         <DataTable
           columns={LOG_COLUMNS}
           data={logs}

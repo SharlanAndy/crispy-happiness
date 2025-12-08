@@ -9,6 +9,8 @@ import SelectInput from '../../components/form/SelectInput';
 import PasswordInput from '../../components/form/PasswordInput';
 import TextInputWithDropdown from '../../components/form/TextInputWithDropdown';
 import countriesAndStates from '../../constant/countriesAndStates.json';
+import { authService } from '../../services/authService';
+import { api } from '../../lib/api';
 import {
   MERCHANT_TYPES,
   CURRENCIES,
@@ -99,9 +101,62 @@ export default function UnifiedSettings() {
 
   // Determine if admin is viewing another user's settings
   const isAdminView = (isSystemAdmin || isT3Admin) && id;
+  
+  // State for T3 admin profile
+  const [t3AdminProfile, setT3AdminProfile] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+
+  // Fetch T3 admin profile if viewing own settings
+  useEffect(() => {
+    const fetchT3AdminProfile = async () => {
+      if (isT3Admin && !id) {
+        // T3 admin viewing their own settings
+        setLoadingProfile(true);
+        try {
+          // First try to get from localStorage
+          const storedProfile = localStorage.getItem('t3admin_profile');
+          if (storedProfile) {
+            setT3AdminProfile(JSON.parse(storedProfile));
+          }
+          
+          // Then fetch fresh data from API
+          const response = await api.t3admin.getProfile();
+          if (response && response.success && response.data) {
+            setT3AdminProfile(response.data);
+            localStorage.setItem('t3admin_profile', JSON.stringify(response.data));
+            
+            // Update user in localStorage with profile data
+            const user = authService.getCurrentUser();
+            if (user) {
+              const updatedUser = {
+                ...user,
+                ...response.data,
+                wallet_address: response.data.wallet_address
+              };
+              localStorage.setItem('user', JSON.stringify(updatedUser));
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch T3 admin profile:', error);
+        } finally {
+          setLoadingProfile(false);
+        }
+      }
+    };
+    fetchT3AdminProfile();
+  }, [isT3Admin, id]);
 
   // Role-based tab configuration
   const getTabs = () => {
+    // T3 Admin viewing their own settings
+    if (isT3Admin && !id) {
+      return [
+        { id: 'profile', label: 'Profile Information', icon: User },
+        { id: 'wallet', label: 'Wallet Address', icon: Wallet },
+        { id: 'security', label: 'Security', icon: Lock },
+      ];
+    }
+    
     if (isAdminView) {
       // Admin viewing another user's settings
       if (entityType === 'agent') {
@@ -458,9 +513,70 @@ export default function UnifiedSettings() {
           {activeTab === 'profile' && (
             <div className="space-y-6">
               <h2 className="text-lg font-semibold">Profile Information</h2>
-              <FormField label="Email Address" icon={<Mail size={18} />}>
-                <input type="email" value="testing@gmail.com" readOnly className="w-full px-3 py-2 rounded-md bg-secondary/50 border-none" />
-              </FormField>
+              {loadingProfile ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Loading profile...</p>
+                </div>
+              ) : (
+                <>
+                  <FormField label="Username" icon={<User size={18} />}>
+                    <input 
+                      type="text" 
+                      value={t3AdminProfile?.username || authService.getCurrentUser()?.username || ''} 
+                      readOnly 
+                      className="w-full px-3 py-2 rounded-md bg-secondary/50 border-none" 
+                    />
+                  </FormField>
+                  <FormField label="Email Address" icon={<Mail size={18} />}>
+                    <input 
+                      type="email" 
+                      value={t3AdminProfile?.email || authService.getCurrentUser()?.email || ''} 
+                      readOnly 
+                      className="w-full px-3 py-2 rounded-md bg-secondary/50 border-none" 
+                    />
+                  </FormField>
+                  {t3AdminProfile?.first_name && (
+                    <FormField label="First Name" icon={<User size={18} />}>
+                      <input 
+                        type="text" 
+                        value={t3AdminProfile.first_name} 
+                        readOnly 
+                        className="w-full px-3 py-2 rounded-md bg-secondary/50 border-none" 
+                      />
+                    </FormField>
+                  )}
+                  {t3AdminProfile?.last_name && (
+                    <FormField label="Last Name" icon={<User size={18} />}>
+                      <input 
+                        type="text" 
+                        value={t3AdminProfile.last_name} 
+                        readOnly 
+                        className="w-full px-3 py-2 rounded-md bg-secondary/50 border-none" 
+                      />
+                    </FormField>
+                  )}
+                  {t3AdminProfile?.phone && (
+                    <FormField label="Phone" icon={<User size={18} />}>
+                      <input 
+                        type="text" 
+                        value={t3AdminProfile.phone} 
+                        readOnly 
+                        className="w-full px-3 py-2 rounded-md bg-secondary/50 border-none" 
+                      />
+                    </FormField>
+                  )}
+                  {t3AdminProfile?.character && (
+                    <FormField label="Character" icon={<User size={18} />}>
+                      <input 
+                        type="text" 
+                        value={t3AdminProfile.character} 
+                        readOnly 
+                        className="w-full px-3 py-2 rounded-md bg-secondary/50 border-none" 
+                      />
+                    </FormField>
+                  )}
+                </>
+              )}
             </div>
           )}
 
@@ -471,7 +587,12 @@ export default function UnifiedSettings() {
                 Please be advised that the limit for changing your wallet address is once every 24 hours.
               </div>
               <FormField label="Wallet Address" icon={<Wallet size={18} />}>
-                <input type="text" value="0xF3A1B2C3D4E5F67890123456789AB45" className="w-full px-3 py-2 rounded-md border bg-background" />
+                <input 
+                  type="text" 
+                  value={t3AdminProfile?.wallet_address || authService.getCurrentUser()?.wallet_address || ''} 
+                  readOnly
+                  className="w-full px-3 py-2 rounded-md bg-secondary/50 border-none" 
+                />
               </FormField>
               <FormField label="TAC Code">
                 <div className="flex gap-2">

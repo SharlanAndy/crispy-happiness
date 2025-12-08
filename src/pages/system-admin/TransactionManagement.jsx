@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, ArrowDownToLine } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader } from '../../components/ui';
 import { filterAndPaginate } from '../../lib/pagination';
+import { t3Service } from '../../services/t3Service';
+import { api } from '../../lib/api';
 
 const ITEMS_PER_PAGE = 10;
 const TRANSACTION_SEARCH_KEYS = ['id', 'type', 'orderno', 'status', 'reference'];
@@ -36,10 +38,58 @@ export default function TransactionManagement() {
   const location = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [transactionsData, setTransactionsData] = useState([]);
+  const [statsData, setStatsData] = useState(null);
 
   // Detect if accessed from T3 Admin or System Admin
   const isT3Admin = location.pathname.startsWith('/t3-admin');
   const basePath = isT3Admin ? '/t3-admin' : '/system-admin';
+
+  // Fetch transactions data
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      try {
+        setLoading(true);
+        // Fetch all transactions (no search param - using client-side fuzzy search)
+        const [transactionsResult, overviewResult] = await Promise.all([
+          isT3Admin 
+            ? t3Service.getTransactions({ page: 1, search: '' }) // Fetch all, filter client-side
+            : api.request(`/systemadmin/transactions?page=${currentPage}&search=${encodeURIComponent(searchTerm || '')}`, { method: 'GET' }),
+          isT3Admin
+            ? t3Service.getTransactionOverview()
+            : api.request('/systemadmin/transactions/overview', { method: 'GET' })
+        ]);
+
+        if (transactionsResult.success) {
+          const transformed = transactionsResult.data.map(t => ({
+            id: `T${String(t.id || t.transaction_id || '').padStart(6, '0')}`,
+            type: t.type || 'Payment',
+            merchantOrderNo: t.merchant_order_no || t.description || 'N/A',
+            amount: `${(t.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t.currency || 'U'}`,
+            net: `${((t.amount || 0) * 0.1).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t.currency || 'U'}`,
+            bonus: `${((t.amount || 0) * 0.01).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t.currency || 'U'}`,
+            referralFees: `${((t.amount || 0) * 0.004).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t.currency || 'U'}`,
+            time: t.created_at ? new Date(t.created_at).toLocaleString('en-GB') : 'N/A',
+            reference: t.description || t.reference || 'N/A',
+            status: t.status === 'completed' ? 'Success' : t.status === 'pending' ? 'Pending' : t.status === 'failed' ? 'Failed' : t.status || 'Success',
+            rawData: t
+          }));
+          setTransactionsData(transformed);
+        }
+
+        if (overviewResult.success) {
+          setStatsData(overviewResult.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch transactions:', error);
+        setTransactionsData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTransactions();
+  }, [currentPage, searchTerm, isT3Admin]);
 
   // Scroll to top when page changes
   useEffect(() => {
@@ -48,8 +98,8 @@ export default function TransactionManagement() {
 
   // Apply search and pagination
   const { data: transactions, totalPages } = useMemo(
-    () => filterAndPaginate(ALL_TRANSACTIONS, searchTerm, TRANSACTION_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
-    [searchTerm, currentPage]
+    () => filterAndPaginate(transactionsData, searchTerm, TRANSACTION_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
+    [transactionsData, searchTerm, currentPage]
   );
 
   const handleSearchChange = (value) => {
@@ -62,7 +112,7 @@ export default function TransactionManagement() {
     const headers = COLUMNS.map(col => col.label).join(',');
     
     // CSV rows from transaction data
-    const rows = ALL_TRANSACTIONS.map(transaction => 
+    const rows = transactionsData.map(transaction => 
       COLUMNS.map(col => {
         const value = transaction[col.key] || '';
         // Escape values containing commas or quotes
@@ -101,9 +151,16 @@ export default function TransactionManagement() {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {STATS.map((stat, idx) => (
-          <StatCard key={idx} {...stat} />
-        ))}
+        <StatCard 
+          label="Total Transaction" 
+          value={statsData ? `${(statsData.total_volume || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT` : '0.00 USDT'} 
+          lastUpdate={new Date().toLocaleDateString('en-GB')} 
+        />
+        <StatCard 
+          label="Today Transaction" 
+          value={statsData ? `${(statsData.today_volume || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT` : '0.00 USDT'} 
+          lastUpdate={new Date().toLocaleDateString('en-GB')} 
+        />
       </div>
 
       <button
@@ -126,16 +183,22 @@ export default function TransactionManagement() {
               className="max-w-sm"
             />
 
-            <DataTable
-              columns={COLUMNS}
-              data={transactions}
-              actions={actions}
-              pagination={{
-                currentPage,
-                totalPages,
-                onPageChange: setCurrentPage,
-              }}
-            />
+            {loading ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Loading transactions...</p>
+              </div>
+            ) : (
+              <DataTable
+                columns={COLUMNS}
+                data={transactions}
+                actions={actions}
+                pagination={{
+                  currentPage,
+                  totalPages,
+                  onPageChange: setCurrentPage,
+                }}
+              />
+            )}
           </div>
         </div>
       </div>

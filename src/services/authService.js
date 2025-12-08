@@ -77,18 +77,50 @@ export const authService = {
       }
       throw new Error('Invalid credentials');
     } else {
-      // Use T3Admin login endpoint only
+      // Use T3Admin login endpoint
       const response = await api.t3admin.login({ username, password });
       if (response && response.success && response.data) {
+        const token = response.data.token;
+        localStorage.setItem('token', token);
+        
+        // Fetch profile after login to get full user data
+        try {
+          const profileResponse = await api.t3admin.getProfile();
+          if (profileResponse && profileResponse.success && profileResponse.data) {
+            const profile = profileResponse.data;
+            const userData = {
+              id: profile.id || username,
+              username: profile.username || username,
+              role: 't3-admin',
+              email: profile.email || `${username}@nbn.com`,
+              first_name: profile.first_name,
+              last_name: profile.last_name,
+              phone: profile.phone,
+              admin_type: profile.admin_type,
+              character: profile.character,
+              wallet_address: profile.wallet_address,
+              status: profile.status,
+              last_login: profile.last_login,
+              created_at: profile.created_at,
+              token: token
+            };
+            localStorage.setItem('user', JSON.stringify(userData));
+            localStorage.setItem('t3admin_profile', JSON.stringify(profile)); // Store full profile
+            return userData;
+          }
+        } catch (profileError) {
+          console.warn('Failed to fetch profile after login, using basic data:', profileError);
+        }
+        
+        // Fallback to basic data if profile fetch fails
         const userData = {
-          id: username, // T3Admin response doesn't include id in data, use username as id
+          id: username,
           username: username,
           role: 't3-admin',
           email: `${username}@nbn.com`,
-          token: response.data.token
+          token: token
         };
         localStorage.setItem('user', JSON.stringify(userData));
-        localStorage.setItem('token', response.data.token);
         return userData;
       }
       throw new Error('Invalid credentials');
@@ -118,15 +150,47 @@ export const authService = {
     } else {
       const response = await api.t3admin.login({ username, password });
       if (response && response.success && response.data) {
+        const token = response.data.token;
+        localStorage.setItem('token', token);
+        
+        // Fetch profile after login to get full user data
+        try {
+          const profileResponse = await api.t3admin.getProfile();
+          if (profileResponse && profileResponse.success && profileResponse.data) {
+            const profile = profileResponse.data;
+            const userData = {
+              id: profile.id || username,
+              username: profile.username || username,
+              role: 't3-admin',
+              email: profile.email || `${username}@nbn.com`,
+              first_name: profile.first_name,
+              last_name: profile.last_name,
+              phone: profile.phone,
+              admin_type: profile.admin_type,
+              character: profile.character,
+              wallet_address: profile.wallet_address,
+              status: profile.status,
+              last_login: profile.last_login,
+              created_at: profile.created_at,
+              token: token
+            };
+            localStorage.setItem('user', JSON.stringify(userData));
+            localStorage.setItem('t3admin_profile', JSON.stringify(profile)); // Store full profile
+            return userData;
+          }
+        } catch (profileError) {
+          console.warn('Failed to fetch profile after login, using basic data:', profileError);
+        }
+        
+        // Fallback to basic data if profile fetch fails
         const userData = {
           id: username,
           username: username,
           role: 't3-admin',
           email: `${username}@nbn.com`,
-          token: response.data.token
+          token: token
         };
         localStorage.setItem('user', JSON.stringify(userData));
-        localStorage.setItem('token', response.data.token);
         return userData;
       }
       throw new Error(response.message || 'Invalid credentials');

@@ -489,5 +489,132 @@ export const t3Service = {
       }));
     }
     throw new Error('Failed to fetch withdrawals');
+  },
+
+  /**
+   * Get transaction overview/statistics
+   * Note: Uses system admin endpoint - T3 admin may need specific endpoint
+   * @returns {Promise<Object>} Transaction overview stats
+   */
+  getTransactionOverview: async () => {
+    const mockData = {
+      success: true,
+      data: {
+        total_transactions: 0,
+        total_volume: 0,
+        today_transactions: 0,
+        today_volume: 0,
+        monthly_transactions: 0,
+        monthly_volume: 0
+      }
+    };
+
+    if (api.config.useMock) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return mockData;
+    }
+    
+    try {
+      // Try using system admin endpoint (if T3 admin has access)
+      const result = await api.request('/systemadmin/transactions/overview', { method: 'GET' });
+      return result || mockData;
+    } catch (error) {
+      console.warn('[T3Service] Transaction overview API failed, using empty data:', error);
+      return mockData;
+    }
+  },
+
+  /**
+   * Get transaction list
+   * Note: Uses system admin endpoint - T3 admin may need specific endpoint
+   * @param {Object} params - { page, search, status, type }
+   * @returns {Promise<Object>} Transaction list
+   */
+  getTransactions: async (params = {}) => {
+    const mockData = {
+      success: true,
+      data: [],
+      page: params.page || 1,
+      limit: 20
+    };
+
+    if (api.config.useMock) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return mockData;
+    }
+    
+    try {
+      const query = new URLSearchParams(params).toString();
+      const result = await api.request(`/systemadmin/transactions?${query}`, { method: 'GET' });
+      return result || mockData;
+    } catch (error) {
+      console.warn('[T3Service] Transactions API failed, using empty data:', error);
+      return mockData;
+    }
+  },
+
+  /**
+   * Get transaction details
+   * Note: Uses system admin endpoint - T3 admin may need specific endpoint
+   * @param {string} id - Transaction ID
+   * @returns {Promise<Object>} Transaction details
+   */
+  getTransactionDetails: async (id) => {
+    const mockData = {
+      success: true,
+      data: {
+        id: parseInt(id),
+        type: 'payment',
+        amount: 0,
+        status: 'completed',
+        created_at: new Date().toISOString()
+      }
+    };
+
+    if (api.config.useMock) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return mockData;
+    }
+    
+    try {
+      const result = await api.request(`/systemadmin/transactions/${id}`, { method: 'GET' });
+      return result || mockData;
+    } catch (error) {
+      console.warn('[T3Service] Transaction details API failed, using empty data:', error);
+      return mockData;
+    }
+  },
+
+  /**
+   * Get merchant details
+   * Note: Uses system admin endpoint - T3 admin may need specific endpoint
+   * @param {string} id - Merchant ID
+   * @returns {Promise<Object>} Merchant details
+   */
+  getMerchantDetails: async (id) => {
+    const mockData = {
+      success: true,
+      data: {
+        id: parseInt(id),
+        business_name: '',
+        name: '',
+        email: '',
+        wallet_address: '',
+        status: 'active'
+      }
+    };
+
+    if (api.config.useMock) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return mockData;
+    }
+    
+    try {
+      const result = await api.request(`/systemadmin/merchants/${id}`, { method: 'GET' });
+      return result || mockData;
+    } catch (error) {
+      console.warn('[T3Service] Merchant details API failed, using empty data:', error);
+      return mockData;
+    }
   }
 };

@@ -2,23 +2,63 @@ import { useState, useEffect, useMemo } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, PageHeader, StatCard } from '../../components/ui';
+import { t3Service } from '../../services/t3Service';
 
 export default function T3AdminDashboard() {
   const [currentPage] = useState(1);
   const [selectedStartDate, setSelectedStartDate] = useState('14 Nov 2025');
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState(null);
+
+  // Fetch dashboard data
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        setLoading(true);
+        const result = await t3Service.getDashboard();
+        if (result.success) {
+          setDashboardData(result.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch dashboard:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboard();
+  }, []);
 
   // Scroll to top when page changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
   
-  const stats = [
-    { label: 'Total Incoming Funds', value: '6,000.00 USDT', lastUpdate: '17-11-2025', },
-    { label: 'Total Outgoing Funds', value: '4,000.00 USDT', lastUpdate: '17-11-2025', type: 'outgoing' },
-    { label: 'Monthly Incoming Funds', value: '4,000.00 USDT', lastUpdate: '17-11-2025', type: 'outgoing' },
-    { label: 'Monthly Outgoing Funds', value: '4,000.00 USDT', lastUpdate: '17-11-2025', type: 'outgoing' },
-  ];
+  // Format stats from API data
+  const stats = useMemo(() => {
+    if (!dashboardData) {
+      return [
+        { label: 'Total Incoming Funds', value: '0.00 USDT', lastUpdate: new Date().toLocaleDateString('en-GB') },
+        { label: 'Total Outgoing Funds', value: '0.00 USDT', lastUpdate: new Date().toLocaleDateString('en-GB'), type: 'outgoing' },
+        { label: 'Monthly Incoming Funds', value: '0.00 USDT', lastUpdate: new Date().toLocaleDateString('en-GB'), type: 'outgoing' },
+        { label: 'Monthly Outgoing Funds', value: '0.00 USDT', lastUpdate: new Date().toLocaleDateString('en-GB'), type: 'outgoing' },
+      ];
+    }
+    
+    const formatCurrency = (value) => {
+      return new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(value);
+    };
+
+    return [
+      { label: 'Total Incoming Funds', value: `${formatCurrency(dashboardData.total_incoming_funds || 0)} USDT`, lastUpdate: new Date().toLocaleDateString('en-GB') },
+      { label: 'Total Outgoing Funds', value: `${formatCurrency(dashboardData.total_outgoing_funds || 0)} USDT`, lastUpdate: new Date().toLocaleDateString('en-GB'), type: 'outgoing' },
+      { label: 'Monthly Incoming Funds', value: `${formatCurrency(dashboardData.monthly_incoming_funds || 0)} USDT`, lastUpdate: new Date().toLocaleDateString('en-GB'), type: 'outgoing' },
+      { label: 'Monthly Outgoing Funds', value: `${formatCurrency(dashboardData.monthly_outgoing_funds || 0)} USDT`, lastUpdate: new Date().toLocaleDateString('en-GB'), type: 'outgoing' },
+    ];
+  }, [dashboardData]);
 
   // All weekly chart data - full dataset
   const allWeeklyData = {
@@ -81,6 +121,20 @@ export default function T3AdminDashboard() {
     }
     return null;
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Dashboard Overview"
+          description="Manage Merchant Dashboard Information and Others Details"
+        />
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
      <div className="space-y-6">

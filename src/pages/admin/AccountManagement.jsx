@@ -4,17 +4,12 @@ import { Eye, Settings, Trash2, Plus } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, Modal, Button, FormField, ConfirmDialog } from '../../components/ui';
 import { TextInput, PasswordInput } from '../../components/form';
 import { filterAndPaginate } from '../../lib/pagination';
+import { t3Service } from '../../services/t3Service';
 
 const ITEMS_PER_PAGE = 10;
 const SEARCH_KEYS = ['id', 'username', 'character', 'status'];
 
-const ALL_ACCOUNTS = [
-  { id: '001', username: 'finance1', character: 'Finance', lastLogin: '2 hours ago', created: '01-11-2025 13:00', status: 'Active' },
-  { id: '002', username: 'finance2', character: 'Finance', lastLogin: '3 hours ago', created: '01-11-2025 14:00', status: 'Active' },
-  { id: '003', username: 'finance3', character: 'Finance', lastLogin: '4 hours ago', created: '01-11-2025 15:00', status: 'Inactive' },
-  { id: '004', username: 'finance4', character: 'Finance', lastLogin: '1 day ago', created: '02-11-2025 10:00', status: 'Active' },
-  { id: '005', username: 'finance5', character: 'Finance', lastLogin: '2 days ago', created: '03-11-2025 11:00', status: 'Inactive' },
-];
+// Removed ALL_ACCOUNTS mock data - using real API data only
 
 const STATS = [
   { label: 'Total Account User', value: '5', lastUpdate: '17-11-2025' },
@@ -36,6 +31,9 @@ export default function AccountManagement() {
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, item: null });
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [accountsData, setAccountsData] = useState([]);
+  const [totalAccounts, setTotalAccounts] = useState(0);
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -44,14 +42,54 @@ export default function AccountManagement() {
   });
 
   const basePath = location.pathname.startsWith('/t3-admin') ? '/t3-admin' : '/system-admin';
+  const isT3Admin = location.pathname.startsWith('/t3-admin');
+
+  // Fetch accounts data
+  useEffect(() => {
+    const fetchAccounts = async () => {
+      if (!isT3Admin) {
+        // System admin - no mock data, use empty array
+        setAccountsData([]);
+        setTotalAccounts(0);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        // Fetch all accounts (no search param - using client-side fuzzy search)
+        const result = await t3Service.getAccounts({ page: 1, search: '' }); // Fetch all, filter client-side
+        if (result.success) {
+          // Transform API data to match table format
+          const transformed = result.data.map(acc => ({
+            id: acc.id.toString(),
+            username: acc.username,
+            character: acc.character || 'Finance',
+            lastLogin: acc.last_login ? new Date(acc.last_login).toLocaleString('en-GB') : 'Never',
+            created: acc.created_at ? new Date(acc.created_at).toLocaleString('en-GB') : '',
+            status: acc.status || 'Active'
+          }));
+          setAccountsData(transformed);
+          setTotalAccounts(result.total || transformed.length);
+        }
+      } catch (error) {
+        console.error('Failed to fetch accounts:', error);
+        setAccountsData(ALL_ACCOUNTS);
+        setTotalAccounts(ALL_ACCOUNTS.length);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAccounts();
+  }, [currentPage, searchTerm, isT3Admin]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
 
   const { data: accounts, totalPages } = useMemo(
-    () => filterAndPaginate(ALL_ACCOUNTS, searchTerm, SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
-    [searchTerm, currentPage]
+    () => filterAndPaginate(accountsData, searchTerm, SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
+    [accountsData, searchTerm, currentPage]
   );
 
   const handleSearchChange = (value) => {
@@ -79,11 +117,42 @@ export default function AccountManagement() {
     setFormData({ username: '', password: '', email: '', walletAddress: '' });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (modalState.mode === 'create') {
-      console.log('Creating finance account:', formData);
+      if (isT3Admin) {
+        try {
+          const result = await t3Service.createAccount({
+            username: formData.username,
+            email: formData.email,
+            password: formData.password,
+            wallet_address: formData.walletAddress
+          });
+          if (result.success) {
+            // Refresh accounts list
+            const fetchResult = await t3Service.getAccounts({ page: currentPage, search: searchTerm });
+            if (fetchResult.success) {
+              const transformed = fetchResult.data.map(acc => ({
+                id: acc.id.toString(),
+                username: acc.username,
+                character: acc.character || 'Finance',
+                lastLogin: acc.last_login ? new Date(acc.last_login).toLocaleString('en-GB') : 'Never',
+                created: acc.created_at ? new Date(acc.created_at).toLocaleString('en-GB') : '',
+                status: acc.status || 'Active'
+              }));
+              setAccountsData(transformed);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to create account:', error);
+          alert('Failed to create account. Please try again.');
+          return;
+        }
+      } else {
+        console.log('Creating finance account:', formData);
+      }
     } else {
       console.log('Updating finance account:', modalState.editingId, formData);
+      // TODO: Implement update API when available
     }
     handleCloseModal();
   };
@@ -121,9 +190,11 @@ export default function AccountManagement() {
         />
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {STATS.map((stat, idx) => (
-            <StatCard key={idx} {...stat} />
-          ))}
+          <StatCard 
+            label="Total Account User" 
+            value={totalAccounts.toString()} 
+            lastUpdate={new Date().toLocaleDateString('en-GB')} 
+          />
         </div>
 
         {/* New Finance Button */}
@@ -147,16 +218,22 @@ export default function AccountManagement() {
                 onChange={handleSearchChange}
                 className="max-w-sm"
               />
-              <DataTable
-                columns={COLUMNS}
-                data={accounts}
-                actions={actions}
-                pagination={{
-                  currentPage,
-                  totalPages,
-                  onPageChange: setCurrentPage,
-                }}
-              />
+              {loading ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Loading accounts...</p>
+                </div>
+              ) : (
+                <DataTable
+                  columns={COLUMNS}
+                  data={accounts}
+                  actions={actions}
+                  pagination={{
+                    currentPage,
+                    totalPages,
+                    onPageChange: setCurrentPage,
+                  }}
+                />
+              )}
             </div>
           </div>
         </div>

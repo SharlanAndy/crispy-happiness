@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Eye } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader } from '../../components/ui';
 import { filterAndPaginate } from '../../lib/pagination';
+import { t3Service } from '../../services/t3Service';
 
 const ITEMS_PER_PAGE = 10;
 const SEARCH_KEYS = ['id', 'wallet', 'amount'];
@@ -44,6 +45,62 @@ export default function WithdrawalHistory() {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState('approved');
+  const [loading, setLoading] = useState(true);
+  const [withdrawalsData, setWithdrawalsData] = useState({ approved: [], rejected: [] });
+  const [statsData, setStatsData] = useState(null);
+
+  // Fetch withdrawals history
+  useEffect(() => {
+    const fetchWithdrawals = async () => {
+      try {
+        setLoading(true);
+        // Fetch all history (no page param - using client-side pagination and search)
+        const [approvedResult, rejectedResult] = await Promise.all([
+          t3Service.getWithdrawalHistory({ page: 1, status: 'approved' }), // Fetch all, paginate client-side
+          t3Service.getWithdrawalHistory({ page: 1, status: 'rejected' }) // Fetch all, paginate client-side
+        ]);
+
+        if (approvedResult.success) {
+          const approved = approvedResult.data.map(w => ({
+            id: w.application_id || w.id?.toString(),
+            amount: `${(w.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+            wallet: w.wallet_address ? `${w.wallet_address.substring(0, 6)}....${w.wallet_address.substring(w.wallet_address.length - 5)}` : 'N/A',
+            time: w.verified_at ? new Date(w.verified_at).toLocaleString('en-GB') : (w.created_at ? new Date(w.created_at).toLocaleString('en-GB') : 'N/A'),
+            status: 'Approved'
+          }));
+          setWithdrawalsData(prev => ({ ...prev, approved }));
+        }
+
+        if (rejectedResult.success) {
+          const rejected = rejectedResult.data.map(w => ({
+            id: w.application_id || w.id?.toString(),
+            amount: `${(w.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+            wallet: w.wallet_address ? `${w.wallet_address.substring(0, 6)}....${w.wallet_address.substring(w.wallet_address.length - 5)}` : 'N/A',
+            time: w.verified_at ? new Date(w.verified_at).toLocaleString('en-GB') : (w.created_at ? new Date(w.created_at).toLocaleString('en-GB') : 'N/A'),
+            status: 'Rejected'
+          }));
+          setWithdrawalsData(prev => ({ ...prev, rejected }));
+        }
+
+        // Calculate stats
+        const totalApproved = approvedResult.success ? approvedResult.data.length : 0;
+        const totalRejected = rejectedResult.success ? rejectedResult.data.length : 0;
+        const totalAmount = [...(approvedResult.success ? approvedResult.data : []), ...(rejectedResult.success ? rejectedResult.data : [])]
+          .reduce((sum, w) => sum + (w.amount || 0), 0);
+        setStatsData({
+          approved: totalApproved,
+          rejected: totalRejected,
+          totalAmount: totalAmount
+        });
+      } catch (error) {
+        console.error('Failed to fetch withdrawal history:', error);
+        setWithdrawalsData({ approved: [], rejected: [] });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchWithdrawals();
+  }, [currentPage, activeTab]);
 
   // Dynamic columns based on active tab
   const columns = useMemo(() => [
@@ -59,8 +116,8 @@ export default function WithdrawalHistory() {
   }, [currentPage]);
 
   const { data: withdrawals, totalPages } = useMemo(
-    () => filterAndPaginate(WITHDRAWALS_BY_STATUS[activeTab], searchTerm, SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
-    [searchTerm, currentPage, activeTab]
+    () => filterAndPaginate(withdrawalsData[activeTab] || [], searchTerm, SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
+    [withdrawalsData, activeTab, searchTerm, currentPage]
   );
 
   const handleSearchChange = (value) => {
@@ -96,9 +153,21 @@ export default function WithdrawalHistory() {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {STATS.map((stat, idx) => (
-          <StatCard key={idx} {...stat} />
-        ))}
+        <StatCard 
+          label="Total Withdraw Approve" 
+          value={statsData?.approved?.toString() || '0'} 
+          lastUpdate={new Date().toLocaleDateString('en-GB')} 
+        />
+        <StatCard 
+          label="Total Withdraw Reject" 
+          value={statsData?.rejected?.toString() || '0'} 
+          lastUpdate={new Date().toLocaleDateString('en-GB')} 
+        />
+        <StatCard 
+          label="Total Withdraw Amount" 
+          value={`${(statsData?.totalAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`} 
+          lastUpdate={new Date().toLocaleDateString('en-GB')} 
+        />
       </div>
 
       <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
@@ -127,16 +196,22 @@ export default function WithdrawalHistory() {
               className="max-w-sm"
             />
             
-            <DataTable
-              columns={columns}
-              data={withdrawals}
-              actions={actions}
-              pagination={{
-                currentPage,
-                totalPages,
-                onPageChange: setCurrentPage,
-              }}
-            />
+            {loading ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Loading withdrawal history...</p>
+              </div>
+            ) : (
+              <DataTable
+                columns={columns}
+                data={withdrawals}
+                actions={actions}
+                pagination={{
+                  currentPage,
+                  totalPages,
+                  onPageChange: setCurrentPage,
+                }}
+              />
+            )}
           </div>
         </div>
       </div>

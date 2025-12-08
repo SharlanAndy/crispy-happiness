@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, Settings, Trash2, ArrowRightLeft } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, ConfirmDialog, TransferModal } from '../../components/ui';
 import { filterAndPaginate } from '../../lib/pagination';
+import { t3Service } from '../../services/t3Service';
 
 const ITEMS_PER_PAGE = 10;
 const USER_SEARCH_KEYS = ['id', 'status', 'spend', 'bonus', 'join'];
@@ -14,31 +15,75 @@ export default function UserManagement() {
   const [transferModal, setTransferModal] = useState({ isOpen: false, user: null });
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [usersData, setUsersData] = useState([]);
+  const [statsData, setStatsData] = useState(null);
 
   // Detect if accessed from T3 Admin or System Admin
   const isT3Admin = location.pathname.startsWith('/t3-admin');
   const basePath = isT3Admin ? '/t3-admin' : '/system-admin';
+
+  // Fetch users data for T3 Admin
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (!isT3Admin) {
+        // System admin uses mock data for now
+        setUsersData([
+          { id: 'U1234567890', walletId: '0x123456789abcdef', amount: '10,000.00 U', spend: '10,000.00 U', bonus: '10.00 U', join: '01-11-2025 13:00', status: 'Active' },
+          { id: 'U1234567891', walletId: '0x234567890abcdef', amount: '5,000.00 U', spend: '5,000.00 U', bonus: '5.00 U', join: '02-11-2025 14:00', status: 'Active' },
+        ]);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        // Fetch all users (no search param - using client-side fuzzy search)
+        const [usersResult, dashboardResult] = await Promise.all([
+          t3Service.getUsers({ page: 1, search: '' }), // Fetch all, filter client-side
+          t3Service.getDashboard()
+        ]);
+
+        if (usersResult.success) {
+          const transformed = usersResult.data.map(user => ({
+            id: user.id,
+            walletId: user.wallet_id || 'N/A',
+            amount: `${(user.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+            join: user.join_time ? new Date(user.join_time).toLocaleString('en-GB') : 'N/A',
+            status: user.status || 'Active'
+          }));
+          setUsersData(transformed);
+        }
+
+        if (dashboardResult.success) {
+          setStatsData(dashboardResult.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch users:', error);
+        setUsersData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUsers();
+  }, [currentPage, searchTerm, isT3Admin]);
 
   // Scroll to top when page changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
 
-  const allUsers = [
-    { id: 'U1234567890', walletId: '0x123456789abcdef', amount: '10,000.00 U', spend: '10,000.00 U', bonus: '10.00 U', join: '01-11-2025 13:00', status: 'Active' },
-    { id: 'U1234567891', walletId: '0x234567890abcdef', amount: '5,000.00 U', spend: '5,000.00 U', bonus: '5.00 U', join: '02-11-2025 14:00', status: 'Active' },
-    { id: 'U1234567892', walletId: '0x345678901abcdef', amount: '2,500.00 U', spend: '2,500.00 U', bonus: '2.50 U', join: '03-11-2025 15:00', status: 'Active' },
-    { id: 'U1234567893', walletId: '0x456789012abcdef', amount: '15,000.00 U', spend: '15,000.00 U', bonus: '15.00 U', join: '04-11-2025 16:00', status: 'Active' },
-    { id: 'U1234567894', walletId: '0x567890123abcdef', amount: '7,500.00 U', spend: '7,500.00 U', bonus: '7.50 U', join: '05-11-2025 17:00', status: 'Active' },
-  ];
-
   // Apply search and pagination
   const { data: users, totalPages } = useMemo(
-    () => filterAndPaginate(allUsers, searchTerm, USER_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
-    [searchTerm, currentPage]
+    () => filterAndPaginate(usersData, searchTerm, USER_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
+    [usersData, searchTerm, currentPage]
   );
 
-  const stats = [
+  const stats = statsData ? [
+    { label: 'Total Active User', value: statsData.total_users?.toString() || '0', lastUpdate: new Date().toLocaleDateString('en-GB') },
+    { label: 'Total Bonus Distributed', value: 'N/A', lastUpdate: new Date().toLocaleDateString('en-GB') }, // TODO: Add bonus API
+    { label: 'Total Spending Volume', value: `${(statsData.total_incoming_funds || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, lastUpdate: new Date().toLocaleDateString('en-GB') },
+  ] : [
     { label: 'Total Active User', value: '23', lastUpdate: '17-11-2025' },
     { label: 'Total Bonus Distributed', value: '10,000.00 USDT', lastUpdate: '17-11-2025' },
     { label: 'Total Spending Volume', value: '10,000.00 USDT', lastUpdate: '17-11-2025' },
@@ -137,16 +182,22 @@ export default function UserManagement() {
                 className="max-w-sm"
               />
 
-              <DataTable
-                columns={columns}
-                data={users}
-                actions={actions}
-                pagination={{
-                  currentPage,
-                  totalPages,
-                  onPageChange: setCurrentPage,
-                }}
-              />
+              {loading ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Loading users...</p>
+                </div>
+              ) : (
+                <DataTable
+                  columns={columns}
+                  data={users}
+                  actions={actions}
+                  pagination={{
+                    currentPage,
+                    totalPages,
+                    onPageChange: setCurrentPage,
+                  }}
+                />
+              )}
             </div>
           </div>
         </div>

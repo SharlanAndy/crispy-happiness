@@ -71,7 +71,18 @@ export default function AdminLayout() {
     <div className="bg-white min-h-screen">
       <Sidebar sections={sections} />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title={currentTitle} walletAddress={user.role === 'system-admin' ? "0xSys...Admin" : "0xT3...Admin"} />
+        <Header 
+          title={currentTitle} 
+          walletAddress={
+            user.role === 'system-admin' 
+              ? "0xSys...Admin" 
+              : (user.wallet_address 
+                  ? user.wallet_address.length > 10
+                    ? `${user.wallet_address.substring(0, 6)}...${user.wallet_address.substring(user.wallet_address.length - 4)}`
+                    : user.wallet_address
+                  : "0xT3...Admin")
+          } 
+        />
         <main className="ml-[274px] mt-[80px] p-6">
           <Outlet />
         </main>
