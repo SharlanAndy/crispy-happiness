@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, Settings, Trash2, Plus } from 'lucide-react';
 import { PageHeader, DataTable, ConfirmDialog, Pagination } from '../../components/ui';
-import { filterAndPaginate } from '../../lib/pagination';
+import { filterAndPaginate } from '@/lib/pagination';
 
 const ITEMS_PER_PAGE = 10;
 

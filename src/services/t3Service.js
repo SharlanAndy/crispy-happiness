@@ -1,4 +1,4 @@
-import { api } from '../lib/api';
+import { api, T3SYSTEMADMIN_BASE } from '@/lib/api';
 
 /**
  * T3Admin Service
@@ -516,7 +516,7 @@ export const t3Service = {
     
     try {
       // Try using system admin endpoint (if T3 admin has access)
-      const result = await api.request('/systemadmin/transactions/overview', { method: 'GET' });
+      const result = await api.request(`${T3SYSTEMADMIN_BASE}/transactions/overview`, { method: 'GET' });
       return result || mockData;
     } catch (error) {
       console.warn('[T3Service] Transaction overview API failed, using empty data:', error);
@@ -545,7 +545,7 @@ export const t3Service = {
     
     try {
       const query = new URLSearchParams(params).toString();
-      const result = await api.request(`/systemadmin/transactions?${query}`, { method: 'GET' });
+      const result = await api.request(`${T3SYSTEMADMIN_BASE}/transactions?${query}`, { method: 'GET' });
       return result || mockData;
     } catch (error) {
       console.warn('[T3Service] Transactions API failed, using empty data:', error);
@@ -577,7 +577,7 @@ export const t3Service = {
     }
     
     try {
-      const result = await api.request(`/systemadmin/transactions/${id}`, { method: 'GET' });
+      const result = await api.request(`${T3SYSTEMADMIN_BASE}/transactions/${id}`, { method: 'GET' });
       return result || mockData;
     } catch (error) {
       console.warn('[T3Service] Transaction details API failed, using empty data:', error);
@@ -610,7 +610,7 @@ export const t3Service = {
     }
     
     try {
-      const result = await api.request(`/systemadmin/merchants/${id}`, { method: 'GET' });
+      const result = await api.request(`${T3SYSTEMADMIN_BASE}/merchants/${id}`, { method: 'GET' });
       return result || mockData;
     } catch (error) {
       console.warn('[T3Service] Merchant details API failed, using empty data:', error);

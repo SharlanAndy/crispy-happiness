@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Check, X } from 'lucide-react';
 import { InfoSection, Button, PageHeader, ConfirmDialog, VerificationModal } from '../../components/ui';
-import { t3Service } from '../../services/t3Service';
+import { t3Service } from '@/services/t3Service';
 
 export default function WithdrawalDetails() {
   const { id } = useParams();

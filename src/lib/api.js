@@ -6,6 +6,9 @@ const API_CONFIG = {
   fallbackToMock: false, // Disable fallback to see real API errors
 };
 
+// Centralized base path for T3Admin and SystemAdmin endpoints
+export const T3SYSTEMADMIN_BASE = '/t3systemadmin';
+
 // Generic fetch wrapper with fallback to mock
 async function request(endpoint, options = {}) {
   if (API_CONFIG.useMock) {
@@ -350,14 +353,14 @@ export const api = {
      * @param {Object} credentials - { username, password }
      * @returns {Promise<Object>} { success, message, data: { token, token_expires_at, admin_type } }
      */
-    login: (credentials) => request('/t3admin/auth/login', { method: 'POST', body: JSON.stringify(credentials) }),
+    login: (credentials) => request(`${T3SYSTEMADMIN_BASE}/auth/login`, { method: 'POST', body: JSON.stringify(credentials) }),
 
     /**
      * Get T3Admin profile.
      * Headers: Authorization: Bearer <token>
      * @returns {Promise<Object>} Admin profile data
      */
-    getProfile: () => request('/t3admin/auth/profile', { method: 'GET' }),
+    getProfile: () => request(`${T3SYSTEMADMIN_BASE}/auth/profile`, { method: 'GET' }),
 
     // Dashboard
     /**
@@ -365,7 +368,7 @@ export const api = {
      * Headers: Authorization: Bearer <token>
      * @returns {Promise<Object>} { success, data: { total_incoming_funds, monthly_incoming_funds, total_outgoing_funds, monthly_outgoing_funds, total_users } }
      */
-    getDashboard: () => request('/t3admin/dashboard', { method: 'GET' }),
+    getDashboard: () => request(`${T3SYSTEMADMIN_BASE}/dashboard`, { method: 'GET' }),
 
     // User Management
     /**
@@ -376,7 +379,7 @@ export const api = {
      */
     getUsers: (params = {}) => {
       const query = new URLSearchParams(params).toString();
-      return request(`/t3admin/users?${query}`, { method: 'GET' });
+      return request(`${T3SYSTEMADMIN_BASE}/users?${query}`, { method: 'GET' });
     },
 
     /**
@@ -385,7 +388,7 @@ export const api = {
      * @param {string} id - User ID (with or without 'U' prefix)
      * @returns {Promise<Object>} { success, data: { id, username, wallet_address, status, created_at, total_incoming_funds, total_outgoing_funds, current_unclaim_funds, total_claimed_funds } }
      */
-    getUserDetails: (id) => request(`/t3admin/users/${id}`, { method: 'GET' }),
+    getUserDetails: (id) => request(`${T3SYSTEMADMIN_BASE}/users/${id}`, { method: 'GET' }),
 
     // Account Management (Finance Accounts)
     /**
@@ -396,7 +399,7 @@ export const api = {
      */
     getAccounts: (params = {}) => {
       const query = new URLSearchParams(params).toString();
-      return request(`/t3admin/accounts?${query}`, { method: 'GET' });
+      return request(`${T3SYSTEMADMIN_BASE}/accounts?${query}`, { method: 'GET' });
     },
 
     /**
@@ -405,7 +408,7 @@ export const api = {
      * @param {Object} data - { username, email, password, wallet_address }
      * @returns {Promise<Object>} { success, message, data: { id, username, email } }
      */
-    createAccount: (data) => request('/t3admin/accounts', { method: 'POST', body: JSON.stringify(data) }),
+    createAccount: (data) => request(`${T3SYSTEMADMIN_BASE}/accounts`, { method: 'POST', body: JSON.stringify(data) }),
 
     /**
      * Get account details.
@@ -413,7 +416,7 @@ export const api = {
      * @param {string} id - Account ID
      * @returns {Promise<Object>} Account details
      */
-    getAccountDetails: (id) => request(`/t3admin/accounts/${id}`, { method: 'GET' }),
+    getAccountDetails: (id) => request(`${T3SYSTEMADMIN_BASE}/accounts/${id}`, { method: 'GET' }),
 
     // Withdrawal Management
     /**
@@ -424,7 +427,7 @@ export const api = {
      */
     getWithdrawalApplications: (params = {}) => {
       const query = new URLSearchParams(params).toString();
-      return request(`/t3admin/withdrawals/applications?${query}`, { method: 'GET' });
+      return request(`${T3SYSTEMADMIN_BASE}/withdrawals/applications?${query}`, { method: 'GET' });
     },
 
     /**
@@ -435,7 +438,7 @@ export const api = {
      */
     getWithdrawalHistory: (params = {}) => {
       const query = new URLSearchParams(params).toString();
-      return request(`/t3admin/withdrawals/history?${query}`, { method: 'GET' });
+      return request(`${T3SYSTEMADMIN_BASE}/withdrawals/history?${query}`, { method: 'GET' });
     },
 
     /**
@@ -444,7 +447,7 @@ export const api = {
      * @param {string} id - Withdrawal ID or application_id
      * @returns {Promise<Object>} Withdrawal details
      */
-    getWithdrawalDetails: (id) => request(`/t3admin/withdrawals/${id}`, { method: 'GET' }),
+    getWithdrawalDetails: (id) => request(`${T3SYSTEMADMIN_BASE}/withdrawals/${id}`, { method: 'GET' }),
 
     /**
      * Approve a withdrawal.
@@ -452,7 +455,7 @@ export const api = {
      * @param {string} id - Withdrawal ID or application_id
      * @returns {Promise<Object>} { success, message }
      */
-    approveWithdrawal: (id) => request(`/t3admin/withdrawals/${id}/approve`, { method: 'POST' }),
+    approveWithdrawal: (id) => request(`${T3SYSTEMADMIN_BASE}/withdrawals/${id}/approve`, { method: 'POST' }),
 
     /**
      * Reject a withdrawal.
@@ -460,7 +463,7 @@ export const api = {
      * @param {string} id - Withdrawal ID or application_id
      * @returns {Promise<Object>} { success, message }
      */
-    rejectWithdrawal: (id) => request(`/t3admin/withdrawals/${id}/reject`, { method: 'POST' }),
+    rejectWithdrawal: (id) => request(`${T3SYSTEMADMIN_BASE}/withdrawals/${id}/reject`, { method: 'POST' }),
 
     // API Keys & Logs
     /**
@@ -468,7 +471,7 @@ export const api = {
      * Headers: Authorization: Bearer <token>
      * @returns {Promise<Object>} { success, data: [...] }
      */
-    getAPIKeys: () => request('/t3admin/api-keys', { method: 'GET' }),
+    getAPIKeys: () => request(`${T3SYSTEMADMIN_BASE}/api-keys`, { method: 'GET' }),
 
     /**
      * Create a new API key.
@@ -476,7 +479,7 @@ export const api = {
      * @param {Object} data - { key_name, backend_url, merchant_key }
      * @returns {Promise<Object>} { success, message, data: { id, key_name, api_key, secret_key, merchant_key, backend_url } }
      */
-    createAPIKey: (data) => request('/t3admin/api-keys', { method: 'POST', body: JSON.stringify(data) }),
+    createAPIKey: (data) => request(`${T3SYSTEMADMIN_BASE}/api-keys`, { method: 'POST', body: JSON.stringify(data) }),
 
     /**
      * Get API logs.
@@ -486,7 +489,7 @@ export const api = {
      */
     getAPILogs: (params = {}) => {
       const query = new URLSearchParams(params).toString();
-      return request(`/t3admin/api-logs?${query}`, { method: 'GET' });
+      return request(`${T3SYSTEMADMIN_BASE}/api-logs?${query}`, { method: 'GET' });
     },
 
     /**
@@ -495,7 +498,7 @@ export const api = {
      * @param {Object} data - { backend_url, key_id }
      * @returns {Promise<Object>} { success, message }
      */
-    updateCallbackSettings: (data) => request('/t3admin/callback-settings', { method: 'PUT', body: JSON.stringify(data) }),
+    updateCallbackSettings: (data) => request(`${T3SYSTEMADMIN_BASE}/callback-settings`, { method: 'PUT', body: JSON.stringify(data) }),
   },
 
   // ============================================================================
@@ -508,14 +511,14 @@ export const api = {
      * @param {Object} credentials - { username, password }
      * @returns {Promise<Object>} { success, message, data: { token, token_expires_at, admin_type } }
      */
-    login: (credentials) => request('/systemadmin/auth/login', { method: 'POST', body: JSON.stringify(credentials) }),
+    login: (credentials) => request(`${T3SYSTEMADMIN_BASE}/auth/login`, { method: 'POST', body: JSON.stringify(credentials) }),
 
     /**
      * Get System Admin profile.
      * Headers: Authorization: Bearer <token>
      * @returns {Promise<Object>} Admin profile data
      */
-    getProfile: () => request('/systemadmin/auth/profile', { method: 'GET' }),
+    getProfile: () => request(`${T3SYSTEMADMIN_BASE}/auth/profile`, { method: 'GET' }),
 
     // Dashboard
     /**
@@ -523,7 +526,7 @@ export const api = {
      * Headers: Authorization: Bearer <token>
      * @returns {Promise<Object>} Dashboard stats
      */
-    getDashboard: () => request('/systemadmin/dashboard', { method: 'GET' }),
+    getDashboard: () => request(`${T3SYSTEMADMIN_BASE}/dashboard`, { method: 'GET' }),
 
     // Merchant Management
     /**
@@ -534,7 +537,7 @@ export const api = {
      */
     getMerchants: (params = {}) => {
       const query = new URLSearchParams(params).toString();
-      return request(`/systemadmin/merchants?${query}`, { method: 'GET' });
+      return request(`${T3SYSTEMADMIN_BASE}/merchants?${query}`, { method: 'GET' });
     },
 
     /**
@@ -543,7 +546,7 @@ export const api = {
      * @param {Object} data - Merchant data
      * @returns {Promise<Object>} { success, message, data: {...} }
      */
-    createMerchant: (data) => request('/systemadmin/merchants', { method: 'POST', body: JSON.stringify(data) }),
+    createMerchant: (data) => request(`${T3SYSTEMADMIN_BASE}/merchants`, { method: 'POST', body: JSON.stringify(data) }),
 
     /**
      * Get merchant details.
@@ -551,7 +554,7 @@ export const api = {
      * @param {string} id - Merchant ID
      * @returns {Promise<Object>} Merchant details
      */
-    getMerchantDetails: (id) => request(`/systemadmin/merchants/${id}`, { method: 'GET' }),
+    getMerchantDetails: (id) => request(`${T3SYSTEMADMIN_BASE}/merchants/${id}`, { method: 'GET' }),
 
     // Agent Management
     /**
@@ -562,7 +565,7 @@ export const api = {
      */
     getAgents: (params = {}) => {
       const query = new URLSearchParams(params).toString();
-      return request(`/systemadmin/agents?${query}`, { method: 'GET' });
+      return request(`${T3SYSTEMADMIN_BASE}/agents?${query}`, { method: 'GET' });
     },
 
     /**
@@ -571,7 +574,7 @@ export const api = {
      * @param {string} id - Agent ID
      * @returns {Promise<Object>} Agent details
      */
-    getAgentDetails: (id) => request(`/systemadmin/agents/${id}`, { method: 'GET' }),
+    getAgentDetails: (id) => request(`${T3SYSTEMADMIN_BASE}/agents/${id}`, { method: 'GET' }),
 
     // User Management
     /**
@@ -582,7 +585,7 @@ export const api = {
      */
     getUsers: (params = {}) => {
       const query = new URLSearchParams(params).toString();
-      return request(`/systemadmin/users?${query}`, { method: 'GET' });
+      return request(`${T3SYSTEMADMIN_BASE}/users?${query}`, { method: 'GET' });
     },
 
     /**
@@ -591,7 +594,7 @@ export const api = {
      * @param {string} id - User ID
      * @returns {Promise<Object>} User details
      */
-    getUserDetails: (id) => request(`/systemadmin/users/${id}`, { method: 'GET' }),
+    getUserDetails: (id) => request(`${T3SYSTEMADMIN_BASE}/users/${id}`, { method: 'GET' }),
 
     // Transaction Management
     /**
@@ -599,7 +602,7 @@ export const api = {
      * Headers: Authorization: Bearer <token>
      * @returns {Promise<Object>} Transaction overview stats
      */
-    getTransactionOverview: () => request('/systemadmin/transactions/overview', { method: 'GET' }),
+    getTransactionOverview: () => request(`${T3SYSTEMADMIN_BASE}/transactions/overview`, { method: 'GET' }),
 
     /**
      * Get transaction list.
@@ -609,7 +612,7 @@ export const api = {
      */
     getTransactions: (params = {}) => {
       const query = new URLSearchParams(params).toString();
-      return request(`/systemadmin/transactions?${query}`, { method: 'GET' });
+      return request(`${T3SYSTEMADMIN_BASE}/transactions?${query}`, { method: 'GET' });
     },
 
     /**
@@ -618,7 +621,7 @@ export const api = {
      * @param {string} id - Transaction ID
      * @returns {Promise<Object>} Transaction details
      */
-    getTransactionDetails: (id) => request(`/systemadmin/transactions/${id}`, { method: 'GET' }),
+    getTransactionDetails: (id) => request(`${T3SYSTEMADMIN_BASE}/transactions/${id}`, { method: 'GET' }),
 
     // Bonus Management
     /**
@@ -629,7 +632,7 @@ export const api = {
      */
     getBonusClaims: (params = {}) => {
       const query = new URLSearchParams(params).toString();
-      return request(`/systemadmin/bonus/claims?${query}`, { method: 'GET' });
+      return request(`${T3SYSTEMADMIN_BASE}/bonus/claims?${query}`, { method: 'GET' });
     },
 
     /**
@@ -640,7 +643,7 @@ export const api = {
      */
     getBonusUnclaims: (params = {}) => {
       const query = new URLSearchParams(params).toString();
-      return request(`/systemadmin/bonus/unclaims?${query}`, { method: 'GET' });
+      return request(`${T3SYSTEMADMIN_BASE}/bonus/unclaims?${query}`, { method: 'GET' });
     },
 
     /**
@@ -651,7 +654,7 @@ export const api = {
      */
     getMonthlyBonus: (params = {}) => {
       const query = new URLSearchParams(params).toString();
-      return request(`/systemadmin/bonus/monthly?${query}`, { method: 'GET' });
+      return request(`${T3SYSTEMADMIN_BASE}/bonus/monthly?${query}`, { method: 'GET' });
     },
 
     // Fees Management
@@ -663,7 +666,7 @@ export const api = {
      */
     getFees: (params = {}) => {
       const query = new URLSearchParams(params).toString();
-      return request(`/systemadmin/fees?${query}`, { method: 'GET' });
+      return request(`${T3SYSTEMADMIN_BASE}/fees?${query}`, { method: 'GET' });
     },
 
     /**
@@ -671,7 +674,7 @@ export const api = {
      * Headers: Authorization: Bearer <token>
      * @returns {Promise<Object>} Fees statistics
      */
-    getFeesStatistics: () => request('/systemadmin/fees/statistics', { method: 'GET' }),
+    getFeesStatistics: () => request(`${T3SYSTEMADMIN_BASE}/fees/statistics`, { method: 'GET' }),
 
     // System Logs
     /**
@@ -682,7 +685,7 @@ export const api = {
      */
     getLogs: (params = {}) => {
       const query = new URLSearchParams(params).toString();
-      return request(`/systemadmin/logs?${query}`, { method: 'GET' });
+      return request(`${T3SYSTEMADMIN_BASE}/logs?${query}`, { method: 'GET' });
     },
   },
 

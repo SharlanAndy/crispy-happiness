@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { InfoSection, Button, PageHeader } from '../../components/ui';
-import { t3Service } from '../../services/t3Service';
+import { t3Service } from '@/services/t3Service';
 
 export default function AccountDetails() {
   const { id } = useParams();

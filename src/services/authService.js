@@ -1,4 +1,4 @@
-import { api } from '../lib/api';
+import { api } from '@/lib/api';
 
 // Mock user data for local development
 const MOCK_USERS = [

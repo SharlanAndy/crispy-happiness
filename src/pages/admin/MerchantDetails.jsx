@@ -1,12 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Eye } from 'lucide-react';
-import { StatCard, InfoSection, Card, DataTable, SearchBar, PageHeader, ProfitChart, TabButtons, Modal, Button, FormField } from '../../components/ui';
-import { PasswordInput, TextInput } from '../../components/form';
+import { StatCard, InfoSection, Card, DataTable, SearchBar, PageHeader, ProfitChart, TabButtons, Modal, Button, FormField } from '@/components/ui';
+import { PasswordInput, TextInput } from '@/components/form';
 
-import { filterAndPaginate } from '../../lib/pagination';
-import { t3Service } from '../../services/t3Service';
-import { api } from '../../lib/api';
+import { filterAndPaginate } from '@/lib/pagination';
+import { t3Service } from '@/services/t3Service';
+import { api, T3SYSTEMADMIN_BASE } from '@/lib/api';
 
 const ITEMS_PER_PAGE = 10;
 const TRANSACTION_SEARCH_KEYS = ['id', 'type', 'status'];
@@ -47,7 +47,7 @@ export default function MerchantDetails() {
         setLoading(true);
         const result = isT3Admin 
           ? await t3Service.getMerchantDetails(id)
-          : await api.request(`/systemadmin/merchants/${id}`, { method: 'GET' });
+          : await api.request(`${T3SYSTEMADMIN_BASE}/merchants/${id}`, { method: 'GET' });
         
         if (result.success && result.data) {
           setMerchantData(result.data);
@@ -71,7 +71,7 @@ export default function MerchantDetails() {
         // Fetch transactions for this merchant
         const result = isT3Admin
           ? await t3Service.getTransactions({ page: currentPage, search: searchTerm })
-          : await api.request(`/systemadmin/transactions?page=${currentPage}&search=${encodeURIComponent(searchTerm || '')}`, { method: 'GET' });
+          : await api.request(`${T3SYSTEMADMIN_BASE}/transactions?page=${currentPage}&search=${encodeURIComponent(searchTerm || '')}`, { method: 'GET' });
         
         if (result.success) {
           // Filter transactions for this merchant/user

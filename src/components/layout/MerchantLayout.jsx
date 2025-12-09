@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { authService } from '../../services/authService';
+import { authService } from '@/services/authService';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { LayoutDashboard, Users, FileText, Settings, CreditCard } from 'lucide-react';

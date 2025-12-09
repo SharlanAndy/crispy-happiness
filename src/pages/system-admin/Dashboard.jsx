@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Users, Store, UserCheck, DollarSign, TrendingUp, Activity } from 'lucide-react';
-import { Card } from '../../components/ui';
-import { api } from '../../lib/api';
+import { Card } from '@/components/ui';
+import { api } from '@/lib/api';
 
 export default function SystemAdminDashboard() {
   const [currentPage] = useState(1);

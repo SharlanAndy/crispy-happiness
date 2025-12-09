@@ -2,8 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, Settings, Trash2, Plus } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, ConfirmDialog, AddAgentModal } from '../../components/ui';
-import { filterAndPaginate } from '../../lib/pagination';
-import { api } from '../../lib/api';
+import { filterAndPaginate } from '@/lib/pagination';
+import { api } from '@/lib/api';
 
 const ITEMS_PER_PAGE = 10;
 const AGENT_SEARCH_KEYS = ['id', 'status', 'bonus', 'l1', 'l2', 'join'];

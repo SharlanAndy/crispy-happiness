@@ -3,8 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, Settings, Trash2, Plus } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, Modal, Button, FormField, ConfirmDialog } from '../../components/ui';
 import { TextInput, PasswordInput } from '../../components/form';
-import { filterAndPaginate } from '../../lib/pagination';
-import { t3Service } from '../../services/t3Service';
+import { filterAndPaginate } from '@/lib/pagination';
+import { t3Service } from '@/services/t3Service';
 
 const ITEMS_PER_PAGE = 10;
 const SEARCH_KEYS = ['id', 'username', 'character', 'status'];

@@ -2,8 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, Settings, Trash2, Plus } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, ConfirmDialog, AddMerchantModal } from '../../components/ui';
-import { filterAndPaginate } from '../../lib/pagination';
-import { api } from '../../lib/api';
+import { filterAndPaginate } from '@/lib/pagination';
+import { api } from '@/lib/api';
 import {
   MERCHANT_STATS,
   MERCHANT_COLUMNS,

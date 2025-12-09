@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Eye, Settings, Trash2 } from 'lucide-react';
 import { StatCard, InfoSection, Card, DataTable, SearchBar, PageHeader, ConfirmDialog } from '../../components/ui';
-import { filterAndPaginate } from '../../lib/pagination';
+import { filterAndPaginate } from '@/lib/pagination';
 import { STATS, USER_INFO, SPONSOR_INFO, WALLET_ADDRESS_INFO, BONUS_INFO, ALL_NETWORK_DATA } from '../../constant/agentMockData';
 
 const ITEMS_PER_PAGE = 10;

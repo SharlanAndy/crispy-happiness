@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Card, PageHeader, StatCard } from '../../components/ui';
-import { t3Service } from '../../services/t3Service';
+import { Card, PageHeader, StatCard } from '@/components/ui';
+import { t3Service } from '@/services/t3Service';
 
 export default function T3AdminDashboard() {
   const [currentPage] = useState(1);

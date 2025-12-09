@@ -2,8 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, Check, X } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, ConfirmDialog, VerificationModal } from '../../components/ui';
-import { filterAndPaginate } from '../../lib/pagination';
-import { t3Service } from '../../services/t3Service';
+import { filterAndPaginate } from '@/lib/pagination';
+import { t3Service } from '@/services/t3Service';
 
 const ITEMS_PER_PAGE = 10;
 const SEARCH_KEYS = ['id', 'merchant', 'wallet', 'ref'];

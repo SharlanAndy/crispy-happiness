@@ -2,9 +2,9 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, Settings, Trash2, ArrowRightLeft } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, ConfirmDialog, TransferModal } from '../../components/ui';
-import { filterAndPaginate } from '../../lib/pagination';
-import { t3Service } from '../../services/t3Service';
-import { api } from '../../lib/api';
+import { filterAndPaginate } from '@/lib/pagination';
+import { t3Service } from '@/services/t3Service';
+import { api } from '@/lib/api';
 
 const ITEMS_PER_PAGE = 10;
 const USER_SEARCH_KEYS = ['id', 'status', 'spend', 'bonus', 'join'];

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Eye } from 'lucide-react';
-import { InfoSection, Card, DataTable, SearchBar, PageHeader } from '../../components/ui';
-import { t3Service } from '../../services/t3Service';
-import { api } from '../../lib/api';
+import { InfoSection, Card, DataTable, SearchBar, PageHeader } from '@/components/ui';
+import { t3Service } from '@/services/t3Service';
+import { api, T3SYSTEMADMIN_BASE } from '@/lib/api';
 
 export default function UserDetails() {
   const { id } = useParams();
@@ -31,7 +31,7 @@ export default function UserDetails() {
         setLoading(true);
         const result = isT3Admin
           ? await t3Service.getUserDetails(id)
-          : await api.request(`/systemadmin/users/${id}`, { method: 'GET' });
+          : await api.request(`${T3SYSTEMADMIN_BASE}/users/${id}`, { method: 'GET' });
         
         if (result.success && result.data) {
           setUserData(result.data);
@@ -53,7 +53,7 @@ export default function UserDetails() {
       try {
         const result = isT3Admin
           ? await t3Service.getTransactions({ page: currentPage, search: searchTerm })
-          : await api.request(`/systemadmin/transactions?page=${currentPage}&search=${encodeURIComponent(searchTerm || '')}`, { method: 'GET' });
+          : await api.request(`${T3SYSTEMADMIN_BASE}/transactions?page=${currentPage}&search=${encodeURIComponent(searchTerm || '')}`, { method: 'GET' });
         
         if (result.success) {
           // Filter transactions for this user

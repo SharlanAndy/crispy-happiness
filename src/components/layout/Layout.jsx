@@ -1,7 +1,7 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { authService } from '../../services/authService';
+import { authService } from '@/services/authService';
 import { LogOut, User, Wallet, LayoutDashboard, Users, FileText, Settings, CreditCard, Network } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn } from '@/lib/utils';
 
 const SidebarItem = ({ icon: Icon, label, path, active }) => {
   const navigate = useNavigate();

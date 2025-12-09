@@ -9,8 +9,8 @@ import SelectInput from '../../components/form/SelectInput';
 import PasswordInput from '../../components/form/PasswordInput';
 import TextInputWithDropdown from '../../components/form/TextInputWithDropdown';
 import countriesAndStates from '../../constant/countriesAndStates.json';
-import { authService } from '../../services/authService';
-import { api } from '../../lib/api';
+import { authService } from '@/services/authService';
+import { api } from '@/lib/api';
 import {
   MERCHANT_TYPES,
   CURRENCIES,

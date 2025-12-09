@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Copy, RefreshCw, Save } from 'lucide-react';
 import { Card, FormField, Button, PageHeader, DataTable, SearchBar } from '../../components/ui';
-import { filterAndPaginate } from '../../lib/pagination';
-import { t3Service } from '../../services/t3Service';
+import { filterAndPaginate } from '@/lib/pagination';
+import { t3Service } from '@/services/t3Service';
 
 const ITEMS_PER_PAGE = 10;
 const LOG_SEARCH_KEYS = ['date', 'endpoint', 'status', 'ip'];

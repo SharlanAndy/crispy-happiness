@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authService } from '../services/authService';
+import { authService } from '@/services/authService';
 import { Loader2, Lock, User } from 'lucide-react';
 
 export default function Login() {

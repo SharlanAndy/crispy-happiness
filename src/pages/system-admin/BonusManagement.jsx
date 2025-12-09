@@ -4,8 +4,8 @@ import { Eye, Calendar, Check } from 'lucide-react';
 import { StatCard, PageHeader, ConfirmDialog, BonusListCard } from '../../components/ui';
 import SelectWithIcon from '../../components/ui/SelectWithIcon';
 import MonthlyBonusTable from '../../components/ui/MonthlyBonusTable';
-import { filterAndPaginate } from '../../lib/pagination';
-import { api } from '../../lib/api';
+import { filterAndPaginate } from '@/lib/pagination';
+import { api } from '@/lib/api';
 
 const ITEMS_PER_PAGE = 10;
 const TRANSACTION_SEARCH_KEYS = ['id', 'wallet', 'status'];

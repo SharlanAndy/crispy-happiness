@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { DataTable, PageHeader } from '../../components/ui';
-import { api } from '../../lib/api';
+import { DataTable, PageHeader } from '@/components/ui';
+import { api } from '@/lib/api';
 
 const ITEMS_PER_PAGE = 10;
 
