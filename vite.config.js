@@ -1,22 +1,30 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [react()],
-  base: '/',
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
+export default defineConfig(({ mode }) => {
+  // Load env file based on `mode` in the current working directory.
+  // eslint-disable-next-line no-undef
+  const env = loadEnv(mode, process.cwd(), '')
+  
+  return {
+    plugins: [react()],
+    base: '/',
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
+      },
     },
-  },
-  server: {
-    port: 5173, // Default port, will auto-change if not available
-    open: false, // Don't auto-open browser
-    proxy: {
-      '/api': {
-        target: 'https://nbn.iotareward.com',
+    server: {
+      port: 5173, // Default port, will auto-change if not available
+      open: false, // Don't auto-open browser
+      proxy: {
+        '/api': {
+          target: env.VITE_API_PROXY_TARGET || 'https://nbn.iotareward.com',
         changeOrigin: true,
         secure: true,
         rewrite: (path) => path, // Keep the /api prefix
@@ -51,4 +59,5 @@ export default defineConfig({
     },
     chunkSizeWarningLimit: 600, // Increase limit to 600KB to reduce warnings
   },
+  }
 })

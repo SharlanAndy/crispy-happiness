@@ -5,11 +5,13 @@ import { Card, SearchBar, PageHeader } from '../../components/ui';
 export default function MyTeam() {
   const [activeLevel, setActiveLevel] = useState('L1');
   const [searchTerm, setSearchTerm] = useState('');
-  const referralLink = 'nbn.sharemarket/1245...';
   const referralId = '12346788';
+  // TODO: Fetch referralId from API/user profile
+  const referralBaseUrl = import.meta.env.VITE_REFERRAL_BASE_URL || 'https://nbn.iotareward.com';
+  const referralLink = `${referralBaseUrl.replace(/^https?:\/\//, '')}/${referralId}`;
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText('https://nbn.sharemarket/12345678');
+    navigator.clipboard.writeText(`${referralBaseUrl}/${referralId}`);
     console.log('Referral link copied to clipboard');
     // TODO: Show toast notification
   };
