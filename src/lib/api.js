@@ -51,6 +51,7 @@ async function request(endpoint, options = {}) {
 
 export const api = {
   config: API_CONFIG,
+  request: request, // Export request function for direct use
 
   // ============================================================================
   // AUTHENTICATION MODULE

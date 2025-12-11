@@ -27,14 +27,23 @@ export default function FeesManagement() {
         ]);
 
         if (feesResult && feesResult.success) {
-          const transformed = feesResult.data.map(f => ({
-            id: `tx-${f.id}`,
-            wallet: f.username ? `0x${f.username.slice(0, 5)}....${f.username.slice(-5)}` : 'N/A',
-            amount: `${(f.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
-            fees: `${(f.fee_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`,
-            time: f.created_at ? new Date(f.created_at).toLocaleString('en-GB') : 'N/A',
-            status: f.status || 'Success'
-          }));
+          const transformed = feesResult.data.map(f => {
+            // Use transaction_id if available, otherwise use fee id
+            const transactionId = f.transaction_id || f.id;
+            const numericId = transactionId;
+            const formattedId = `T${String(numericId).padStart(6, '0')}`;
+            
+            return {
+              id: formattedId, // Display ID with T prefix for consistency
+              numericId: numericId, // Store numeric ID for API calls
+              wallet: f.username ? `0x${f.username.slice(0, 5)}....${f.username.slice(-5)}` : 'N/A',
+              amount: `${(f.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+              fees: `${(f.fee_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`,
+              time: f.created_at ? new Date(f.created_at).toLocaleString('en-GB') : 'N/A',
+              status: f.status || 'Success',
+              rawData: f // Store raw data for reference
+            };
+          });
           setFeesData(transformed);
         } else {
           setFeesData([]);
@@ -83,7 +92,11 @@ export default function FeesManagement() {
 
   const actions = [{
     icon: <Eye size={16} />,
-    onClick: (row) => navigate(`/system-admin/transactions/${row.id}`),
+    onClick: (row) => {
+      // Use formatted ID for display in URL, TransactionDetails will extract numeric ID
+      const transactionId = row.id || row.numericId || row.rawData?.transaction_id || row.rawData?.id;
+      navigate(`/system-admin/transactions/${transactionId}`);
+    },
     tooltip: 'View Details',
   }];
 

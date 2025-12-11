@@ -62,19 +62,24 @@ export default function TransactionManagement() {
         ]);
 
         if (transactionsResult.success) {
-          const transformed = transactionsResult.data.map(t => ({
-            id: `T${String(t.id || t.transaction_id || '').padStart(6, '0')}`,
-            type: t.type || 'Payment',
-            merchantOrderNo: t.merchant_order_no || t.description || 'N/A',
-            amount: `${(t.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t.currency || 'U'}`,
-            net: `${((t.amount || 0) * 0.1).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t.currency || 'U'}`,
-            bonus: `${((t.amount || 0) * 0.01).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t.currency || 'U'}`,
-            referralFees: `${((t.amount || 0) * 0.004).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t.currency || 'U'}`,
-            time: t.created_at ? new Date(t.created_at).toLocaleString('en-GB') : 'N/A',
-            reference: t.description || t.reference || 'N/A',
-            status: t.status === 'completed' ? 'Success' : t.status === 'pending' ? 'Pending' : t.status === 'failed' ? 'Failed' : t.status || 'Success',
-            rawData: t
-          }));
+          const transformed = transactionsResult.data.map(t => {
+            const numericId = t.id || t.transaction_id || '';
+            const formattedId = `T${String(numericId).padStart(6, '0')}`;
+            return {
+              id: formattedId, // Display ID with T prefix
+              numericId: numericId, // Store numeric ID for API calls
+              type: t.type || 'Payment',
+              merchantOrderNo: t.merchant_order_no || t.description || 'N/A',
+              amount: `${(t.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t.currency || 'U'}`,
+              net: `${((t.amount || 0) * 0.1).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t.currency || 'U'}`,
+              bonus: `${((t.amount || 0) * 0.01).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t.currency || 'U'}`,
+              referralFees: `${((t.amount || 0) * 0.004).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t.currency || 'U'}`,
+              time: t.created_at ? new Date(t.created_at).toLocaleString('en-GB') : 'N/A',
+              reference: t.description || t.reference || 'N/A',
+              status: t.status === 'completed' ? 'Success' : t.status === 'pending' ? 'Pending' : t.status === 'failed' ? 'Failed' : t.status || 'Success',
+              rawData: t
+            };
+          });
           setTransactionsData(transformed);
         }
 
@@ -139,7 +144,11 @@ export default function TransactionManagement() {
 
   const actions = useMemo(() => [{
     icon: <Eye size={16} />,
-    onClick: (row) => navigate(`${basePath}/transactions/${row.id}`),
+    onClick: (row) => {
+      // Use formatted ID for display in URL, but store numeric ID for API calls
+      const transactionId = row.id || row.numericId || row.rawData?.id || row.rawData?.transaction_id;
+      navigate(`${basePath}/transactions/${transactionId}`);
+    },
     tooltip: 'View Details',
   }], [navigate, basePath]);
 
