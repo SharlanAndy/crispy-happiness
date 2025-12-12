@@ -19,10 +19,11 @@ const Header = ({ walletAddress }) => {
       </div>
       
       <div className="flex items-center gap-5">
-        <button className="border border-black flex items-center gap-1.5 px-2.5 py-2 rounded-full hover:bg-black hover:text-white transition-colors group">
+        {/* Temporarily commented out - Connect Wallet button */}
+        {/* <button className="border border-black flex items-center gap-1.5 px-2.5 py-2 rounded-full hover:bg-black hover:text-white transition-colors group">
           <img alt="" className="w-3.5 h-3.5" src={imgVector3} />
           <span className="font-bold text-xs group-hover:text-white">Connect Wallet</span>
-        </button>
+        </button> */}
         
         {walletAddress && (
           <div className="px-3 py-1.5 bg-gray-100 rounded-full text-sm font-medium">
