@@ -10,7 +10,7 @@ import PasswordInput from '../../components/form/PasswordInput';
 import TextInputWithDropdown from '../../components/form/TextInputWithDropdown';
 import countriesAndStates from '../../constant/countriesAndStates.json';
 import { authService } from '@/services/authService';
-import { api } from '@/lib/api';
+import { api, T3SYSTEMADMIN_BASE } from '@/lib/api';
 import {
   MERCHANT_TYPES,
   CURRENCIES,
@@ -105,6 +105,90 @@ export default function UnifiedSettings() {
   // State for admin profile (both T3 and System Admin)
   const [adminProfile, setAdminProfile] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
+  
+  // State for entity data (user, agent, merchant) when admin is viewing
+  const [entityData, setEntityData] = useState(null);
+  const [loadingEntity, setLoadingEntity] = useState(false);
+
+  // Normalize API response to handle both PascalCase (from API) and snake_case (for backward compatibility)
+  const normalizeUserData = (data) => {
+    if (!data) return null;
+    return {
+      id: data.ID || data.id,
+      username: data.Username || data.username,
+      walletAddress: data.WalletAddress || data.wallet_address,
+      status: data.Status || data.status,
+      createdAt: data.CreatedAt || data.created_at,
+      totalIncomingFunds: data.TotalIncomingFunds ?? data.total_incoming_funds ?? 0,
+      totalOutgoingFunds: data.TotalOutgoingFunds ?? data.total_outgoing_funds ?? 0,
+      currentUnclaimFunds: data.CurrentUnclaimFunds ?? data.current_unclaim_funds ?? 0,
+      totalClaimedFunds: data.TotalClaimedFunds ?? data.total_claimed_funds ?? 0,
+    };
+  };
+
+  // Fetch entity data when admin is viewing another user/agent/merchant's settings
+  useEffect(() => {
+    const fetchEntityData = async () => {
+      if (!isAdminView || !id || !entityType) return;
+
+      setLoadingEntity(true);
+      try {
+        let response = null;
+        
+        if (entityType === 'user') {
+          // Fetch user details
+          if (isT3Admin) {
+            response = await api.t3admin.getUserDetails(id);
+          } else if (isSystemAdmin) {
+            response = await api.systemadmin.getUserDetails(id);
+          }
+        } else if (entityType === 'agent') {
+          // Fetch agent details
+          if (isT3Admin) {
+            response = await api.t3admin.getAgentDetails(id);
+          } else if (isSystemAdmin) {
+            response = await api.systemadmin.getAgentDetails(id);
+          }
+        } else if (entityType === 'merchant') {
+          // Fetch merchant details
+          if (isT3Admin) {
+            response = await api.t3admin.getMerchantDetails(id);
+          } else if (isSystemAdmin) {
+            response = await api.systemadmin.getMerchantDetails(id);
+          }
+        }
+        
+        if (response && response.success && response.data) {
+          const data = response.data;
+          setEntityData(data);
+          
+          // Normalize and populate form data for users
+          if (entityType === 'user') {
+            const normalized = normalizeUserData(data);
+            setFormData(prev => ({
+              ...prev,
+              username: normalized?.username || prev.username,
+              walletAddress: normalized?.walletAddress || prev.walletAddress,
+              accountStatus: normalized?.status || prev.accountStatus,
+            }));
+          } else {
+            // For agents and merchants, use the existing location.state logic
+            setFormData(prev => ({
+              ...prev,
+              walletAddress: data.wallet_address || data.walletAddress || prev.walletAddress,
+              accountStatus: data.status || data.Status || prev.accountStatus,
+            }));
+          }
+        }
+      } catch (error) {
+        console.error(`Failed to fetch ${entityType} data:`, error);
+      } finally {
+        setLoadingEntity(false);
+      }
+    };
+    
+    fetchEntityData();
+  }, [isAdminView, id, entityType, isT3Admin, isSystemAdmin]);
 
   // Fetch admin profile if viewing own settings (both T3 and System Admin)
   useEffect(() => {
@@ -426,6 +510,7 @@ export default function UnifiedSettings() {
     profile: {
       title: 'Profile Information',
         fields: entityType === 'user' ? [
+          createField('text', 'Username', 'username', { placeholder: 'Username' }),
           createField('password', 'Password', 'password', { placeholder: 'Insert password here' })
         ] : [
         createField('email', 'Email', 'email', { placeholder: 'Insert email here' }),
@@ -449,13 +534,33 @@ export default function UnifiedSettings() {
 
     return (
       <div className="space-y-6">
+        {loadingEntity && (
+          <div className="text-center py-4">
+            <p className="text-muted-foreground">Loading {entityType} data...</p>
+          </div>
+        )}
         <h2 className="text-lg font-semibold">{getEntityDisplayName()} {section.title}</h2>
         {sectionKey === 'profile' && (
           <FormField label={getIdLabel()}>
             <input type="text" value={id} readOnly className="w-full px-3 py-2 rounded-md bg-secondary/50 border-none" />
           </FormField>
         )}
-        {section.fields.map(field => renderField(field))}
+        {section.fields.map(field => {
+          // Make username read-only for users
+          if (field.name === 'username' && entityType === 'user') {
+            return (
+              <FormLabel key={field.name} label={field.label}>
+                <input 
+                  type="text" 
+                  value={field.value || ''} 
+                  readOnly 
+                  className="w-full px-3 py-2 rounded-md bg-secondary/50 border-none" 
+                />
+              </FormLabel>
+            );
+          }
+          return renderField(field);
+        })}
         <div className="flex justify-end gap-3">
           <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
           <Button>Save Changes</Button>

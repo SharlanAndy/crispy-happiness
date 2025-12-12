@@ -460,6 +460,13 @@ export const api = {
      */
     getDashboard: () => request(`${T3SYSTEMADMIN_BASE}/dashboard`, { method: 'GET' }),
 
+    /**
+     * Get weekly incoming and outgoing funds data.
+     * Headers: Authorization: Bearer <token>
+     * @returns {Promise<Object>} { success, data: { data: { incoming, outgoing } } }
+     */
+    getWeeklyFunds: () => request(`${T3SYSTEMADMIN_BASE}/funds/weekly`, { method: 'GET' }),
+
     // User Management
     /**
      * Get user list.
@@ -617,6 +624,14 @@ export const api = {
      * @returns {Promise<Object>} Dashboard stats
      */
     getDashboard: () => request(`${T3SYSTEMADMIN_BASE}/dashboard`, { method: 'GET' }),
+
+    /**
+     * Get revenue data for a specific period.
+     * Headers: Authorization: Bearer <token>
+     * @param {string} period - 'today', 'week', 'month', or 'year'
+     * @returns {Promise<Object>} { success, data: { chart_data, period, total_revenue } }
+     */
+    getRevenue: (period = 'week') => request(`${T3SYSTEMADMIN_BASE}/revenue?period=${period}`, { method: 'GET' }),
 
     // Merchant Management
     /**

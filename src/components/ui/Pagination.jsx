@@ -10,8 +10,6 @@ import PropTypes from 'prop-types';
  * @param {number} [props.maxVisible] - Max page buttons to show (default: 5)
  */
 export default function Pagination({ currentPage, totalPages, onPageChange, maxVisible = 5 }) {
-  if (totalPages <= 1) return null;
-
   const getPageNumbers = () => {
     const pages = [];
     let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
@@ -27,38 +25,64 @@ export default function Pagination({ currentPage, totalPages, onPageChange, maxV
     return pages;
   };
 
+  const hasMultiplePages = totalPages > 1;
+  const pageNumbers = getPageNumbers();
+  
+  // Ensure currentPage is within valid range
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const isFirstPage = safeCurrentPage <= 1;
+  const isLastPage = safeCurrentPage >= totalPages;
+
   return (
     <div className="p-4 border-t flex justify-end">
       <div className="flex items-center h-[40px]">
-        <button
-          onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-          className="border border-neutral-200 flex items-center justify-center h-full w-[80px] rounded-tl-[5px] rounded-bl-[5px] text-[16px] text-black hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          Previous
-        </button>
-
-        {getPageNumbers().map((page) => (
+        {hasMultiplePages && (
           <button
-            key={page}
-            onClick={() => onPageChange(page)}
-            className={`border border-neutral-200 border-l-0 flex items-center justify-center h-full w-[45px] text-[16px] transition-colors ${
-              page === currentPage
-                ? 'bg-black text-white'
-                : 'text-black hover:bg-gray-50'
-            }`}
+            onClick={() => onPageChange(safeCurrentPage - 1)}
+            disabled={isFirstPage}
+            className="border border-neutral-200 flex items-center justify-center h-full w-[80px] rounded-tl-[5px] rounded-bl-[5px] text-[16px] text-black hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {page}
+            Previous
           </button>
-        ))}
+        )}
 
-        <button
-          onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
-          className="border border-neutral-200 border-l-0 flex items-center justify-center h-full w-[86px] rounded-tr-[5px] rounded-br-[5px] text-[16px] text-black hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          Next
-        </button>
+        {pageNumbers.map((page, index) => {
+          // Determine border and rounding classes
+          let borderClasses = 'border border-neutral-200';
+          let roundedClasses = '';
+          
+          if (!hasMultiplePages) {
+            // Single page: all rounded corners, all borders
+            roundedClasses = 'rounded-tl-[5px] rounded-bl-[5px] rounded-tr-[5px] rounded-br-[5px]';
+          } else {
+            // Multiple pages: remove left border to connect with Previous button or previous page number
+            borderClasses += ' border-l-0';
+          }
+          
+          return (
+            <button
+              key={page}
+              onClick={() => onPageChange(page)}
+              className={`${borderClasses} ${roundedClasses} flex items-center justify-center h-full w-[45px] text-[16px] transition-colors ${
+                page === safeCurrentPage
+                  ? 'bg-black text-white'
+                  : 'text-black hover:bg-gray-50'
+              }`}
+            >
+              {page}
+            </button>
+          );
+        })}
+
+        {hasMultiplePages && (
+          <button
+            onClick={() => onPageChange(safeCurrentPage + 1)}
+            disabled={isLastPage}
+            className="border border-neutral-200 border-l-0 flex items-center justify-center h-full w-[86px] rounded-tr-[5px] rounded-br-[5px] text-[16px] text-black hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Next
+          </button>
+        )}
       </div>
     </div>
   );

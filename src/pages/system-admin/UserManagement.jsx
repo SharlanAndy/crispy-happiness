@@ -2,12 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, Settings, Trash2, ArrowRightLeft } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, ConfirmDialog, TransferModal } from '../../components/ui';
-import { filterAndPaginate } from '@/lib/pagination';
 import { t3Service } from '@/services/t3Service';
 import { api } from '@/lib/api';
-
-const ITEMS_PER_PAGE = 10;
-const USER_SEARCH_KEYS = ['id', 'status', 'spend', 'bonus', 'join'];
 
 export default function UserManagement() {
   const navigate = useNavigate();
@@ -18,23 +14,51 @@ export default function UserManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [usersData, setUsersData] = useState([]);
-  const [statsData, setStatsData] = useState(null);
+  const [usersMeta, setUsersMeta] = useState(null); // Store metadata from users endpoint
+  const [paginationMeta, setPaginationMeta] = useState({ total: 0, limit: 20, page: 1 }); // Store pagination metadata
 
   // Detect if accessed from T3 Admin or System Admin
   const isT3Admin = location.pathname.startsWith('/t3-admin');
   const basePath = isT3Admin ? '/t3-admin' : '/system-admin';
+
+  // Fetch stats from page 1 on initial load
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        if (isT3Admin) {
+          const statsResult = await t3Service.getUsers({ page: 1 });
+          if (statsResult.success) {
+            // Store metadata from page 1 for stats
+            setUsersMeta(statsResult.meta || statsResult);
+          }
+        } else {
+          const statsResult = await api.systemadmin.getUsers({ page: 1 });
+          if (statsResult && statsResult.success) {
+            // Store metadata from page 1 for stats
+            setUsersMeta(statsResult.meta || statsResult);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+      }
+    };
+    fetchStats();
+  }, [isT3Admin]);
 
   // Fetch users data for T3 Admin or System Admin
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         setLoading(true);
+        // Build params object, only include search if it has a value
+        const params = { page: currentPage };
+        if (searchTerm && searchTerm.trim()) {
+          params.search = searchTerm.trim();
+        }
+        
         if (isT3Admin) {
-          // Fetch all users (no search param - using client-side fuzzy search)
-          const [usersResult, dashboardResult] = await Promise.all([
-            t3Service.getUsers({ page: 1, search: '' }), // Fetch all, filter client-side
-            t3Service.getDashboard()
-          ]);
+          // Fetch users with search parameter
+          const usersResult = await t3Service.getUsers(params);
 
           if (usersResult.success) {
             const transformed = usersResult.data.map(user => ({
@@ -45,17 +69,21 @@ export default function UserManagement() {
               status: user.status || 'Active'
             }));
             setUsersData(transformed);
-          }
-
-          if (dashboardResult.success) {
-            setStatsData(dashboardResult.data);
+            
+            // Store pagination metadata
+            const limit = usersResult.limit || usersResult.meta?.limit || 20;
+            const total = usersResult.total || usersResult.meta?.total;
+            const page = usersResult.page || usersResult.meta?.page || currentPage;
+            
+            setPaginationMeta({
+              total: total !== undefined ? total : (usersResult.data.length < limit ? (page - 1) * limit + usersResult.data.length : null),
+              limit: limit,
+              page: page
+            });
           }
         } else {
           // System Admin - fetch from systemadmin API
-          const [usersResult, dashboardResult] = await Promise.all([
-            api.systemadmin.getUsers({ page: 1 }), // Fetch all, filter client-side
-            api.systemadmin.getDashboard()
-          ]);
+          const usersResult = await api.systemadmin.getUsers(params);
 
           if (usersResult && usersResult.success) {
             const transformed = usersResult.data.map(user => ({
@@ -66,12 +94,20 @@ export default function UserManagement() {
               status: user.status || 'Active'
             }));
             setUsersData(transformed);
+            
+            // Store pagination metadata
+            const limit = usersResult.limit || usersResult.meta?.limit || 20;
+            const total = usersResult.total || usersResult.meta?.total;
+            const page = usersResult.page || usersResult.meta?.page || currentPage;
+            
+            setPaginationMeta({
+              total: total !== undefined ? total : (usersResult.data.length < limit ? (page - 1) * limit + usersResult.data.length : null),
+              limit: limit,
+              page: page
+            });
           } else {
             setUsersData([]);
-          }
-
-          if (dashboardResult && dashboardResult.success) {
-            setStatsData(dashboardResult.data);
+            setPaginationMeta({ total: 0, limit: 20, page: 1 });
           }
         }
       } catch (error) {
@@ -89,21 +125,98 @@ export default function UserManagement() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
 
-  // Apply search and pagination
-  const { data: users, totalPages } = useMemo(
-    () => filterAndPaginate(usersData, searchTerm, USER_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
-    [usersData, searchTerm, currentPage]
-  );
+  // Calculate total pages from API pagination metadata
+  const totalPages = useMemo(() => {
+    // If API provides total, use it to calculate pages
+    if (paginationMeta.total !== null && paginationMeta.total !== undefined && paginationMeta.total > 0) {
+      return Math.ceil(paginationMeta.total / paginationMeta.limit) || 1;
+    }
+    
+    // If total is not provided, use heuristic based on data length vs limit:
+    // - If data.length < limit: This is the last page (e.g., 19 items with limit 20 = 1 page)
+    // - If data.length === limit: There might be more pages, show at least current + 1
+    if (usersData.length > 0) {
+      if (usersData.length < paginationMeta.limit) {
+        // Fewer items than limit means this is the last page
+        return paginationMeta.page;
+      } else if (usersData.length === paginationMeta.limit) {
+        // Full page of data, there might be more pages
+        // Show at least current page + 1, but will adjust when user navigates
+        return paginationMeta.page + 1;
+      }
+    }
+    
+    // Default to 1 page if no data
+    return 1;
+  }, [paginationMeta, usersData.length]);
 
-  const stats = statsData ? [
-    { label: 'Total Active User', value: statsData.total_users?.toString() || '0', lastUpdate: new Date().toLocaleDateString('en-GB') },
-    { label: 'Total Bonus Distributed', value: 'N/A', lastUpdate: new Date().toLocaleDateString('en-GB') }, // TODO: Add bonus API
-    { label: 'Total Spending Volume', value: `${(statsData.total_incoming_funds || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, lastUpdate: new Date().toLocaleDateString('en-GB') },
-  ] : [
-    { label: 'Total Active User', value: '23', lastUpdate: '17-11-2025' },
-    { label: 'Total Bonus Distributed', value: '10,000.00 USDT', lastUpdate: '17-11-2025' },
-    { label: 'Total Spending Volume', value: '10,000.00 USDT', lastUpdate: '17-11-2025' },
-  ];
+  // Use data directly from API (server-side pagination)
+  const users = usersData;
+
+  // Extract stats from users endpoint response
+  const stats = useMemo(() => {
+    // Get last updated date from centralized key, default to today
+    const getLastUpdated = () => {
+      if (usersMeta) {
+        const lastUpdated = usersMeta.last_updated || 
+                           usersMeta.updated_at || 
+                           usersMeta.last_update ||
+                           usersMeta.updated_at_date ||
+                           usersMeta.LastUpdated ||
+                           usersMeta.UpdatedAt;
+        
+        if (lastUpdated) {
+          try {
+            return new Date(lastUpdated).toLocaleDateString('en-GB');
+          } catch (e) {
+            console.warn('Failed to parse last_updated date:', e);
+          }
+        }
+      }
+      // Default to today's date
+      return new Date().toLocaleDateString('en-GB');
+    };
+
+    const lastUpdate = getLastUpdated();
+
+    // Extract values from users endpoint response, default to 0
+    const totalActiveUsers = usersMeta?.total_users || 
+                             usersMeta?.total_active_users || 
+                             usersMeta?.TotalUsers ||
+                             usersMeta?.TotalActiveUsers ||
+                             0;
+
+    const totalBonusDistributed = usersMeta?.total_bonus_distributed || 
+                                  usersMeta?.total_bonus || 
+                                  usersMeta?.TotalBonusDistributed ||
+                                  usersMeta?.TotalBonus ||
+                                  0;
+
+    const totalSpendingVolume = usersMeta?.total_spending_volume || 
+                                usersMeta?.total_incoming_funds || 
+                                usersMeta?.total_spend ||
+                                usersMeta?.TotalSpendingVolume ||
+                                usersMeta?.TotalIncomingFunds ||
+                                0;
+
+    return [
+      { 
+        label: 'Total Active User', 
+        value: totalActiveUsers.toString(), 
+        lastUpdate: lastUpdate 
+      },
+      { 
+        label: 'Total Bonus Distributed', 
+        value: `${totalBonusDistributed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
+        lastUpdate: lastUpdate 
+      },
+      { 
+        label: 'Total Spending Volume', 
+        value: `${totalSpendingVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
+        lastUpdate: lastUpdate 
+      },
+    ];
+  }, [usersMeta]);
 
   // Different columns for T3 Admin vs System Admin
   const columns = isT3Admin ? [

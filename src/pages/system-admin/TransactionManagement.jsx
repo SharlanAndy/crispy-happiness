@@ -51,14 +51,19 @@ export default function TransactionManagement() {
     const fetchTransactions = async () => {
       try {
         setLoading(true);
-        // Fetch all transactions (no search param - using client-side fuzzy search)
+        // Build params object, only include search if it has a value
+        const params = { page: currentPage };
+        if (searchTerm && searchTerm.trim()) {
+          params.search = searchTerm.trim();
+        }
+        
         const [transactionsResult, overviewResult] = await Promise.all([
           isT3Admin 
-            ? t3Service.getTransactions({ page: 1, search: '' }) // Fetch all, filter client-side
-            : api.request(`${T3SYSTEMADMIN_BASE}/transactions?page=${currentPage}&search=${encodeURIComponent(searchTerm || '')}`, { method: 'GET' }),
+            ? t3Service.getTransactions(params)
+            : api.systemadmin.getTransactions(params),
           isT3Admin
             ? t3Service.getTransactionOverview()
-            : api.request(`${T3SYSTEMADMIN_BASE}/transactions/overview`, { method: 'GET' })
+            : api.systemadmin.getTransactionOverview()
         ]);
 
         if (transactionsResult.success) {

@@ -9,6 +9,14 @@ import PropTypes from 'prop-types';
  * @param {boolean} [props.small] - If true, use text-xs; if false, use text-md (default: true)
  */
 export default function StatusBadge({ status, variant, small = true }) {
+  // Capitalize first letter of status
+  const capitalizeFirstLetter = (str) => {
+    if (!str) return str;
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+  };
+
+  const formattedStatus = capitalizeFirstLetter(status);
+
   // Auto-detect variant from status text if not provided
   const autoVariant = variant || (() => {
     const statusLower = status.toLowerCase();
@@ -38,7 +46,7 @@ export default function StatusBadge({ status, variant, small = true }) {
 
   return (
     <div className={`${sizeClass} w-fit font-medium ${variantClasses[autoVariant]}`}>
-      {status}
+      {formattedStatus}
     </div>
   );
 }

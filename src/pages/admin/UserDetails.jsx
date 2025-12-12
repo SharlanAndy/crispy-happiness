@@ -19,6 +19,22 @@ export default function UserDetails() {
   const basePath = location.pathname.includes('system-admin') ? '/system-admin' : '/t3-admin';
   const isT3Admin = location.pathname.startsWith('/t3-admin');
 
+  // Normalize API response to handle both PascalCase (from API) and snake_case (for backward compatibility)
+  const normalizeUserData = (data) => {
+    if (!data) return null;
+    return {
+      id: data.ID || data.id,
+      username: data.Username || data.username,
+      walletAddress: data.WalletAddress || data.wallet_address,
+      status: data.Status || data.status,
+      createdAt: data.CreatedAt || data.created_at,
+      totalIncomingFunds: data.TotalIncomingFunds ?? data.total_incoming_funds ?? 0,
+      totalOutgoingFunds: data.TotalOutgoingFunds ?? data.total_outgoing_funds ?? 0,
+      currentUnclaimFunds: data.CurrentUnclaimFunds ?? data.current_unclaim_funds ?? 0,
+      totalClaimedFunds: data.TotalClaimedFunds ?? data.total_claimed_funds ?? 0,
+    };
+  };
+
   // Fetch user details
   useEffect(() => {
     const fetchUserDetails = async () => {
@@ -56,9 +72,13 @@ export default function UserDetails() {
           : await api.request(`${T3SYSTEMADMIN_BASE}/transactions?page=${currentPage}&search=${encodeURIComponent(searchTerm || '')}`, { method: 'GET' });
         
         if (result.success) {
+          // Normalize user data for comparison
+          const normalized = normalizeUserData(userData);
+          const userId = normalized?.id || parseInt(id.replace('U', ''));
+          
           // Filter transactions for this user
           const userTransactions = result.data.filter(t => 
-            t.user_id === userData.id || t.user_id === parseInt(id.replace('U', ''))
+            t.user_id === userId || t.user_id === parseInt(id.replace('U', ''))
           );
           setTransactionsData(userTransactions);
         }
@@ -92,31 +112,37 @@ export default function UserDetails() {
     return new Date(dateString).toLocaleString('en-GB');
   };
 
+  const normalizedUserData = normalizeUserData(userData);
+
   // Format user info from API data
-  const userInfo = userData ? [
-    { label: "User's ID", value: userData.id ? `U${userData.id}` : id || 'N/A' },
-    { label: 'Join Date', value: formatDate(userData.created_at) },
-    { label: 'Status', value: userData.status || 'Active', badge: true },
+  const userInfo = normalizedUserData ? [
+    { label: "User's ID", value: normalizedUserData.id ? `U${normalizedUserData.id}` : id || 'N/A' },
+    { label: 'Username', value: normalizedUserData.username || 'N/A' },
+    { label: 'Join Date', value: formatDate(normalizedUserData.createdAt) },
+    { label: 'Status', value: normalizedUserData.status || 'Active', badge: true },
   ] : [
     { label: "User's ID", value: id || 'A00002' },
+    { label: 'Username', value: 'user_0xf39Fd6' },
     { label: 'Join Date', value: '01-11-2025 13:00' },
     { label: 'Status', value: 'Active', badge: true },
   ];
 
-  const walletAddressInfo = userData ? [
-    { label: 'Wallet Address', value: userData.wallet_address || 'N/A' }
+  const walletAddressInfo = normalizedUserData ? [
+    { label: 'Wallet Address', value: normalizedUserData.walletAddress || 'N/A' }
   ] : [
     { label: 'Wallet Address', value: '0xF3A1B2C3D4E5F67890123456789ABCDEF012345' }
   ];
 
-  const fundsInfo = userData ? [
-    { label: 'Current Unclaim Funds', value: `${formatCurrency(userData.current_unclaim_funds)} U` },
-    { label: 'Total Claimed Funds', value: `${formatCurrency(userData.total_claimed_funds)} U` },
-    { label: 'Total Incoming Funds', value: `${formatCurrency(userData.total_incoming_funds)} U` },
+  const fundsInfo = normalizedUserData ? [
+    { label: 'Current Unclaim Funds', value: `${formatCurrency(normalizedUserData.currentUnclaimFunds)} U` },
+    { label: 'Total Claimed Funds', value: `${formatCurrency(normalizedUserData.totalClaimedFunds)} U` },
+    { label: 'Total Incoming Funds', value: `${formatCurrency(normalizedUserData.totalIncomingFunds)} U` },
+    { label: 'Total Outgoing Funds', value: `${formatCurrency(normalizedUserData.totalOutgoingFunds)} U` },
   ] : [
-    { label: 'Current Unclaim Funds', value: '100 U' },
-    { label: 'Total Claimed Funds', value: '1000 U' },
-    { label: 'Total Incoming Funds', value: '1100 U' },
+    { label: 'Current Unclaim Funds', value: '5 U' },
+    { label: 'Total Claimed Funds', value: '10 U' },
+    { label: 'Total Incoming Funds', value: '0 U' },
+    { label: 'Total Outgoing Funds', value: '200 U' },
   ];
 
   // Transform transactions for display
