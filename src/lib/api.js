@@ -1,3 +1,6 @@
+// Import toastManager (will be registered by ToastContext)
+import { toastManager } from './toastManager.js';
+
 // Configuration for API connection
 const API_CONFIG = {
   baseURL: import.meta.env.VITE_API_URL || '/api', // Use relative path to leverage Vite proxy
@@ -8,6 +11,21 @@ const API_CONFIG = {
 
 // Centralized base path for T3Admin and SystemAdmin endpoints
 export const T3SYSTEMADMIN_BASE = '/t3systemadmin';
+
+// Check if error message indicates token expiration
+const isTokenExpiredError = (errorMessage) => {
+  if (!errorMessage) return false;
+  const message = errorMessage.toLowerCase();
+  return (
+    message.includes('expired token') ||
+    message.includes('invalid token') ||
+    message.includes('invalid or expired token') ||
+    message.includes('token expired') ||
+    message.includes('please login again') ||
+    message.includes('unauthorized') ||
+    message.includes('authentication failed')
+  );
+};
 
 // Generic fetch wrapper with fallback to mock
 async function request(endpoint, options = {}) {
@@ -29,15 +47,86 @@ async function request(endpoint, options = {}) {
       headers,
     });
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'API Error' }));
-      console.error(`API Error [${response.status}]:`, JSON.stringify(error, null, 2));
-      throw new Error(error.message || error.error || `Error ${response.status}`);
+    // Parse JSON response regardless of HTTP status
+    let responseData;
+    try {
+      responseData = await response.json();
+    } catch (parseError) {
+      // If response is not JSON, create error object
+      const text = await response.text();
+      responseData = { 
+        success: false, 
+        error: text || `HTTP ${response.status} Error`,
+        message: text || `HTTP ${response.status} Error`
+      };
     }
 
-    return await response.json();
+    // Check for success: false in response body (even if HTTP status is 200)
+    if (responseData && responseData.success === false) {
+      const errorMessage = responseData.error || responseData.message || 'Operation failed';
+      
+      // Always show/print the error message
+      console.error(`API Error [${endpoint}]:`, errorMessage);
+      
+      // Show toast notification
+      toastManager.showError(errorMessage, 7000); // Longer duration for errors
+      
+      // Check if it's a token expiration error
+      if (isTokenExpiredError(errorMessage)) {
+        console.warn('Token expired or invalid. Logging out user...');
+        
+        // Clear local storage
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('t3admin_profile');
+        localStorage.removeItem('systemadmin_profile');
+        
+        // Redirect to login page
+        window.location.href = '/login';
+        
+        // Return error response so caller knows it failed
+        return responseData;
+      }
+      
+      // For other errors, throw so caller can handle
+      throw new Error(errorMessage);
+    }
+
+    // Handle HTTP errors (non-200 status codes)
+    if (!response.ok) {
+      const errorMessage = responseData?.error || responseData?.message || `HTTP ${response.status} Error`;
+      console.error(`API Error [${response.status}]:`, errorMessage);
+      
+      // Show toast notification
+      toastManager.showError(errorMessage, 7000);
+      
+      // Check if it's a token expiration error (401 Unauthorized)
+      if (response.status === 401 || isTokenExpiredError(errorMessage)) {
+        console.warn('Token expired or invalid. Logging out user...');
+        
+        // Clear local storage
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('t3admin_profile');
+        localStorage.removeItem('systemadmin_profile');
+        
+        // Redirect to login page
+        window.location.href = '/login';
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    // Success response
+    return responseData;
   } catch (error) {
+    // Network errors or other exceptions
     console.error('API Request Failed:', error);
+    
+    // Show error message if it's a string
+    if (error.message && typeof error.message === 'string') {
+      toastManager.showError(error.message, 7000);
+    }
     
     // Fallback to mock if enabled
     if (API_CONFIG.fallbackToMock) {
@@ -577,6 +666,14 @@ export const api = {
      */
     getAgentDetails: (id) => request(`${T3SYSTEMADMIN_BASE}/agents/${id}`, { method: 'GET' }),
 
+    /**
+     * Create a new agent.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} data - Agent data
+     * @returns {Promise<Object>} { success, message, data: {...} }
+     */
+    createAgent: (data) => request(`${T3SYSTEMADMIN_BASE}/agents`, { method: 'POST', body: JSON.stringify(data) }),
+
     // User Management
     /**
      * Get user list.
@@ -687,6 +784,18 @@ export const api = {
     getLogs: (params = {}) => {
       const query = new URLSearchParams(params).toString();
       return request(`${T3SYSTEMADMIN_BASE}/logs?${query}`, { method: 'GET' });
+    },
+
+    // System Activities
+    /**
+     * Get recent system activities.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} params - { page, limit }
+     * @returns {Promise<Object>} { success, data: [{ id, title, description, type, created_at }, ...] }
+     */
+    getActivities: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`${T3SYSTEMADMIN_BASE}/activities?${query}`, { method: 'GET' });
     },
   },
 

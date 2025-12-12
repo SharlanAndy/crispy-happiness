@@ -4,6 +4,7 @@ import { Eye, Settings, Trash2, Plus } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, ConfirmDialog, AddAgentModal } from '../../components/ui';
 import { filterAndPaginate } from '@/lib/pagination';
 import { api } from '@/lib/api';
+import { useToast } from '@/contexts/ToastContext';
 
 const ITEMS_PER_PAGE = 10;
 const AGENT_SEARCH_KEYS = ['id', 'status', 'bonus', 'l1', 'l2', 'join'];
@@ -17,6 +18,7 @@ export default function AgentManagement() {
   const [loading, setLoading] = useState(true);
   const [agentsData, setAgentsData] = useState([]);
   const [dashboardData, setDashboardData] = useState(null);
+  const { handleApiResponse, showError } = useToast();
 
   // Fetch agents data
   useEffect(() => {
@@ -88,11 +90,55 @@ export default function AgentManagement() {
     // TODO: api.agent.delete(agent.id);
   };
 
-  const handleCreateAgent = (agentData) => {
-    // TODO: Implement create agent logic
-    console.log('Creating new agent...', agentData);
-    // After creation, you might want to refresh the agent list
-    // or navigate to the new agent's detail page
+  const handleCreateAgent = async (agentData) => {
+    try {
+      // Transform form data to match API expected format
+      const apiData = {
+        email: agentData.email,
+        password: agentData.password,
+        wallet_address: agentData.walletAddress,
+        sponsor_id: agentData.sponsorBy || '',
+        initial_bonus: agentData.initialBonus ? parseFloat(agentData.initialBonus) : 0,
+        bonus_currency: agentData.currency || 'USDT',
+      };
+
+      const result = await api.systemadmin.createAgent(apiData);
+      
+      // Handle API response with toast
+      handleApiResponse(result, {
+        successMessage: 'Agent created successfully!',
+        errorMessage: result?.message || 'Failed to create agent. Please try again.',
+      });
+
+      if (result && result.success) {
+        // Refresh agent list
+        const [agentsResult, dashboardResult] = await Promise.all([
+          api.systemadmin.getAgents({ page: 1 }),
+          api.systemadmin.getDashboard()
+        ]);
+
+        if (agentsResult && agentsResult.success) {
+          const transformed = agentsResult.data.map(a => ({
+            id: a.id || 'N/A',
+            bonus: `${(a.bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+            l1: (a.level1 || 0).toString(),
+            l2: (a.level2 || 0).toString(),
+            join: a.join_time ? new Date(a.join_time).toLocaleString('en-GB') : 'N/A',
+            status: a.status || 'Active'
+          }));
+          setAgentsData(transformed);
+        }
+
+        if (dashboardResult && dashboardResult.success) {
+          setDashboardData(dashboardResult.data);
+        }
+
+        setShowAddModal(false);
+      }
+    } catch (error) {
+      console.error('Failed to create agent:', error);
+      showError(error?.message || 'Failed to create agent. Please try again.');
+    }
   };
 
   const handleSearchChange = (value) => {

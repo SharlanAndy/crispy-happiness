@@ -4,6 +4,7 @@ import { Eye, Settings, Trash2, Plus } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, ConfirmDialog, AddMerchantModal } from '../../components/ui';
 import { filterAndPaginate } from '@/lib/pagination';
 import { api } from '@/lib/api';
+import { useToast } from '@/contexts/ToastContext';
 import {
   MERCHANT_STATS,
   MERCHANT_COLUMNS,
@@ -24,6 +25,7 @@ export default function MerchantManagement() {
   const [loading, setLoading] = useState(true);
   const [merchantsData, setMerchantsData] = useState([]);
   const [dashboardData, setDashboardData] = useState(null);
+  const { handleApiResponse, showError } = useToast();
 
   const isSystemAdmin = location.pathname.includes('system-admin');
 
@@ -41,10 +43,10 @@ export default function MerchantManagement() {
           const transformed = merchantsResult.data.map(m => ({
             id: m.id,
             merchant_id: m.merchant_id || `MER${m.id}`,
-            company_name: m.company_name || 'N/A',
+            name: m.company_name || 'N/A', // Column expects 'name' but API provides 'company_name'
             type: m.type || 'N/A',
-            state: m.state || '',
-            join_date: m.join_date ? new Date(m.join_date).toLocaleString('en-GB') : 'N/A',
+            state: m.state || m.location?.state || '', // API might provide state in location object
+            join: m.join_date ? new Date(m.join_date).toLocaleString('en-GB') : 'N/A', // Column expects 'join' but transformation was creating 'join_date'
             status: m.status || 'Active',
             tier: m.type === 't1' || m.type === 'merchant' ? 'T1' : m.type === 't2' ? 'T2' : m.type === 't3' ? 'T3' : 'T1'
           }));
@@ -88,9 +90,74 @@ export default function MerchantManagement() {
     console.log('Deleting merchant:', merchant.id);
   };
 
-  const handleMerchantSubmit = (merchantData) => {
-    console.log('Creating merchant account...', merchantData);
-    setShowAddModal(false);
+  const handleMerchantSubmit = async (merchantData) => {
+    try {
+      // Transform form data to match API expected format
+      const apiData = {
+        email: merchantData.email,
+        password: merchantData.password,
+        company_name: merchantData.companyName,
+        ssm_number: merchantData.ssmNumber,
+        merchant_type: merchantData.merchantType,
+        merchant_group: merchantData.merchantGroup, // T1, T2, or T3
+        address: {
+          line1: merchantData.addressLine1,
+          line2: merchantData.addressLine2 || '',
+          city: merchantData.city,
+          postcode: merchantData.postcode,
+          state: merchantData.state,
+          country: merchantData.country,
+        },
+        wallet_address: merchantData.walletAddress,
+        sponsor_id: merchantData.referralBy || '',
+        referral_fees: merchantData.referralFees ? parseFloat(merchantData.referralFees) : 0,
+        referral_remarks: merchantData.referralRemarks || '',
+        fees: {
+          markup: merchantData.markupFees ? parseFloat(merchantData.markupFees) : 0,
+          processing: merchantData.processingFees ? parseFloat(merchantData.processingFees) : 0,
+        },
+        currency: merchantData.currencies,
+      };
+
+      const result = await api.systemadmin.createMerchant(apiData);
+      
+      // Handle API response with toast
+      handleApiResponse(result, {
+        successMessage: 'Merchant created successfully!',
+        errorMessage: result?.message || 'Failed to create merchant. Please try again.',
+      });
+
+      if (result && result.success) {
+        // Refresh merchant list
+        const [merchantsResult, dashboardResult] = await Promise.all([
+          api.systemadmin.getMerchants({ page: 1 }),
+          api.systemadmin.getDashboard()
+        ]);
+
+        if (merchantsResult && merchantsResult.success) {
+          const transformed = merchantsResult.data.map(m => ({
+            id: m.id,
+            merchant_id: m.merchant_id || `MER${m.id}`,
+            name: m.company_name || 'N/A',
+            type: m.type || 'N/A',
+            state: m.state || m.location?.state || '',
+            join: m.join_date ? new Date(m.join_date).toLocaleString('en-GB') : 'N/A',
+            status: m.status || 'Active',
+            tier: m.type === 't1' || m.type === 'merchant' ? 'T1' : m.type === 't2' ? 'T2' : m.type === 't3' ? 'T3' : 'T1'
+          }));
+          setMerchantsData(transformed);
+        }
+
+        if (dashboardResult && dashboardResult.success) {
+          setDashboardData(dashboardResult.data);
+        }
+
+        setShowAddModal(false);
+      }
+    } catch (error) {
+      console.error('Failed to create merchant:', error);
+      showError(error?.message || 'Failed to create merchant. Please try again.');
+    }
   };
 
   const handleTierChange = (tier) => {

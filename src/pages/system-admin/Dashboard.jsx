@@ -7,21 +7,79 @@ export default function SystemAdminDashboard() {
   const [currentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState(null);
+  const [activitiesData, setActivitiesData] = useState([]);
 
-  // Fetch dashboard data
+  // Helper function to convert timestamp to relative time
+  const getRelativeTime = (timestamp) => {
+    if (!timestamp) return 'Unknown';
+    
+    try {
+      // Handle different timestamp formats
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diffInSeconds = Math.floor((now - date) / 1000);
+      
+      if (diffInSeconds < 60) {
+        return `${diffInSeconds} sec${diffInSeconds !== 1 ? 's' : ''} ago`;
+      } else if (diffInSeconds < 3600) {
+        const minutes = Math.floor(diffInSeconds / 60);
+        return `${minutes} min${minutes !== 1 ? 's' : ''} ago`;
+      } else if (diffInSeconds < 86400) {
+        const hours = Math.floor(diffInSeconds / 3600);
+        return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+      } else {
+        const days = Math.floor(diffInSeconds / 86400);
+        return `${days} day${days !== 1 ? 's' : ''} ago`;
+      }
+    } catch (error) {
+      console.error('Error parsing timestamp:', timestamp, error);
+      return 'Unknown';
+    }
+  };
+
+  // Fetch dashboard data and activities
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
         setLoading(true);
-        const result = await api.systemadmin.getDashboard();
-        if (result && result.success) {
-          setDashboardData(result.data);
+        const [dashboardResult, activitiesResult] = await Promise.all([
+          api.systemadmin.getDashboard(),
+          api.systemadmin.getActivities({ limit: 20 }) // Fetch more to ensure we get the latest 5 after sorting
+        ]);
+
+        if (dashboardResult && dashboardResult.success) {
+          setDashboardData(dashboardResult.data);
         } else {
           setDashboardData(null);
+        }
+
+        if (activitiesResult && activitiesResult.success) {
+          // Sort by created_at descending (latest first), then transform
+          const sorted = [...activitiesResult.data].sort((a, b) => {
+            const dateA = new Date(a.created_at);
+            const dateB = new Date(b.created_at);
+            return dateB - dateA; // Descending order (newest first)
+          });
+
+          // Take only the latest 5 after sorting
+          const latest5 = sorted.slice(0, 5);
+
+          // Transform API data to match UI format
+          const transformed = latest5.map(activity => ({
+            title: activity.title || 'System Activity',
+            desc: activity.description || '',
+            time: getRelativeTime(activity.created_at),
+            created_at: activity.created_at, // Keep for reference
+            rawData: activity // Keep raw data for reference
+          }));
+          setActivitiesData(transformed);
+        } else {
+          setActivitiesData([]);
         }
       } catch (error) {
         console.error('Failed to fetch dashboard:', error);
         setDashboardData(null);
+        setActivitiesData([]);
       } finally {
         setLoading(false);
       }
@@ -94,13 +152,10 @@ export default function SystemAdminDashboard() {
     },
   ];
 
-  const recentActivities = [
-    { title: 'New Merchant Registered', desc: 'Food Merchant Sdn Bhd joined as T1', time: '2 mins ago' },
-    { title: 'Withdrawal Approved', desc: 'ap123455551 - 10,000 USDT', time: '5 mins ago' },
-    { title: 'New Agent Added', desc: 'Agent T1234567890 registered', time: '10 mins ago' },
-    { title: 'Bonus Distributed', desc: '5,000 USDT to System members', time: '15 mins ago' },
-    { title: 'User Registered', desc: 'U1234567890 joined via referral', time: '20 mins ago' },
-  ];
+  // Use API data if available, otherwise show empty state
+  const recentActivities = activitiesData.length > 0 
+    ? activitiesData 
+    : [];
 
   return (
     <div className="space-y-6">
@@ -133,18 +188,28 @@ export default function SystemAdminDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card title="Recent System Activity" headerAction={<Activity size={18} />}>
           <div className="space-y-4">
-            {recentActivities.map((activity, i) => (
-              <div key={i} className="flex items-center justify-between py-2 border-b last:border-0">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                  <div>
-                    <p className="text-sm font-medium">{activity.title}</p>
-                    <p className="text-xs text-muted-foreground">{activity.desc}</p>
-                  </div>
-                </div>
-                <span className="text-xs text-muted-foreground">{activity.time}</span>
+            {loading ? (
+              <div className="text-center py-4">
+                <p className="text-sm text-muted-foreground">Loading activities...</p>
               </div>
-            ))}
+            ) : recentActivities.length > 0 ? (
+              recentActivities.map((activity, i) => (
+                <div key={activity.rawData?.id || i} className="flex items-center justify-between py-2 border-b last:border-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                    <div>
+                      <p className="text-sm font-medium">{activity.title}</p>
+                      <p className="text-xs text-muted-foreground">{activity.desc}</p>
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted-foreground">{activity.time}</span>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-sm text-muted-foreground">No recent activities</p>
+              </div>
+            )}
           </div>
         </Card>
 
