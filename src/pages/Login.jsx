@@ -18,8 +18,9 @@ export default function Login() {
     try {
       const user = await authService.login(username, password);
 
-      // Strict Redirection based on Role
-      switch (user.role) {
+      // Strict Redirection based on admin_type from profile
+      const role = authService.getRoleFromAdminType() || user.role;
+      switch (role) {
         case 'system-admin':
           navigate('/system-admin');
           break;

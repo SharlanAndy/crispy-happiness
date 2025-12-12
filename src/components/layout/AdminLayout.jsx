@@ -8,7 +8,10 @@ export default function AdminLayout() {
   const location = useLocation();
   const user = authService.getCurrentUser();
 
-  if (!user || (user.role !== 'system-admin' && user.role !== 't3-admin')) {
+  // Use admin_type to determine role
+  const role = authService.getRoleFromAdminType();
+  
+  if (!user || (role !== 'system-admin' && role !== 't3-admin')) {
     return <Navigate to="/login" replace />;
   }
 
@@ -59,7 +62,7 @@ export default function AdminLayout() {
     ] }
   ];
 
-  const sections = user.role === 'system-admin' ? systemSections : t3Sections;
+  const sections = role === 'system-admin' ? systemSections : t3Sections;
   const allItems = sections.flatMap(section => section.items);
   
   // Check for returnPath in location state for details pages
@@ -74,7 +77,7 @@ export default function AdminLayout() {
         <Header 
           title={currentTitle} 
           walletAddress={
-            user.role === 'system-admin' 
+            role === 'system-admin' 
               ? "0xSys...Admin" 
               : (user.wallet_address 
                   ? user.wallet_address.length > 10

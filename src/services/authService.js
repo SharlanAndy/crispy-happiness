@@ -53,10 +53,19 @@ export const authService = {
             const profileResponse = await api.t3admin.getProfile();
             if (profileResponse && profileResponse.success && profileResponse.data) {
               const profile = profileResponse.data;
+              // Determine role from admin_type
+              const adminType = profile.admin_type?.toLowerCase();
+              let role = 't3-admin'; // Default fallback
+              if (adminType === 'system' || adminType === 'systemadmin' || adminType === 'system_admin') {
+                role = 'system-admin';
+              } else if (adminType === 't3' || adminType === 't3admin' || adminType === 't3_admin') {
+                role = 't3-admin';
+              }
+              
               const userData = {
                 id: profile.id || username,
                 username: profile.username || username,
-                role: 't3-admin',
+                role: role, // Use role determined from admin_type
                 email: profile.email || `${username}@nbn.com`,
                 first_name: profile.first_name,
                 last_name: profile.last_name,
@@ -105,10 +114,19 @@ export const authService = {
             const profileResponse = await api.systemadmin.getProfile();
             if (profileResponse && profileResponse.success && profileResponse.data) {
               const profile = profileResponse.data;
+              // Determine role from admin_type
+              const adminType = profile.admin_type?.toLowerCase();
+              let role = 'system-admin'; // Default fallback
+              if (adminType === 'system' || adminType === 'systemadmin' || adminType === 'system_admin') {
+                role = 'system-admin';
+              } else if (adminType === 't3' || adminType === 't3admin' || adminType === 't3_admin') {
+                role = 't3-admin';
+              }
+              
               const userData = {
                 id: profile.id || username,
                 username: profile.username || username,
-                role: 'system-admin',
+                role: role, // Use role determined from admin_type
                 email: profile.email || `${username}@nbn.com`,
                 first_name: profile.first_name,
                 last_name: profile.last_name,
@@ -194,10 +212,19 @@ export const authService = {
           const profileResponse = await api.t3admin.getProfile();
           if (profileResponse && profileResponse.success && profileResponse.data) {
             const profile = profileResponse.data;
+            // Determine role from admin_type
+            const adminType = profile.admin_type?.toLowerCase();
+            let role = 't3-admin'; // Default fallback
+            if (adminType === 'system' || adminType === 'systemadmin' || adminType === 'system_admin') {
+              role = 'system-admin';
+            } else if (adminType === 't3' || adminType === 't3admin' || adminType === 't3_admin') {
+              role = 't3-admin';
+            }
+            
             const userData = {
               id: profile.id || username,
               username: profile.username || username,
-              role: 't3-admin',
+              role: role, // Use role determined from admin_type
               email: profile.email || `${username}@nbn.com`,
               first_name: profile.first_name,
               last_name: profile.last_name,
@@ -242,6 +269,86 @@ export const authService = {
   getCurrentUser: () => {
     const userStr = localStorage.getItem('user');
     return userStr ? JSON.parse(userStr) : null;
+  },
+
+  /**
+   * Get admin_type from user profile
+   * Checks user object first, then falls back to stored profile
+   * @returns {string|null} admin_type value (e.g., 'system', 't3', 'systemadmin')
+   */
+  getAdminType: () => {
+    const user = authService.getCurrentUser();
+    if (user?.admin_type) {
+      return user.admin_type;
+    }
+    
+    // Try to get from stored profile
+    const t3Profile = localStorage.getItem('t3admin_profile');
+    const systemProfile = localStorage.getItem('systemadmin_profile');
+    
+    if (t3Profile) {
+      try {
+        const profile = JSON.parse(t3Profile);
+        if (profile.admin_type) return profile.admin_type;
+      } catch (e) {
+        console.warn('Failed to parse t3admin_profile:', e);
+      }
+    }
+    
+    if (systemProfile) {
+      try {
+        const profile = JSON.parse(systemProfile);
+        if (profile.admin_type) return profile.admin_type;
+      } catch (e) {
+        console.warn('Failed to parse systemadmin_profile:', e);
+      }
+    }
+    
+    return null;
+  },
+
+  /**
+   * Get role based on admin_type from profile
+   * Converts admin_type to role format for backward compatibility
+   * @returns {string} role ('system-admin', 't3-admin', or original role)
+   */
+  getRoleFromAdminType: () => {
+    const user = authService.getCurrentUser();
+    if (!user) return null;
+    
+    // First try to get admin_type
+    const adminType = authService.getAdminType();
+    
+    if (adminType) {
+      // Convert admin_type to role format
+      const adminTypeLower = adminType.toLowerCase();
+      if (adminTypeLower === 'system' || adminTypeLower === 'systemadmin' || adminTypeLower === 'system_admin') {
+        return 'system-admin';
+      } else if (adminTypeLower === 't3' || adminTypeLower === 't3admin' || adminTypeLower === 't3_admin') {
+        return 't3-admin';
+      }
+    }
+    
+    // Fallback to existing role if admin_type not available
+    return user.role || null;
+  },
+
+  /**
+   * Check if user is system admin based on admin_type
+   * @returns {boolean}
+   */
+  isSystemAdmin: () => {
+    const role = authService.getRoleFromAdminType();
+    return role === 'system-admin';
+  },
+
+  /**
+   * Check if user is T3 admin based on admin_type
+   * @returns {boolean}
+   */
+  isT3Admin: () => {
+    const role = authService.getRoleFromAdminType();
+    return role === 't3-admin';
   },
 
   isAuthenticated: () => {

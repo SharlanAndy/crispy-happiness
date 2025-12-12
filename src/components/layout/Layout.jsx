@@ -34,7 +34,10 @@ export default function Layout() {
   };
 
   const getNavItems = () => {
-    switch (user.role) {
+    // Use admin_type to determine role
+    const role = authService.getRoleFromAdminType() || user.role;
+    
+    switch (role) {
       case 'system-admin':
         return [
           { icon: LayoutDashboard, label: 'Dashboard', path: '/system-admin' },
@@ -78,7 +81,7 @@ export default function Layout() {
       <div className="w-64 border-r bg-card flex flex-col">
         <div className="p-6 border-b">
           <h1 className="text-2xl font-bold text-primary">NBN System</h1>
-          <p className="text-xs text-muted-foreground mt-1 capitalize">{user.role.replace('-', ' ')} Portal</p>
+          <p className="text-xs text-muted-foreground mt-1 capitalize">{(authService.getRoleFromAdminType() || user.role || 'user').replace('-', ' ')} Portal</p>
         </div>
 
         <div className="flex-1 p-4 overflow-y-auto">

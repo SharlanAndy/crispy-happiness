@@ -102,54 +102,89 @@ export default function UnifiedSettings() {
   // Determine if admin is viewing another user's settings
   const isAdminView = (isSystemAdmin || isT3Admin) && id;
   
-  // State for T3 admin profile
-  const [t3AdminProfile, setT3AdminProfile] = useState(null);
+  // State for admin profile (both T3 and System Admin)
+  const [adminProfile, setAdminProfile] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
 
-  // Fetch T3 admin profile if viewing own settings
+  // Fetch admin profile if viewing own settings (both T3 and System Admin)
   useEffect(() => {
-    const fetchT3AdminProfile = async () => {
-      if (isT3Admin && !id) {
-        // T3 admin viewing their own settings
+    const fetchAdminProfile = async () => {
+      if ((isT3Admin || isSystemAdmin) && !id) {
+        // Admin viewing their own settings
         setLoadingProfile(true);
         try {
-          // First try to get from localStorage
-          const storedProfile = localStorage.getItem('t3admin_profile');
-          if (storedProfile) {
-            setT3AdminProfile(JSON.parse(storedProfile));
+          let storedProfile = null;
+          let response = null;
+          
+          if (isT3Admin) {
+            // First try to get from localStorage
+            storedProfile = localStorage.getItem('t3admin_profile');
+            if (storedProfile) {
+              setAdminProfile(JSON.parse(storedProfile));
+            }
+            
+            // Then fetch fresh data from API
+            response = await api.t3admin.getProfile();
+          } else if (isSystemAdmin) {
+            // First try to get from localStorage
+            storedProfile = localStorage.getItem('systemadmin_profile');
+            if (storedProfile) {
+              setAdminProfile(JSON.parse(storedProfile));
+            }
+            
+            // Then fetch fresh data from API
+            response = await api.systemadmin.getProfile();
           }
           
-          // Then fetch fresh data from API
-          const response = await api.t3admin.getProfile();
           if (response && response.success && response.data) {
-            setT3AdminProfile(response.data);
-            localStorage.setItem('t3admin_profile', JSON.stringify(response.data));
+            const profile = response.data;
+            setAdminProfile(profile);
             
-            // Update user in localStorage with profile data
+            // Store in appropriate localStorage key
+            if (isT3Admin) {
+              localStorage.setItem('t3admin_profile', JSON.stringify(profile));
+            } else if (isSystemAdmin) {
+              localStorage.setItem('systemadmin_profile', JSON.stringify(profile));
+            }
+            
+            // Update user in localStorage with profile data and role from admin_type
             const user = authService.getCurrentUser();
             if (user) {
+              // Determine role from admin_type
+              const adminType = profile.admin_type?.toLowerCase();
+              let role = user.role; // Keep existing role as fallback
+              if (adminType === 'system' || adminType === 'systemadmin' || adminType === 'system_admin') {
+                role = 'system-admin';
+              } else if (adminType === 't3' || adminType === 't3admin' || adminType === 't3_admin') {
+                role = 't3-admin';
+              }
+              
               const updatedUser = {
                 ...user,
-                ...response.data,
-                wallet_address: response.data.wallet_address
+                ...profile,
+                role: role, // Update role based on admin_type
+                wallet_address: profile.wallet_address
               };
               localStorage.setItem('user', JSON.stringify(updatedUser));
             }
           }
         } catch (error) {
-          console.error('Failed to fetch T3 admin profile:', error);
+          console.error('Failed to fetch admin profile:', error);
         } finally {
           setLoadingProfile(false);
         }
       }
     };
-    fetchT3AdminProfile();
-  }, [isT3Admin, id]);
+    fetchAdminProfile();
+  }, [isT3Admin, isSystemAdmin, id]);
 
   // Role-based tab configuration
   const getTabs = () => {
-    // T3 Admin viewing their own settings
-    if (isT3Admin && !id) {
+    // Get role from admin_type
+    const role = authService.getRoleFromAdminType();
+    
+    // T3 Admin or System Admin viewing their own settings
+    if ((isT3Admin || isSystemAdmin) && !id) {
       return [
         { id: 'profile', label: 'Profile Information', icon: User },
         { id: 'wallet', label: 'Wallet Address', icon: Wallet },
@@ -522,7 +557,7 @@ export default function UnifiedSettings() {
                   <FormField label="Username" icon={<User size={18} />}>
                     <input 
                       type="text" 
-                      value={t3AdminProfile?.username || authService.getCurrentUser()?.username || ''} 
+                      value={adminProfile?.username || authService.getCurrentUser()?.username || ''} 
                       readOnly 
                       className="w-full px-3 py-2 rounded-md bg-secondary/50 border-none" 
                     />
@@ -530,46 +565,46 @@ export default function UnifiedSettings() {
                   <FormField label="Email Address" icon={<Mail size={18} />}>
                     <input 
                       type="email" 
-                      value={t3AdminProfile?.email || authService.getCurrentUser()?.email || ''} 
+                      value={adminProfile?.email || authService.getCurrentUser()?.email || ''} 
                       readOnly 
                       className="w-full px-3 py-2 rounded-md bg-secondary/50 border-none" 
                     />
                   </FormField>
-                  {t3AdminProfile?.first_name && (
+                  {adminProfile?.first_name && (
                     <FormField label="First Name" icon={<User size={18} />}>
                       <input 
                         type="text" 
-                        value={t3AdminProfile.first_name} 
+                        value={adminProfile.first_name} 
                         readOnly 
                         className="w-full px-3 py-2 rounded-md bg-secondary/50 border-none" 
                       />
                     </FormField>
                   )}
-                  {t3AdminProfile?.last_name && (
+                  {adminProfile?.last_name && (
                     <FormField label="Last Name" icon={<User size={18} />}>
                       <input 
                         type="text" 
-                        value={t3AdminProfile.last_name} 
+                        value={adminProfile.last_name} 
                         readOnly 
                         className="w-full px-3 py-2 rounded-md bg-secondary/50 border-none" 
                       />
                     </FormField>
                   )}
-                  {t3AdminProfile?.phone && (
+                  {adminProfile?.phone && (
                     <FormField label="Phone" icon={<User size={18} />}>
                       <input 
                         type="text" 
-                        value={t3AdminProfile.phone} 
+                        value={adminProfile.phone} 
                         readOnly 
                         className="w-full px-3 py-2 rounded-md bg-secondary/50 border-none" 
                       />
                     </FormField>
                   )}
-                  {t3AdminProfile?.character && (
+                  {adminProfile?.character && (
                     <FormField label="Character" icon={<User size={18} />}>
                       <input 
                         type="text" 
-                        value={t3AdminProfile.character} 
+                        value={adminProfile.character} 
                         readOnly 
                         className="w-full px-3 py-2 rounded-md bg-secondary/50 border-none" 
                       />
@@ -589,7 +624,7 @@ export default function UnifiedSettings() {
               <FormField label="Wallet Address" icon={<Wallet size={18} />}>
                 <input 
                   type="text" 
-                  value={t3AdminProfile?.wallet_address || authService.getCurrentUser()?.wallet_address || ''} 
+                  value={adminProfile?.wallet_address || authService.getCurrentUser()?.wallet_address || ''} 
                   readOnly
                   className="w-full px-3 py-2 rounded-md bg-secondary/50 border-none" 
                 />
