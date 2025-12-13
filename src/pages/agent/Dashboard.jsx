@@ -21,7 +21,7 @@ export default function AgentDashboard() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Agent Dashboard</h1>
         <div className="text-sm text-muted-foreground">
-          Last updated: {new Date().toLocaleDateString()}
+          Last updated: {new Date().toLocaleDateString('en-GB')}
         </div>
       </div>
 

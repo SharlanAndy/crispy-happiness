@@ -172,15 +172,20 @@ export default function UnifiedSettings() {
               username: normalized?.username || prev.username,
               walletAddress: normalized?.walletAddress || prev.walletAddress,
               accountStatus: normalized?.status || prev.accountStatus,
+              // Referred By - who referred this user (upline)
+              // This field will be added to the API response later
+              // Assumes field names: ReferredBy, referred_by, referredBy, sponsor_by, sponsorBy
+              referralBy: data.ReferredBy || data.referred_by || data.referredBy || data.sponsor_by || data.sponsorBy || prev.referralBy || '',
             }));
           } else if (entityType === 'merchant') {
             // For merchants, populate all fields including rebates
             // Handle both PascalCase (from API) and snake_case (for backward compatibility)
-            const merchantGroup = data.UserType || data.user_type || data.merchantGroup || prev.merchantGroup;
-            // Normalize UserType to match form values (t1 -> T1, t2 -> T2, t3 -> T3)
-            const normalizedGroup = merchantGroup ? merchantGroup.toUpperCase() : prev.merchantGroup;
-            
-            setFormData(prev => ({
+            setFormData(prev => {
+              const merchantGroup = data.UserType || data.user_type || data.merchantGroup || prev.merchantGroup;
+              // Normalize UserType to match form values (t1 -> T1, t2 -> T2, t3 -> T3)
+              const normalizedGroup = merchantGroup ? merchantGroup.toUpperCase() : prev.merchantGroup;
+              
+              return {
               ...prev,
               // Business Information
               merchantGroup: normalizedGroup,
@@ -206,7 +211,8 @@ export default function UnifiedSettings() {
               T1_rebate: data.T1Rebate ?? data.T1_rebate ?? data.t1_rebate ?? prev.T1_rebate ?? 0,
               T2_rebate: data.T2Rebate ?? data.T2_rebate ?? data.t2_rebate ?? prev.T2_rebate ?? 0,
               token_rebate: data.TokenRebate ?? data.token_rebate ?? prev.token_rebate ?? 0,
-            }));
+              };
+            });
           } else {
             // For agents, use the existing location.state logic
             setFormData(prev => ({

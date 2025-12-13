@@ -260,7 +260,7 @@ export default function T3AdminDashboard() {
         try {
           const date = new Date(lastUpdated);
           if (!isNaN(date.getTime())) {
-            return date.toLocaleDateString();
+            return date.toLocaleDateString('en-GB');
           }
         } catch (e) {
           console.warn('Failed to parse last_updated date:', e);
@@ -268,7 +268,7 @@ export default function T3AdminDashboard() {
       }
     }
     // Fallback to today's date
-    return new Date().toLocaleDateString();
+    return new Date().toLocaleDateString('en-GB');
   };
 
   return (
