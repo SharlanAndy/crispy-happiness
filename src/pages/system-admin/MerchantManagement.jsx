@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, Settings, Trash2, Plus } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, ConfirmDialog, AddMerchantModal } from '../../components/ui';
-import { filterAndPaginate } from '@/lib/pagination';
 import { api } from '@/lib/api';
 import { useToast } from '@/contexts/ToastContext';
 import {
@@ -11,8 +10,6 @@ import {
   MERCHANT_TIERS,
   MERCHANT_SEARCH_KEYS,
 } from '../../constant/merchantMockData';
-
-const ITEMS_PER_PAGE = 10;
 
 export default function MerchantManagement() {
   const navigate = useNavigate();
@@ -25,34 +22,124 @@ export default function MerchantManagement() {
   const [loading, setLoading] = useState(true);
   const [merchantsData, setMerchantsData] = useState([]);
   const [dashboardData, setDashboardData] = useState(null);
+  const [totalPages, setTotalPages] = useState(1);
+  const [summaryStats, setSummaryStats] = useState({
+    t1: { count: 0, lastUpdate: null },
+    t2: { count: 0, lastUpdate: null },
+    t3: { count: 0, lastUpdate: null },
+  });
   const { handleApiResponse, showError } = useToast();
 
   const isSystemAdmin = location.pathname.includes('system-admin');
 
-  // Fetch merchants data
+  // Map tier to API type parameter
+  const getTypeFromTier = (tier) => {
+    const tierMap = {
+      'T1': 't1',
+      'T2': 't2',
+      'T3': 't3',
+      'Merchant': 'merchant'
+    };
+    return tierMap[tier] || 't1';
+  };
+
+  // Helper function to safely format date
+  const formatDate = (dateValue) => {
+    if (!dateValue) {
+      return new Date().toLocaleDateString('en-GB');
+    }
+    
+    // If it's already a formatted date string (like "13/12/2025"), return as is
+    if (typeof dateValue === 'string' && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateValue)) {
+      return dateValue;
+    }
+    
+    // Try to parse as date
+    const date = new Date(dateValue);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      // Invalid date, return today's date
+      return new Date().toLocaleDateString('en-GB');
+    }
+    
+    // Valid date, format it
+    return date.toLocaleDateString('en-GB');
+  };
+
+  // Fetch summary stats for T1, T2, T3 from individual endpoints
+  useEffect(() => {
+    const fetchSummaryStats = async () => {
+      try {
+        const [t1Result, t2Result, t3Result] = await Promise.all([
+          api.systemadmin.getMerchants({ page: 1, type: 't1' }),
+          api.systemadmin.getMerchants({ page: 1, type: 't2' }),
+          api.systemadmin.getMerchants({ page: 1, type: 't3' }),
+        ]);
+
+        const today = new Date().toLocaleDateString('en-GB');
+
+        setSummaryStats({
+          t1: {
+            count: t1Result?.total || t1Result?.data?.length || t1Result?.count || 0,
+            lastUpdate: t1Result?.last_update || t1Result?.lastUpdate || t1Result?.updated_at || today,
+          },
+          t2: {
+            count: t2Result?.total || t2Result?.data?.length || t2Result?.count || 0,
+            lastUpdate: t2Result?.last_update || t2Result?.lastUpdate || t2Result?.updated_at || today,
+          },
+          t3: {
+            count: t3Result?.total || t3Result?.data?.length || t3Result?.count || 0,
+            lastUpdate: t3Result?.last_update || t3Result?.lastUpdate || t3Result?.updated_at || today,
+          },
+        });
+      } catch (error) {
+        console.error('Failed to fetch summary stats:', error);
+        // Fallback to today's date if fetch fails
+        const today = new Date().toLocaleDateString('en-GB');
+        setSummaryStats({
+          t1: { count: 0, lastUpdate: today },
+          t2: { count: 0, lastUpdate: today },
+          t3: { count: 0, lastUpdate: today },
+        });
+      }
+    };
+
+    fetchSummaryStats();
+  }, []); // Fetch once on mount
+
+  // Fetch merchants data based on active tier
   useEffect(() => {
     const fetchMerchants = async () => {
       try {
         setLoading(true);
+        const type = getTypeFromTier(activeTier);
         const [merchantsResult, dashboardResult] = await Promise.all([
-          api.systemadmin.getMerchants({ page: 1 }), // Fetch all, filter client-side
+          api.systemadmin.getMerchants({ page: currentPage, type }),
           api.systemadmin.getDashboard()
         ]);
 
         if (merchantsResult && merchantsResult.success) {
           const transformed = merchantsResult.data.map(m => ({
-            id: m.id,
-            merchant_id: m.merchant_id || `MER${m.id}`,
-            name: m.company_name || 'N/A', // Column expects 'name' but API provides 'company_name'
-            type: m.type || 'N/A',
-            state: m.state || m.location?.state || '', // API might provide state in location object
-            join: m.join_date ? new Date(m.join_date).toLocaleString('en-GB') : 'N/A', // Column expects 'join' but transformation was creating 'join_date'
+            id: m.id, // Keep numeric id for navigation/actions
+            merchant_id: m.merchant_id || 'N/A', // Use merchant_id directly from API for display
+            name: m.company_name || 'N/A',
+            type: m.type ? m.type.toUpperCase() : 'N/A', // Uppercase the type (e.g., t1 -> T1)
+            state: m.state || m.location?.state || '',
+            join: m.join_date ? new Date(m.join_date).toLocaleString('en-GB') : 'N/A',
             status: m.status || 'Active',
-            tier: m.type === 't1' || m.type === 'merchant' ? 'T1' : m.type === 't2' ? 'T2' : m.type === 't3' ? 'T3' : 'T1'
           }));
           setMerchantsData(transformed);
+          
+          // Set total pages from API response if available
+          if (merchantsResult.total_pages) {
+            setTotalPages(merchantsResult.total_pages);
+          } else if (merchantsResult.meta?.totalPages) {
+            setTotalPages(merchantsResult.meta.totalPages);
+          }
         } else {
           setMerchantsData([]);
+          setTotalPages(1);
         }
 
         if (dashboardResult && dashboardResult.success) {
@@ -61,28 +148,32 @@ export default function MerchantManagement() {
       } catch (error) {
         console.error('Failed to fetch merchants:', error);
         setMerchantsData([]);
+        setTotalPages(1);
       } finally {
         setLoading(false);
       }
     };
     fetchMerchants();
-  }, []);
+  }, [activeTier, currentPage]);
 
   // Scroll to top when page changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
 
-  // Filter merchants by tier first
-  const tierFilteredMerchants = useMemo(
-    () => merchantsData.filter(m => m.tier === activeTier),
-    [merchantsData, activeTier]
-  );
-
-  // Apply search and pagination
-  const { data: merchants, totalPages } = useMemo(
-    () => filterAndPaginate(tierFilteredMerchants, searchTerm, MERCHANT_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
-    [tierFilteredMerchants, searchTerm, currentPage]
+  // Apply search filter (client-side search on already filtered API data)
+  const filteredMerchants = useMemo(
+    () => {
+      if (!searchTerm) return merchantsData;
+      const searchLower = searchTerm.toLowerCase();
+      return merchantsData.filter(m => 
+        MERCHANT_SEARCH_KEYS.some(key => {
+          const value = m[key];
+          return value && value.toString().toLowerCase().includes(searchLower);
+        })
+      );
+    },
+    [merchantsData, searchTerm]
   );
 
   // Handlers
@@ -92,31 +183,34 @@ export default function MerchantManagement() {
 
   const handleMerchantSubmit = async (merchantData) => {
     try {
-      // Transform form data to match API expected format
+      // Transform form data to match API expected format (flat structure with snake_case keys)
       const apiData = {
-        email: merchantData.email,
-        password: merchantData.password,
-        company_name: merchantData.companyName,
-        ssm_number: merchantData.ssmNumber,
-        merchant_type: merchantData.merchantType,
-        merchant_group: merchantData.merchantGroup, // T1, T2, or T3
-        address: {
-          line1: merchantData.addressLine1,
-          line2: merchantData.addressLine2 || '',
-          city: merchantData.city,
-          postcode: merchantData.postcode,
-          state: merchantData.state,
-          country: merchantData.country,
-        },
-        wallet_address: merchantData.walletAddress,
-        sponsor_id: merchantData.referralBy || '',
-        referral_fees: merchantData.referralFees ? parseFloat(merchantData.referralFees) : 0,
-        referral_remarks: merchantData.referralRemarks || '',
-        fees: {
-          markup: merchantData.markupFees ? parseFloat(merchantData.markupFees) : 0,
-          processing: merchantData.processingFees ? parseFloat(merchantData.processingFees) : 0,
-        },
-        currency: merchantData.currencies,
+        username: merchantData.username || '',
+        email: merchantData.email || '',
+        password: merchantData.password || '',
+        first_name: merchantData.firstName || '',
+        last_name: merchantData.lastName || '',
+        phone: merchantData.phone || '',
+        business_name: merchantData.companyName || '',
+        ssm_number: merchantData.ssmNumber || '',
+        merchant_type: merchantData.merchantType || '',
+        merchant_group: merchantData.merchantGroup || 'T1',
+        address_line1: merchantData.addressLine1 || '',
+        address_line2: merchantData.addressLine2 || '',
+        city: merchantData.city || '',
+        state: merchantData.state || '',
+        country: merchantData.country || '',
+        postcode: merchantData.postcode || '',
+        wallet_address: merchantData.walletAddress || '',
+        sponsor_by: merchantData.sponsorBy || '',
+        markup_fees: merchantData.markupFees ? parseFloat(merchantData.markupFees) : 0,
+        processing_fees: merchantData.processingFees ? parseFloat(merchantData.processingFees) : 0,
+        L1_rebate: merchantData.L1Rebate ? parseFloat(merchantData.L1Rebate) : 0,
+        L2_rebate: merchantData.L2Rebate ? parseFloat(merchantData.L2Rebate) : 0,
+        T1_rebate: merchantData.T1Rebate ? parseFloat(merchantData.T1Rebate) : 0,
+        T2_rebate: merchantData.T2Rebate ? parseFloat(merchantData.T2Rebate) : 0,
+        Merchant_rebate: merchantData.MerchantRebate ? parseFloat(merchantData.MerchantRebate) : 0,
+        DirectRebate: merchantData.DirectRebate ? parseFloat(merchantData.DirectRebate) : 0,
       };
 
       const result = await api.systemadmin.createMerchant(apiData);
@@ -128,29 +222,58 @@ export default function MerchantManagement() {
       });
 
       if (result && result.success) {
-        // Refresh merchant list
+        // Refresh merchant list for current tier
+        const type = getTypeFromTier(activeTier);
         const [merchantsResult, dashboardResult] = await Promise.all([
-          api.systemadmin.getMerchants({ page: 1 }),
+          api.systemadmin.getMerchants({ page: currentPage, type }),
           api.systemadmin.getDashboard()
         ]);
 
         if (merchantsResult && merchantsResult.success) {
           const transformed = merchantsResult.data.map(m => ({
-            id: m.id,
-            merchant_id: m.merchant_id || `MER${m.id}`,
+            id: m.id, // Keep numeric id for navigation/actions
+            merchant_id: m.merchant_id || 'N/A', // Use merchant_id directly from API for display
             name: m.company_name || 'N/A',
-            type: m.type || 'N/A',
+            type: m.type ? m.type.toUpperCase() : 'N/A', // Uppercase the type (e.g., t1 -> T1)
             state: m.state || m.location?.state || '',
             join: m.join_date ? new Date(m.join_date).toLocaleString('en-GB') : 'N/A',
             status: m.status || 'Active',
-            tier: m.type === 't1' || m.type === 'merchant' ? 'T1' : m.type === 't2' ? 'T2' : m.type === 't3' ? 'T3' : 'T1'
           }));
           setMerchantsData(transformed);
+          
+          if (merchantsResult.total_pages) {
+            setTotalPages(merchantsResult.total_pages);
+          } else if (merchantsResult.meta?.totalPages) {
+            setTotalPages(merchantsResult.meta.totalPages);
+          }
         }
 
         if (dashboardResult && dashboardResult.success) {
           setDashboardData(dashboardResult.data);
         }
+
+        // Refresh summary stats
+        const [t1Result, t2Result, t3Result] = await Promise.all([
+          api.systemadmin.getMerchants({ page: 1, type: 't1' }),
+          api.systemadmin.getMerchants({ page: 1, type: 't2' }),
+          api.systemadmin.getMerchants({ page: 1, type: 't3' }),
+        ]);
+
+        const today = new Date().toLocaleDateString('en-GB');
+        setSummaryStats({
+          t1: {
+            count: t1Result?.total || t1Result?.data?.length || t1Result?.count || 0,
+            lastUpdate: t1Result?.last_update || t1Result?.lastUpdate || t1Result?.updated_at || today,
+          },
+          t2: {
+            count: t2Result?.total || t2Result?.data?.length || t2Result?.count || 0,
+            lastUpdate: t2Result?.last_update || t2Result?.lastUpdate || t2Result?.updated_at || today,
+          },
+          t3: {
+            count: t3Result?.total || t3Result?.data?.length || t3Result?.count || 0,
+            lastUpdate: t3Result?.last_update || t3Result?.lastUpdate || t3Result?.updated_at || today,
+          },
+        });
 
         setShowAddModal(false);
       }
@@ -202,12 +325,24 @@ export default function MerchantManagement() {
         />
 
         {/* Stats Section */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {dashboardData ? [
-            { label: 'Total T1 Merchants', value: dashboardData.total_t1_merchants?.toString() || '0', lastUpdate: new Date().toLocaleDateString('en-GB') },
-            { label: 'Total T2 Merchants', value: dashboardData.total_t2_merchants?.toString() || '0', lastUpdate: new Date().toLocaleDateString('en-GB') },
-            { label: 'Total T3 Merchants', value: dashboardData.total_t3_merchants?.toString() || '0', lastUpdate: new Date().toLocaleDateString('en-GB') },
-          ].map((stat, i) => <StatCard key={i} {...stat} />) : MERCHANT_STATS.map((stat, i) => <StatCard key={i} {...stat} />)}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          {[
+            { 
+              label: 'Total T1 Merchants', 
+              value: summaryStats.t1.count.toString(), 
+              lastUpdate: formatDate(summaryStats.t1.lastUpdate)
+            },
+            { 
+              label: 'Total T2 Merchants', 
+              value: summaryStats.t2.count.toString(), 
+              lastUpdate: formatDate(summaryStats.t2.lastUpdate)
+            },
+            { 
+              label: 'Total T3 Merchants', 
+              value: summaryStats.t3.count.toString(), 
+              lastUpdate: formatDate(summaryStats.t3.lastUpdate)
+            },
+          ].map((stat, i) => <StatCard key={i} {...stat} />)}
         </div>
 
         {/* New Merchant Button */}
@@ -237,7 +372,7 @@ export default function MerchantManagement() {
                       activeTier === tier ? 'bg-white text-black' : 'hover:bg-white/50'
                     }`}
                   >
-                    {tier} Merchant
+                    {tier === 'Merchant' ? 'Merchant' : `${tier} Merchant`}
                   </button>
                 ))}
               </div>
@@ -255,14 +390,14 @@ export default function MerchantManagement() {
                 <div className="text-center py-8">
                   <p className="text-muted-foreground">Loading merchants...</p>
                 </div>
-              ) : merchants.length === 0 ? (
+              ) : filteredMerchants.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-muted-foreground">No merchants found</p>
                 </div>
               ) : (
                 <DataTable
                   columns={MERCHANT_COLUMNS}
-                  data={merchants}
+                  data={filteredMerchants}
                   actions={actions}
                   pagination={{
                     currentPage,

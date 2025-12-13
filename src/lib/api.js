@@ -661,6 +661,29 @@ export const api = {
      */
     getMerchantDetails: (id) => request(`${T3SYSTEMADMIN_BASE}/merchants/${id}`, { method: 'GET' }),
 
+    /**
+     * Update merchant (rebates, wallet, password).
+     * Headers: Authorization: Bearer <token>
+     * @param {string} id - Merchant ID
+     * @param {Object} data - Update data (rebates, wallet_address, password, etc.)
+     * @returns {Promise<Object>} { success, message, data: {...} }
+     */
+    updateMerchant: (id, data) => request(`${T3SYSTEMADMIN_BASE}/merchants/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+    /**
+     * Get merchant profit chart data.
+     * Headers: Authorization: Bearer <token>
+     * @param {string} id - Merchant ID
+     * @param {string} [period] - Time period: 'today', 'week', 'month', 'year'
+     * @returns {Promise<Object>} { success, data: { chart_data: [...], period: "..." } }
+     */
+    getMerchantProfitChart: (id, period = 'month') => {
+      if (!id || id === 'undefined') {
+        return Promise.reject(new Error('Merchant ID is required'));
+      }
+      return request(`${T3SYSTEMADMIN_BASE}/merchants/${id}/profit-chart?period=${period}`, { method: 'GET' });
+    },
+
     // Agent Management
     /**
      * Get agent list.

@@ -87,5 +87,13 @@ export const INITIAL_FORM_DATA = {
   accountStatus: 'Active',
   // Profile
   email: '',
-  password: ''
+  password: '',
+  // Rebates
+  DirectRebate: 0,
+  L1_rebate: 0,
+  L2_rebate: 0,
+  Merchant_rebate: 0,
+  T1_rebate: 0,
+  T2_rebate: 0,
+  token_rebate: 0
 };

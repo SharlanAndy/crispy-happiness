@@ -7,7 +7,7 @@ export const MERCHANT_STATS = [
 ];
 
 export const MERCHANT_COLUMNS = [
-  { key: 'id', label: 'Mer. ID' },
+  { key: 'merchant_id', label: 'Mer. ID' },
   { key: 'name', label: 'Com. Name' },
   { key: 'type', label: 'Type' },
   { key: 'state', label: 'State' },
@@ -15,9 +15,9 @@ export const MERCHANT_COLUMNS = [
   { key: 'status', label: 'Status' },
 ];
 
-export const MERCHANT_TIERS = ['T1', 'T2', 'T3'];
+export const MERCHANT_TIERS = ['T1', 'T2', 'T3', 'Merchant'];
 
-export const MERCHANT_SEARCH_KEYS = ['id', 'name', 'type', 'state'];
+export const MERCHANT_SEARCH_KEYS = ['merchant_id', 'name', 'type', 'state'];
 
 export const ALL_MERCHANTS = [
   // T1 Merchants

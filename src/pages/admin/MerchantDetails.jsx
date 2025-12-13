@@ -16,11 +16,13 @@ export default function MerchantDetails() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('This Month');
+  const [activeTab, setActiveTab] = useState('Today');
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [merchantData, setMerchantData] = useState(null);
   const [transactionsData, setTransactionsData] = useState([]);
+  const [chartData, setChartData] = useState([]);
+  const [loadingChart, setLoadingChart] = useState(false);
   
   // Modal and form states for T3 Admin
   const [showWalletModal, setShowWalletModal] = useState(false);
@@ -47,11 +49,12 @@ export default function MerchantDetails() {
         setLoading(true);
         const result = isT3Admin 
           ? await t3Service.getMerchantDetails(id)
-          : await api.request(`${T3SYSTEMADMIN_BASE}/merchants/${id}`, { method: 'GET' });
+          : await api.systemadmin.getMerchantDetails(id);
         
         if (result.success && result.data) {
           setMerchantData(result.data);
-          setWalletAddress(result.data.wallet_address || '');
+          // Handle both PascalCase (from API) and snake_case (for backward compatibility)
+          setWalletAddress(result.data.WalletAddress || result.data.wallet_address || '');
         }
       } catch (error) {
         console.error('Failed to fetch merchant details:', error);
@@ -97,43 +100,118 @@ export default function MerchantDetails() {
   }, [currentPage]);
 
   // Format merchant info from API data
+  // Handle both PascalCase (from API) and snake_case (for backward compatibility)
   const merchantInfo = merchantData ? [
-    { label: 'Business Name', value: merchantData.business_name || merchantData.name || 'N/A' },
-    { label: 'SSM Number', value: merchantData.business_registration || merchantData.ssm_number || 'N/A' },
+    { label: 'Business Name', value: merchantData.BusinessName || merchantData.business_name || merchantData.Name || merchantData.name || 'N/A' },
+    { label: 'SSM Number', value: merchantData.SSMNumber || merchantData.business_registration || merchantData.ssm_number || 'N/A' },
     ...(isT3Admin ? [] : [
-      { label: 'Email', value: merchantData.email || 'N/A' },
+      { label: 'Email', value: merchantData.Email || merchantData.email || 'N/A' },
       { label: 'Password', value: '••••••••' },
-      { label: 'Status', value: merchantData.status || 'Active', badge: true }
+      { label: 'Status', value: merchantData.Status || merchantData.status || 'Active', badge: true }
     ])
   ] : [];
 
   // Email and Password info for T3 Admin
   const credentialsInfo = merchantData ? [
-    { label: 'Email', value: merchantData.email || 'N/A' },
+    { label: 'Email', value: merchantData.Email || merchantData.email || 'N/A' },
     { label: 'Password', value: '••••••••' }
   ] : [];
 
   // Format address info
-  const addressInfo = merchantData?.location ? [
-    { label: 'Address Line 1', value: merchantData.location || 'N/A' },
-    { label: 'City', value: merchantData.city || 'N/A' },
-    { label: 'State', value: merchantData.state || 'N/A' },
-    { label: 'Country', value: merchantData.country || 'N/A' },
-    { label: 'Postcode', value: merchantData.postcode || 'N/A' }
-  ] : [];
+  // Handle both PascalCase (from API) and snake_case (for backward compatibility)
+  const addressInfo = merchantData ? [
+    { label: 'Address Line 1', value: merchantData.AddressLine1 || merchantData.addressLine1 || merchantData.location || 'N/A' },
+    { label: 'Address Line 2', value: merchantData.AddressLine2 || merchantData.addressLine2 || '' },
+    { label: 'City', value: merchantData.City || merchantData.city || 'N/A' },
+    { label: 'State', value: merchantData.State || merchantData.state || 'N/A' },
+    { label: 'Country', value: merchantData.Country || merchantData.country || 'N/A' },
+    { label: 'Postcode', value: merchantData.Postcode || merchantData.postcode || 'N/A' }
+  ].filter(item => item.value && item.value !== '') : [];
 
   // Format wallet info
-  const walletInfo = [{ label: 'Wallet Address', value: walletAddress || merchantData?.wallet_address || 'N/A' }];
+  // Handle both PascalCase (from API) and snake_case (for backward compatibility)
+  const walletInfo = [{ label: 'Wallet Address', value: walletAddress || merchantData?.WalletAddress || merchantData?.wallet_address || 'N/A' }];
 
   // Stats from merchant data
+  // Handle both PascalCase (from API) and snake_case (for backward compatibility)
   const stats = merchantData ? [
-    { label: 'Total Transaction', value: `${(merchantData.total_transaction || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, lastUpdate: new Date().toLocaleDateString('en-GB') },
-    { label: 'Total Net Profit', value: `${(merchantData.total_net_profit || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, lastUpdate: new Date().toLocaleDateString('en-GB') },
-    { label: 'Total Fees Contributed', value: `${(merchantData.total_fees_contributed || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, lastUpdate: new Date().toLocaleDateString('en-GB') }
+    { label: 'Total Transaction', value: `${(merchantData.TotalTransaction || merchantData.total_transaction || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, lastUpdate: new Date().toLocaleDateString('en-GB') },
+    { label: 'Total Net Profit', value: `${(merchantData.TotalNetProfit || merchantData.total_net_profit || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, lastUpdate: new Date().toLocaleDateString('en-GB') },
+    { label: 'Total Fees Contributed', value: `${(merchantData.TotalFeesContributed || merchantData.total_fees_contributed || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, lastUpdate: new Date().toLocaleDateString('en-GB') }
   ] : [];
 
-  // Get profit chart data for active tab (using empty data for now - can be enhanced with real API)
-  const chartData = []; // TODO: Add profit chart API endpoint
+  // Fetch profit chart data
+  useEffect(() => {
+    const fetchProfitChart = async () => {
+      // Only fetch if we have a valid ID and it's system admin view
+      if (!id || id === 'undefined' || String(id) === 'undefined' || isT3Admin) {
+        setChartData([]);
+        return;
+      }
+
+      try {
+        setLoadingChart(true);
+        // Map tab to period parameter - API uses: today, week, month, year
+        const periodMap = {
+          'Today': 'today',
+          'This Week': 'week',
+          'This Month': 'month',
+          'This Year': 'year',
+        };
+        const period = periodMap[activeTab] || 'month';
+        
+        // Ensure ID is a valid string/number
+        const merchantId = String(id).trim();
+        if (!merchantId || merchantId === 'undefined' || merchantId === 'null') {
+          console.warn('Invalid merchant ID for profit chart:', id);
+          setChartData([]);
+          return;
+        }
+        
+        const result = await api.systemadmin.getMerchantProfitChart(merchantId, period);
+        
+        if (result && result.success && result.data) {
+          // Transform API data to chart format
+          // API response: { data: { chart_data: [...], period: "year" }, success: true }
+          let transformedData = [];
+          
+          // Handle null chart_data
+          if (result.data.chart_data === null || result.data.chart_data === undefined) {
+            transformedData = [];
+          } else if (Array.isArray(result.data.chart_data)) {
+            // If chart_data is an array, transform it
+            transformedData = result.data.chart_data.map(item => ({
+              time: item.time || item.date || item.label || '',
+              profit: item.profit || item.value || 0
+            }));
+          } else if (Array.isArray(result.data)) {
+            // If data is directly an array (fallback)
+            transformedData = result.data.map(item => ({
+              time: item.time || item.date || item.label || '',
+              profit: item.profit || item.value || 0
+            }));
+          } else if (result.data.data && Array.isArray(result.data.data)) {
+            // If data is nested in a data property (fallback)
+            transformedData = result.data.data.map(item => ({
+              time: item.time || item.date || item.label || '',
+              profit: item.profit || item.value || 0
+            }));
+          }
+          
+          setChartData(transformedData);
+        } else {
+          setChartData([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch profit chart:', error);
+        setChartData([]);
+      } finally {
+        setLoadingChart(false);
+      }
+    };
+
+    fetchProfitChart();
+  }, [id, activeTab, isT3Admin]);
 
   // Transform transactions for display
   const transformedTransactions = transactionsData.map(t => ({
@@ -294,14 +372,20 @@ export default function MerchantDetails() {
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-2xl font-semibold text-black">Total Profit</h3>
               <TabButtons 
-                tabs={[{ id: 'This Month', label: 'This Month' }]} 
+                tabs={['Today', 'This Week', 'This Month', 'This Year']} 
                 activeTab={activeTab} 
                 onTabChange={setActiveTab} 
               />
             </div>
             
             <div className="h-[300px]">
-              <ProfitChart data={chartData} />
+              {loadingChart ? (
+                <div className="w-full h-full flex items-center justify-center text-gray-500">
+                  Loading chart data...
+                </div>
+              ) : (
+                <ProfitChart data={chartData} />
+              )}
             </div>
           </div>
         )}
