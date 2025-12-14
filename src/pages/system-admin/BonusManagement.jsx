@@ -47,22 +47,42 @@ export default function BonusManagement() {
   
   const selectedMonthLabel = monthOptions.find(m => m.value === selectedMonth)?.label || monthOptions[0]?.label;
 
+  // Map API type to bonus tier filter
+  const mapTypeToTier = (type) => {
+    if (!type) return 'System';
+    const typeLower = type.toLowerCase();
+    // Map common API types to filter tiers
+    if (typeLower === 'referral' || typeLower === 'user') return 'User';
+    if (typeLower === 'partner') return 'Partner';
+    if (typeLower === 'agent') return 'Agent';
+    if (typeLower === 'merchant') return 'Merchant';
+    if (typeLower === 'system') return 'System';
+    // Default: if it doesn't match, return as-is (capitalized)
+    return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+  };
+
   // Fetch bonus claims
   useEffect(() => {
     const fetchBonusClaims = async () => {
       try {
         setLoading(true);
-        const result = await api.systemadmin.getBonusClaims({ page: 1 });
+        const params = { page: currentPage };
+        if (searchTerm && searchTerm.trim()) {
+          params.search = searchTerm.trim();
+        }
+        const result = await api.systemadmin.getBonusClaims(params);
         if (result && result.success) {
           const transformed = result.data.map(b => ({
-            id: `tx-${b.id}`,
-            wallet: b.referral_id ? `0x${b.referral_id.slice(0, 5)}....${b.referral_id.slice(-5)}` : 'N/A',
-            bonus: `${(b.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
-            fees: '10.00 USDT', // TODO: Get from API if available
-            net: `${(b.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+            id: b.id, // Store numeric ID for API calls
+            displayId: `tx-${b.id}`, // Display ID with tx- prefix
+            wallet: b.username || `U${b.user_id}` || 'N/A',
+            bonus: `${(b.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${b.currency || 'USDT'}`,
+            fees: '0.00 USDT', // Fees not in API response, will be shown in details
+            net: `${(b.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${b.currency || 'USDT'}`,
             time: b.claimed_at ? new Date(b.claimed_at).toLocaleString('en-GB') : (b.created_at ? new Date(b.created_at).toLocaleString('en-GB') : 'N/A'),
-            status: 'Success',
-            bonusTier: b.type || 'System'
+            status: b.status === 'claimed' ? 'Success' : b.status || 'Pending',
+            bonusTier: mapTypeToTier(b.type),
+            rawData: b // Keep raw data for reference
           }));
           setBonusClaimsData(transformed);
         } else {
@@ -76,21 +96,69 @@ export default function BonusManagement() {
       }
     };
     fetchBonusClaims();
-  }, []);
+  }, [currentPage, searchTerm]);
 
-  // Fetch bonus unclaims
+  // Fetch bonus unclaims - fetch all pages if pagination is supported
   useEffect(() => {
     const fetchBonusUnclaims = async () => {
       try {
         setLoadingUnclaim(true);
-        const result = await api.systemadmin.getBonusUnclaims({ page: 1 });
-        if (result && result.success) {
-          const transformed = result.data.map(b => ({
-            id: b.referral_id || `U${b.user_id}`,
-            bonus: `${(b.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+        let allUnclaims = [];
+        let page = 1;
+        let hasMorePages = true;
+        const limit = 20; // Default limit from API response
+
+        // Fetch all pages sequentially
+        while (hasMorePages) {
+          const result = await api.systemadmin.getBonusUnclaims({ page });
+          
+          if (result && result.success && result.data && Array.isArray(result.data)) {
+            // Add current page data
+            allUnclaims = [...allUnclaims, ...result.data];
+            
+            // Check if there are more pages
+            if (result.total !== undefined && result.limit !== undefined) {
+              // API provides pagination metadata
+              const totalPages = Math.ceil(result.total / result.limit);
+              hasMorePages = page < totalPages;
+            } else if (result.data.length < limit) {
+              // If current page has fewer items than limit, it's the last page
+              hasMorePages = false;
+            } else {
+              // No metadata and got full page - assume there might be more
+              // Will check next page in next iteration
+            }
+            
+            // Increment page for next iteration (if we're continuing)
+            if (hasMorePages) {
+              page++;
+              // Safety limit to prevent infinite loops
+              if (page > 100) {
+                console.warn('Reached safety limit for pagination, stopping');
+                hasMorePages = false;
+              }
+            }
+          } else {
+            // If first page fails, try without pagination parameter
+            if (page === 1) {
+              const resultNoPage = await api.systemadmin.getBonusUnclaims();
+              if (resultNoPage && resultNoPage.success && resultNoPage.data && Array.isArray(resultNoPage.data)) {
+                allUnclaims = resultNoPage.data;
+              }
+            }
+            hasMorePages = false;
+          }
+        }
+
+        // Transform all fetched data
+        if (allUnclaims.length > 0) {
+          const transformed = allUnclaims.map(b => ({
+            id: b.user_id ? `U${b.user_id}` : b.referral_id || 'N/A',
+            bonus: `${(b.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${b.currency || 'USDT'}`,
             update: b.created_at ? new Date(b.created_at).toLocaleString('en-GB') : 'N/A',
             status: 'Pending',
-            bonusTier: b.type || 'System'
+            bonusTier: mapTypeToTier(b.type),
+            rawData: b // Keep raw data for reference
           }));
           setBonusUnclaimsData(transformed);
         } else {
@@ -104,21 +172,28 @@ export default function BonusManagement() {
       }
     };
     fetchBonusUnclaims();
-  }, []);
+  }, []); // Fetch once on mount
 
   // Fetch monthly bonus
   useEffect(() => {
     const fetchMonthlyBonus = async () => {
       try {
         setLoadingMonthly(true);
+        console.log('Fetching monthly bonus for month:', selectedMonth);
         const result = await api.systemadmin.getMonthlyBonus({ month: selectedMonth });
+        console.log('Monthly bonus API response:', result);
+        console.log('API endpoint called: /api/t3systemadmin/bonus/monthly?month=' + selectedMonth);
+        
         if (result && result.success) {
+          console.log('Monthly bonus data:', result.data);
           setMonthlyData(result.data);
         } else {
+          console.warn('Monthly bonus API returned unsuccessful or no data:', result);
           setMonthlyData(null);
         }
       } catch (error) {
         console.error('Failed to fetch monthly bonus:', error);
+        console.error('Error details:', error.message, error.stack);
         setMonthlyData(null);
       } finally {
         setLoadingMonthly(false);
@@ -132,71 +207,65 @@ export default function BonusManagement() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage, currentPageUnclaim]);
 
-  // Transform monthly data for display
-  const monthlyDataDisplay = monthlyData ? [
-    { member: 'System', distributed: `${(monthlyData.total_bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`, claim: `${(monthlyData.total_claimed || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`, unclaim: `${(monthlyData.total_unclaimed || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U` },
-  ] : [];
+  // Transform monthly data for display from API response
+  // API returns: { member_types: [{ member_type, total_distributed, total_claimed, total_unclaimed }], totals: {...} }
+  const monthlyDataDisplay = useMemo(() => {
+    if (!monthlyData || !monthlyData.member_types || !Array.isArray(monthlyData.member_types)) {
+      return [];
+    }
 
-  // Mock data with month for filtering (fallback)
-  const MONTHLY_DATA = {
-    '2025-12': [
-      { member: 'System', distributed: '12,000.00 U', claim: '6,000.00 U', unclaim: '6,000.00 U' },
-      { member: 'Partner', distributed: '11,500.00 U', claim: '11,000.00 U', unclaim: '500.00 U' },
-      { member: 'Agent', distributed: '13,000.00 U', claim: '9,000.00 U', unclaim: '4,000.00 U' },
-      { member: 'Merchant', distributed: '12,500.00 U', claim: '11,500.00 U', unclaim: '1,000.00 U' },
-      { member: 'User', distributed: '11,000.00 U', claim: '11,000.00 U', unclaim: '0.00 U' },
-    ],
-    '2025-11': [
-      { member: 'System', distributed: '10,000.00 U', claim: '5,000.00 U', unclaim: '5,000.00 U' },
-      { member: 'Partner', distributed: '10,010.00 U', claim: '10,000.00 U', unclaim: '10.00 U' },
-      { member: 'Agent', distributed: '10,000.00 U', claim: '7,000.00 U', unclaim: '3,000.00 U' },
-      { member: 'Merchant', distributed: '10,000.00 U', claim: '9,000.00 U', unclaim: '1,000.00 U' },
-      { member: 'User', distributed: '10,000.00 U', claim: '10,000.00 U', unclaim: '0.00 U' },
-    ],
-    '2025-10': [
-      { member: 'System', distributed: '8,000.00 U', claim: '4,000.00 U', unclaim: '4,000.00 U' },
-      { member: 'Partner', distributed: '9,000.00 U', claim: '8,500.00 U', unclaim: '500.00 U' },
-      { member: 'Agent', distributed: '12,000.00 U', claim: '10,000.00 U', unclaim: '2,000.00 U' },
-      { member: 'Merchant', distributed: '11,000.00 U', claim: '10,500.00 U', unclaim: '500.00 U' },
-      { member: 'User', distributed: '9,500.00 U', claim: '9,500.00 U', unclaim: '0.00 U' },
-    ],
-    '2025-09': [
-      { member: 'System', distributed: '7,500.00 U', claim: '3,500.00 U', unclaim: '4,000.00 U' },
-      { member: 'Partner', distributed: '8,200.00 U', claim: '7,800.00 U', unclaim: '400.00 U' },
-      { member: 'Agent', distributed: '9,800.00 U', claim: '8,000.00 U', unclaim: '1,800.00 U' },
-      { member: 'Merchant', distributed: '10,200.00 U', claim: '9,700.00 U', unclaim: '500.00 U' },
-      { member: 'User', distributed: '8,800.00 U', claim: '8,800.00 U', unclaim: '0.00 U' },
-    ],
-  };
+    // Define the order we want to display members
+    const memberOrder = ['System', 'Partner', 'Agent', 'Merchant', 'User'];
+    
+    // Create a map for quick lookup
+    const memberMap = new Map();
+    monthlyData.member_types.forEach(member => {
+      memberMap.set(member.member_type, member);
+    });
 
-  const monthlyDataFallback = MONTHLY_DATA[selectedMonth] || [];
-  const monthlyDataFinal = monthlyDataDisplay.length > 0 ? monthlyDataDisplay : monthlyDataFallback;
+    // Transform and order according to memberOrder
+    return memberOrder
+      .filter(memberType => memberMap.has(memberType)) // Only include members that exist in API response
+      .map(memberType => {
+        const member = memberMap.get(memberType);
+        return {
+          member: member.member_type,
+          distributed: `${(member.total_distributed || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+          claim: `${(member.total_claimed || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+          unclaim: `${(member.total_unclaimed || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+        };
+      });
+  }, [monthlyData]);
+
+  // Get totals from API response
+  const totals = useMemo(() => {
+    if (!monthlyData || !monthlyData.totals) {
+      return { totalDistributed: 0, totalClaim: 0, totalUnclaim: 0 };
+    }
+    return {
+      totalDistributed: monthlyData.totals.total_distributed || 0,
+      totalClaim: monthlyData.totals.total_claimed || 0,
+      totalUnclaim: monthlyData.totals.total_unclaimed || 0,
+    };
+  }, [monthlyData]);
 
   const handleMonthChange = (e) => setSelectedMonth(e.target.value);
 
-  // Calculate totals
-  const calculateTotal = (key) => 
-    monthlyDataFinal.reduce((sum, row) => sum + (parseFloat(row[key].replace(/[^\d.-]/g, '')) || 0), 0);
-
-  const totalDistributed = calculateTotal('distributed');
-  const totalClaim = calculateTotal('claim');
-  const totalUnclaim = calculateTotal('unclaim');
-
-  // Update stats based on selected month
+  // Update stats based on selected month - use totals from API response
   const stats = [
     { 
       label: 'Total Bonus Distributed', 
-      value: `${totalDistributed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
+      value: `${totals.totalDistributed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
       lastUpdate: selectedMonthLabel 
     },
     { 
       label: 'Total Bonus Claim', 
-      value: `${totalClaim.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
+      value: `${totals.totalClaim.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
       lastUpdate: selectedMonthLabel 
     },
     { 
       label: 'Total Bonus Unclaim', 
-      value: `${totalUnclaim.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
+      value: `${totals.totalUnclaim.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
       lastUpdate: selectedMonthLabel 
     },
   ];
@@ -259,10 +328,13 @@ export default function BonusManagement() {
       { key: 'time', label: 'Time' },
       { key: 'status', label: 'Status' },
     ],
-    data: claimList,
+    data: claimList.map(item => ({
+      ...item,
+      id: item.displayId || `tx-${item.id}` // Use displayId for table display
+    })),
     actions: [{
       icon: <Eye size={16} />,
-      onClick: (row) => navigate(`/system-admin/bonus/${row.id}`),
+      onClick: (row) => navigate(`/system-admin/bonus/${row.id || row.rawData?.id}`),
       tooltip: 'View Details',
     }],
     pagination: {
@@ -326,8 +398,8 @@ export default function BonusManagement() {
               </div>
             ) : (
               <MonthlyBonusTable
-                data={monthlyDataFinal}
-                totals={{ totalDistributed, totalClaim, totalUnclaim }}
+                data={monthlyDataDisplay}
+                totals={totals}
                 emptyMessage={`No data available for ${selectedMonthLabel}`}
               />
             )}

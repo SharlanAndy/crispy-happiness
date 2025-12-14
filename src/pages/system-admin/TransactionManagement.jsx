@@ -117,6 +117,30 @@ export default function TransactionManagement() {
     setCurrentPage(1);
   };
 
+  // Helper function to get last updated date from API or fallback
+  const getLastUpdated = () => {
+    if (statsData) {
+      const lastUpdated = statsData.last_updated_date ||
+                         statsData.last_updated || 
+                         statsData.updated_at || 
+                         statsData.last_update ||
+                         statsData.updated_at_date;
+      
+      if (lastUpdated) {
+        try {
+          const date = new Date(lastUpdated);
+          if (!isNaN(date.getTime())) {
+            return date.toLocaleDateString('en-GB');
+          }
+        } catch (e) {
+          console.warn('Failed to parse last_updated date:', e);
+        }
+      }
+    }
+    // Fallback to today's date
+    return new Date().toLocaleDateString('en-GB');
+  };
+
   const handleExportCSV = () => {
     // CSV headers from column labels
     const headers = COLUMNS.map(col => col.label).join(',');
@@ -168,12 +192,12 @@ export default function TransactionManagement() {
         <StatCard 
           label="Total Transaction" 
           value={statsData ? `${(statsData.total_volume || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT` : '0.00 USDT'} 
-          lastUpdate={new Date().toLocaleDateString('en-GB')} 
+          lastUpdate={getLastUpdated()} 
         />
         <StatCard 
           label="Today Transaction" 
           value={statsData ? `${(statsData.today_volume || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT` : '0.00 USDT'} 
-          lastUpdate={new Date().toLocaleDateString('en-GB')} 
+          lastUpdate={getLastUpdated()} 
         />
       </div>
 

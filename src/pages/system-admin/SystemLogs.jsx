@@ -12,9 +12,34 @@ const LEVEL_COLORS = {
 };
 
 const FILTERS = [
-  { label: 'Date Range', default: '24h', options: ['24h', '7d', '30d'], labels: ['Last 24 Hours', 'Last 7 Days', 'Last 30 Days'] },
+  { label: 'Date Range', default: 'all', options: ['all', '24h', '7d', '30d'], getLabel: (v) => v === 'all' ? 'All' : v === '24h' ? 'Last 24 Hours' : v === '7d' ? 'Last 7 Days' : 'Last 30 Days' },
   { label: 'Log Level', default: 'all', options: ['all', 'INFO', 'WARNING', 'ERROR'], getLabel: (v) => v === 'all' ? 'All Level' : v },
-  { label: 'Status', default: 'all', options: ['all', '200', '201', '401', '403', '429', '500', '504'], getLabel: (v) => v === 'all' ? 'All Status' : v },
+  { 
+    label: 'Status', 
+    default: 'all', 
+    options: [
+      'all', 
+      '200 OK', 
+      '201 Created', 
+      '202 Accepted', 
+      '204 No Content', 
+      '301 Moved Permanently', 
+      '302 Found', 
+      '304 Not Modified', 
+      '400 Bad Request', 
+      '401 Unauthorized', 
+      '403 Forbidden', 
+      '404 Not Found', 
+      '409 Conflict', 
+      '422 Unprocessable Entity', 
+      '429 Too Many Requests', 
+      '500 Internal Server Error', 
+      '502 Bad Gateway', 
+      '503 Service Unavailable', 
+      '504 Gateway Timeout'
+    ], 
+    getLabel: (v) => v === 'all' ? 'All Status' : v 
+  },
 ];
 
 export default function SystemLogs() {
@@ -30,8 +55,7 @@ export default function SystemLogs() {
         setLoading(true);
         const [dateRange, levelFilter, statusFilter] = filters;
         const params = {
-          page: currentPage,
-          ...(dateRange !== '24h' && { date_range: dateRange }),
+          ...(dateRange !== 'all' && { date_range: dateRange }),
           ...(levelFilter !== 'all' && { level: levelFilter }),
           ...(statusFilter !== 'all' && { status: statusFilter }),
         };

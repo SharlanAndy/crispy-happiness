@@ -202,7 +202,8 @@ export default function SystemAdminDashboard() {
             // Get last updated from API response, fallback to today's date
             if (dashboardData) {
               // Try different possible field names from API
-              const lastUpdated = dashboardData.last_updated || 
+              const lastUpdated = dashboardData.last_updated_date ||
+                                  dashboardData.last_updated || 
                                   dashboardData.updated_at || 
                                   dashboardData.last_update ||
                                   dashboardData.updated_at_date;

@@ -772,14 +772,22 @@ export const api = {
     },
 
     /**
+     * Get bonus claim details.
+     * Headers: Authorization: Bearer <token>
+     * @param {string} id - Claim ID
+     * @returns {Promise<Object>} Bonus claim details
+     */
+    getBonusClaimDetails: (id) => request(`${T3SYSTEMADMIN_BASE}/bonus/claims/${id}`, { method: 'GET' }),
+
+    /**
      * Get bonus unclaims.
      * Headers: Authorization: Bearer <token>
-     * @param {Object} params - { page, search }
+     * @param {Object} params - { page } (optional, if endpoint supports pagination)
      * @returns {Promise<Object>} Bonus unclaims list
      */
     getBonusUnclaims: (params = {}) => {
       const query = new URLSearchParams(params).toString();
-      return request(`${T3SYSTEMADMIN_BASE}/bonus/unclaims?${query}`, { method: 'GET' });
+      return request(`${T3SYSTEMADMIN_BASE}/bonus/unclaims${query ? `?${query}` : ''}`, { method: 'GET' });
     },
 
     /**

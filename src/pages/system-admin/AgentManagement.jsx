@@ -32,7 +32,7 @@ export default function AgentManagement() {
 
         if (agentsResult && agentsResult.success) {
           const transformed = agentsResult.data.map(a => ({
-            id: a.id || 'N/A',
+            id: a.agent_id || a.id || 'N/A',
             bonus: `${(a.bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
             l1: (a.level1 || 0).toString(),
             l2: (a.level2 || 0).toString(),
@@ -68,9 +68,34 @@ export default function AgentManagement() {
     [agentsData, searchTerm, currentPage]
   );
 
+  // Helper function to get last updated date from API or fallback
+  const getLastUpdated = () => {
+    if (dashboardData) {
+      // Try different possible field names from API
+      const lastUpdated = dashboardData.last_updated_date ||
+                          dashboardData.last_updated || 
+                          dashboardData.updated_at || 
+                          dashboardData.last_update ||
+                          dashboardData.updated_at_date;
+      
+      if (lastUpdated) {
+        try {
+          const date = new Date(lastUpdated);
+          if (!isNaN(date.getTime())) {
+            return date.toLocaleDateString('en-GB');
+          }
+        } catch (e) {
+          console.warn('Failed to parse last_updated date:', e);
+        }
+      }
+    }
+    // Fallback to today's date
+    return new Date().toLocaleDateString('en-GB');
+  };
+
   const stats = dashboardData ? [
-    { label: 'Total Active Agent', value: dashboardData.total_active_agents?.toString() || '0', lastUpdate: new Date().toLocaleDateString('en-GB') },
-    { label: 'Total Bonus Distributed', value: `${(dashboardData.total_bonus_distributed || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, lastUpdate: new Date().toLocaleDateString('en-GB') },
+    { label: 'Total Active Agent', value: dashboardData.total_active_agents?.toString() || '0', lastUpdate: getLastUpdated() },
+    { label: 'Total Bonus Distributed', value: `${(dashboardData.total_bonus_distributed || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, lastUpdate: getLastUpdated() },
   ] : [
     { label: 'Total Active Agent', value: '0', lastUpdate: 'No data' },
     { label: 'Total Bonus Distributed', value: '0.00 USDT', lastUpdate: 'No data' },
@@ -119,7 +144,7 @@ export default function AgentManagement() {
 
         if (agentsResult && agentsResult.success) {
           const transformed = agentsResult.data.map(a => ({
-            id: a.id || 'N/A',
+            id: a.agent_id || a.id || 'N/A',
             bonus: `${(a.bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
             l1: (a.level1 || 0).toString(),
             l2: (a.level2 || 0).toString(),

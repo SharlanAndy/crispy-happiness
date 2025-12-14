@@ -1,31 +1,88 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { InfoSection, PageHeader } from '../../components/ui';
+import { api } from '@/lib/api';
 
 export default function BonusClaimDetails() {
   const { id } = useParams();
-  const [currentPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [claimData, setClaimData] = useState(null);
 
-  // Scroll to top when page changes
+  // Extract numeric ID from tx-{id} format if needed
+  const claimId = id?.startsWith('tx-') ? id.replace('tx-', '') : id;
+
+  // Fetch claim details
+  useEffect(() => {
+    const fetchClaimDetails = async () => {
+      try {
+        setLoading(true);
+        const result = await api.systemadmin.getBonusClaimDetails(claimId);
+        if (result && result.success) {
+          setClaimData(result.data);
+        } else {
+          setClaimData(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch claim details:', error);
+        setClaimData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (claimId) {
+      fetchClaimDetails();
+    }
+  }, [claimId]);
+
+  // Scroll to top when page loads
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [currentPage]);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Bonus Claim Details"
+          description="Overview the Details of Bonus Claim Information"
+        />
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">Loading claim details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!claimData) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Bonus Claim Details"
+          description="Overview the Details of Bonus Claim Information"
+        />
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">Claim not found</p>
+        </div>
+      </div>
+    );
+  }
 
   const claimInfo = [
-    { label: 'Transaction ID', value: id || 'tx-a1b2c3d4' },
-    { label: 'Time', value: '01-11-2025 13:00' },
-    { label: 'Status', value: 'Success', badge: true },
+    { label: 'Transaction ID', value: claimData.transaction_id || `tx-${claimData.id}` || 'N/A' },
+    { label: 'Time', value: claimData.claimed_at ? new Date(claimData.claimed_at).toLocaleString('en-GB') : 'N/A' },
+    { label: 'Status', value: claimData.status || 'N/A', badge: true },
   ];
 
   const claimBy = [
-    { label: 'User ID', value: 'U000001' },
-    { label: 'Wallet Address', value: '0xF3A....12345' },
+    { label: 'User ID', value: claimData.user?.id ? `U${claimData.user.id}` : 'N/A' },
+    { label: 'Wallet Address', value: claimData.user?.wallet_address || 'N/A' },
   ];
 
   const claimBonus = [
-    { label: 'Bonus Claim', value: '10,000.00 U' },
-    { label: 'Net Claim', value: '9,000.00 U' },
-    { label: 'Fees', value: '1,000.00 U' },
+    { label: 'Bonus Claim', value: `${(claimData.bonus?.bonus_claim || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT` },
+    { label: 'Net Claim', value: `${(claimData.bonus?.net_claim || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT` },
+    { label: 'Fees', value: `${(claimData.bonus?.fees || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT` },
   ];
 
   return (

@@ -21,20 +21,20 @@ export default function UserManagement() {
   const isT3Admin = location.pathname.startsWith('/t3-admin');
   const basePath = isT3Admin ? '/t3-admin' : '/system-admin';
 
-  // Fetch stats from page 1 on initial load
+  // Fetch stats from users endpoint (page 1)
   useEffect(() => {
     const fetchStats = async () => {
       try {
         if (isT3Admin) {
           const statsResult = await t3Service.getUsers({ page: 1 });
           if (statsResult.success) {
-            // Store metadata from page 1 for stats
+            // Store metadata from page 1 for stats - check both meta and root level
             setUsersMeta(statsResult.meta || statsResult);
           }
         } else {
           const statsResult = await api.systemadmin.getUsers({ page: 1 });
           if (statsResult && statsResult.success) {
-            // Store metadata from page 1 for stats
+            // Store metadata from page 1 for stats - check both meta and root level
             setUsersMeta(statsResult.meta || statsResult);
           }
         }
@@ -62,7 +62,7 @@ export default function UserManagement() {
 
           if (usersResult.success) {
             const transformed = usersResult.data.map(user => ({
-              id: user.id,
+              id: user.user_id || user.id || 'N/A',
               walletId: user.wallet_id || 'N/A',
               amount: `${(user.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
               join: user.join_time ? new Date(user.join_time).toLocaleString('en-GB') : 'N/A',
@@ -87,7 +87,7 @@ export default function UserManagement() {
 
           if (usersResult && usersResult.success) {
             const transformed = usersResult.data.map(user => ({
-              id: user.id || 'N/A',
+              id: user.user_id || user.id || 'N/A',
               spend: `${(user.total_spend || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
               bonus: `${(user.total_bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
               join: user.join_time ? new Date(user.join_time).toLocaleString('en-GB') : 'N/A',
@@ -155,10 +155,11 @@ export default function UserManagement() {
 
   // Extract stats from users endpoint response
   const stats = useMemo(() => {
-    // Get last updated date from centralized key, default to today
+    // Get last updated date from users endpoint response, default to today
     const getLastUpdated = () => {
       if (usersMeta) {
-        const lastUpdated = usersMeta.last_updated || 
+        const lastUpdated = usersMeta.last_updated_date ||
+                           usersMeta.last_updated || 
                            usersMeta.updated_at || 
                            usersMeta.last_update ||
                            usersMeta.updated_at_date ||
@@ -167,7 +168,10 @@ export default function UserManagement() {
         
         if (lastUpdated) {
           try {
-            return new Date(lastUpdated).toLocaleDateString('en-GB');
+            const date = new Date(lastUpdated);
+            if (!isNaN(date.getTime())) {
+              return date.toLocaleDateString('en-GB');
+            }
           } catch (e) {
             console.warn('Failed to parse last_updated date:', e);
           }
@@ -179,7 +183,7 @@ export default function UserManagement() {
 
     const lastUpdate = getLastUpdated();
 
-    // Extract values from users endpoint response, default to 0
+    // Extract values from users endpoint response - check both root level and meta
     const totalActiveUsers = usersMeta?.total_users || 
                              usersMeta?.total_active_users || 
                              usersMeta?.TotalUsers ||

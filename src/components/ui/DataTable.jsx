@@ -46,9 +46,15 @@ export default function DataTable({
                 </td>
               </tr>
             ) : (
-              data.map((row, idx) => (
+              data.map((row, idx) => {
+                // Generate a unique key - use id if available and valid, otherwise use index
+                // Combine with index to ensure uniqueness even if id is duplicated
+                const rowKey = (row.id !== undefined && row.id !== null && row.id !== '') 
+                  ? `${String(row.id)}-${idx}` 
+                  : `row-${idx}`;
+                return (
                 <tr
-                  key={row.id || idx}
+                  key={rowKey}
                 >
                   {columns.map((col) => (
                     <td key={col.key} className={`px-4 py-2.5 ${col.align === 'right' ? 'text-right' : ''}`}>
@@ -76,7 +82,8 @@ export default function DataTable({
                     </td>
                   )}
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
           {footer && data.length > 0 && (
