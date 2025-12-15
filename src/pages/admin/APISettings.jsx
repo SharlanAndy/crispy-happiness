@@ -107,9 +107,11 @@ export default function APISettings() {
   const [apiKeys, setApiKeys] = useState([]);
   const [logsData, setLogsData] = useState([]);
   const [selectedKeyId, setSelectedKeyId] = useState(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createKeyForm, setCreateKeyForm] = useState(INITIAL_KEY_DATA);
   const [newlyCreatedKey, setNewlyCreatedKey] = useState(null);
+  const [createdKeyData, setCreatedKeyData] = useState(null); // Store the full response data
   const { handleApiResponse, showError, showSuccess } = useToast();
 
   // Fetch API keys and logs
@@ -141,7 +143,7 @@ export default function APISettings() {
             : [];
           setApiKeys(transformed);
           
-          // Find the latest API key (by created_at or id)
+          // Find the latest API key (by created_at or id) and set as default
           if (transformed.length > 0 && keysResult.data.length > 0) {
             // Sort by created_at descending, or by id descending if created_at is not available
             const sortedKeys = [...keysResult.data].sort((a, b) => {
@@ -153,14 +155,18 @@ export default function APISettings() {
             });
             
             const latestKey = sortedKeys[0];
-            setKeys({
-              apiKey: latestKey.api_key || latestKey.api_key_full || 'prod_****************ab12',
-              apiKeyFull: latestKey.api_key_full || latestKey.api_key || '', // Store full key for copying
-              keyName: latestKey.key_name || 'N/A',
-              merchantKey: latestKey.merchant_key || 'XyZ123!@#456',
-              callbackUrl: latestKey.backend_url || 'https://your-website.com/api/callback'
-            });
-            setSelectedKeyId(latestKey.id);
+            // Set default to latest key on initial load only
+            if (isInitialLoad) {
+              setKeys({
+                apiKey: latestKey.api_key || latestKey.api_key_full || 'prod_****************ab12',
+                apiKeyFull: latestKey.api_key_full || latestKey.api_key || '', // Store full key for copying
+                keyName: latestKey.key_name || 'N/A',
+                merchantKey: latestKey.merchant_key || 'XyZ123!@#456',
+                callbackUrl: latestKey.backend_url || 'https://your-website.com/api/callback'
+              });
+              setSelectedKeyId(latestKey.id);
+              setIsInitialLoad(false);
+            }
           }
         } else {
           console.warn('API Keys response:', keysResult);
@@ -203,6 +209,22 @@ export default function APISettings() {
     [apiKeys, apiKeysSearchTerm, apiKeysPage]
   );
 
+  // Handle row click to update Key's Information
+  const handleKeyRowClick = (row) => {
+    // Find the full key data from apiKeys array
+    const fullKeyData = apiKeys.find(k => k.id === row.id);
+    if (fullKeyData) {
+      setKeys({
+        apiKey: fullKeyData.api_key || fullKeyData.api_key_full || 'prod_****************ab12',
+        apiKeyFull: fullKeyData.api_key_full || fullKeyData.api_key || '',
+        keyName: fullKeyData.key_name || 'N/A',
+        merchantKey: fullKeyData.merchant_key || 'XyZ123!@#456',
+        callbackUrl: fullKeyData.backend_url || 'https://your-website.com/api/callback'
+      });
+      setSelectedKeyId(fullKeyData.id);
+    }
+  };
+
   const copyToClipboard = async (text) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -227,14 +249,15 @@ export default function APISettings() {
       });
 
       if (result && result.success && result.data) {
-        // Store the newly created key to show secret_key (only shown once)
+        // Store the newly created key data to display in modal
+        setCreatedKeyData(result.data);
         setNewlyCreatedKey(result.data);
         
-        // Show success message with key details
-        showSuccess(`API Key created! API Key: ${result.data.api_key}. Secret Key: ${result.data.secret_key}. Please save the secret key - it won't be shown again!`, 10000);
+        // Show success message
+        showSuccess('API key created successfully!', 5000);
         
-          // Refresh keys list
-          const keysResult = await api.systemadmin.getAPIKeys();
+        // Refresh keys list
+        const keysResult = await api.systemadmin.getAPIKeys();
           if (keysResult && keysResult.success && keysResult.data) {
             const transformed = keysResult.data.map(key => ({
               id: key.id,
@@ -283,8 +306,9 @@ export default function APISettings() {
               }
             }
           }
-        setShowCreateModal(false);
-        setCreateKeyForm(INITIAL_KEY_DATA);
+        // Don't close modal - keep it open to show response data
+        // setShowCreateModal(false);
+        // setCreateKeyForm(INITIAL_KEY_DATA);
       }
     } catch (error) {
       console.error('Failed to create API key:', error);
@@ -435,6 +459,8 @@ export default function APISettings() {
             totalPages: apiKeysTotalPages,
             onPageChange: setApiKeysPage,
           }}
+          onRowClick={handleKeyRowClick}
+          selectedRowId={selectedKeyId}
         />
       </Card>
 
@@ -467,59 +493,147 @@ export default function APISettings() {
           <div className="bg-white rounded-[10px] w-full max-w-[600px] max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between py-4 px-6">
               <h2 className="font-semibold text-2xl text-black">Create New API Key</h2>
-              <button onClick={() => { setShowCreateModal(false); setCreateKeyForm(INITIAL_KEY_DATA); }} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
+              <button onClick={() => { 
+                setShowCreateModal(false); 
+                setCreateKeyForm(INITIAL_KEY_DATA);
+                setCreatedKeyData(null);
+              }} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
                 <X size={32} className="text-[#868e8d]" />
               </button>
             </div>
 
-            <form onSubmit={(e) => { e.preventDefault(); handleCreateNewKey(createKeyForm); }} className="flex-1 overflow-y-auto py-4 px-6">
-              <div className="flex flex-col gap-6">
-                <FormSection title="API Key Information">
-                  <FormLabel label="Key Name">
-                    <TextInput
-                      value={createKeyForm.key_name}
-                      onChange={(e) => setCreateKeyForm({ ...createKeyForm, key_name: e.target.value })}
-                      placeholder="Enter key name"
-                      required
-                    />
-                  </FormLabel>
-                  <FormLabel label="Backend URL">
-                    <TextInput
-                      value={createKeyForm.backend_url}
-                      onChange={(e) => setCreateKeyForm({ ...createKeyForm, backend_url: e.target.value })}
-                      placeholder="Enter backend URL"
-                      required
-                    />
-                  </FormLabel>
-                  <FormLabel label="Merchant Key">
-                    <TextInput
-                      value={createKeyForm.merchant_key}
-                      onChange={(e) => setCreateKeyForm({ ...createKeyForm, merchant_key: e.target.value })}
-                      placeholder="Enter merchant key"
-                      required
-                    />
-                  </FormLabel>
-                </FormSection>
+            {createdKeyData ? (
+              // Success view - display response data
+              <div className="flex-1 overflow-y-auto py-4 px-6">
+                <div className="flex flex-col gap-6">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                    <p className="text-green-800 font-semibold">API key created successfully!</p>
+                    <p className="text-green-700 text-sm mt-1">Please save the secret key - it won't be shown again.</p>
+                  </div>
+                  
+                  <FormSection title="Created API Key Information">
+                    <FormLabel label="ID">
+                      <div className="px-3 py-2 rounded-md bg-secondary/50 border-none text-sm">
+                        {createdKeyData.id || 'N/A'}
+                      </div>
+                    </FormLabel>
+                    <FormLabel label="Key Name">
+                      <div className="px-3 py-2 rounded-md bg-secondary/50 border-none text-sm">
+                        {createdKeyData.key_name || 'N/A'}
+                      </div>
+                    </FormLabel>
+                    <FormLabel label="API Key">
+                      <div className="flex gap-2">
+                        <div className="flex-1 px-3 py-2 rounded-md bg-secondary/50 border-none text-sm font-mono break-all">
+                          {createdKeyData.api_key || 'N/A'}
+                        </div>
+                        <button 
+                          onClick={() => copyToClipboard(createdKeyData.api_key || '')}
+                          className="p-2 hover:bg-accent rounded-md"
+                        >
+                          <Copy size={18} />
+                        </button>
+                      </div>
+                    </FormLabel>
+                    <FormLabel label="Secret Key">
+                      <div className="flex gap-2">
+                        <div className="flex-1 px-3 py-2 rounded-md bg-secondary/50 border-none text-sm font-mono break-all">
+                          {createdKeyData.secret_key || 'N/A'}
+                        </div>
+                        <button 
+                          onClick={() => copyToClipboard(createdKeyData.secret_key || '')}
+                          className="p-2 hover:bg-accent rounded-md"
+                        >
+                          <Copy size={18} />
+                        </button>
+                      </div>
+                    </FormLabel>
+                    <FormLabel label="Backend URL">
+                      <div className="px-3 py-2 rounded-md bg-secondary/50 border-none text-sm">
+                        {createdKeyData.backend_url || 'N/A'}
+                      </div>
+                    </FormLabel>
+                    <FormLabel label="Merchant Key">
+                      <div className="px-3 py-2 rounded-md bg-secondary/50 border-none text-sm">
+                        {createdKeyData.merchant_key || 'N/A'}
+                      </div>
+                    </FormLabel>
+                  </FormSection>
+                </div>
               </div>
-            </form>
+            ) : (
+              // Form view - input fields
+              <>
+                <form onSubmit={(e) => { e.preventDefault(); handleCreateNewKey(createKeyForm); }} className="flex-1 overflow-y-auto py-4 px-6">
+                  <div className="flex flex-col gap-6">
+                    <FormSection title="API Key Information">
+                      <FormLabel label="Key Name">
+                        <TextInput
+                          value={createKeyForm.key_name}
+                          onChange={(e) => setCreateKeyForm({ ...createKeyForm, key_name: e.target.value })}
+                          placeholder="Enter key name"
+                          required
+                        />
+                      </FormLabel>
+                      <FormLabel label="Backend URL">
+                        <TextInput
+                          value={createKeyForm.backend_url}
+                          onChange={(e) => setCreateKeyForm({ ...createKeyForm, backend_url: e.target.value })}
+                          placeholder="Enter backend URL"
+                          required
+                        />
+                      </FormLabel>
+                      <FormLabel label="Merchant Key">
+                        <TextInput
+                          value={createKeyForm.merchant_key}
+                          onChange={(e) => setCreateKeyForm({ ...createKeyForm, merchant_key: e.target.value })}
+                          placeholder="Enter merchant key"
+                          required
+                        />
+                      </FormLabel>
+                    </FormSection>
+                  </div>
+                </form>
 
-            <div className="flex gap-4 justify-end py-4 px-6">
-              <button
-                type="button"
-                onClick={() => { setShowCreateModal(false); setCreateKeyForm(INITIAL_KEY_DATA); }}
-                className="border border-[#a1abaa] p-3 rounded-md font-semibold text-lg text-black hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                onClick={() => handleCreateNewKey(createKeyForm)}
-                className="bg-black p-3 rounded-md font-semibold text-lg text-white hover:bg-gray-800 transition-colors flex items-center gap-3"
-              >
-                <Plus size={24} />
-                Create Key
-              </button>
-            </div>
+                <div className="flex gap-4 justify-end py-4 px-6">
+                  <button
+                    type="button"
+                    onClick={() => { 
+                      setShowCreateModal(false); 
+                      setCreateKeyForm(INITIAL_KEY_DATA);
+                      setCreatedKeyData(null);
+                    }}
+                    className="border border-[#a1abaa] p-3 rounded-md font-semibold text-lg text-black hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    onClick={() => handleCreateNewKey(createKeyForm)}
+                    className="bg-black p-3 rounded-md font-semibold text-lg text-white hover:bg-gray-800 transition-colors flex items-center gap-3"
+                  >
+                    <Plus size={24} />
+                    Create Key
+                  </button>
+                </div>
+              </>
+            )}
+            
+            {createdKeyData && (
+              <div className="flex gap-4 justify-end py-4 px-6 border-t">
+                <button
+                  type="button"
+                  onClick={() => { 
+                    setShowCreateModal(false); 
+                    setCreateKeyForm(INITIAL_KEY_DATA);
+                    setCreatedKeyData(null);
+                  }}
+                  className="bg-black p-3 rounded-md font-semibold text-lg text-white hover:bg-gray-800 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

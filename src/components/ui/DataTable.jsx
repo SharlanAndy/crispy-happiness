@@ -20,7 +20,9 @@ export default function DataTable({
   actions,
   pagination,
   emptyMessage = 'No data available',
-  footer
+  footer,
+  onRowClick,
+  selectedRowId
 }) {
   return (
     <div className="overflow-hidden">
@@ -52,9 +54,12 @@ export default function DataTable({
                 const rowKey = (row.id !== undefined && row.id !== null && row.id !== '') 
                   ? `${String(row.id)}-${idx}` 
                   : `row-${idx}`;
+                const isSelected = selectedRowId !== undefined && selectedRowId !== null && row.id === selectedRowId;
                 return (
                 <tr
                   key={rowKey}
+                  onClick={() => onRowClick && onRowClick(row)}
+                  className={onRowClick ? `cursor-pointer hover:bg-accent/50 transition-colors ${isSelected ? 'bg-accent' : ''}` : ''}
                 >
                   {columns.map((col) => (
                     <td key={col.key} className={`px-4 py-2.5 ${col.align === 'right' ? 'text-right' : ''}`}>
