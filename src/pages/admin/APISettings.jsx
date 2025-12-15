@@ -298,15 +298,27 @@ export default function APISettings() {
       return;
     }
 
+    if (!keys.callbackUrl || keys.callbackUrl.trim() === '') {
+      showError('Please enter a backend URL');
+      return;
+    }
+
     try {
-      const result = await api.systemadmin.updateCallbackSettings({
-        backend_url: keys.callbackUrl,
-        key_id: selectedKeyId
-      });
+      const payload = {
+        backend_url: keys.callbackUrl.trim(),
+        key_id: Number(selectedKeyId) // Ensure key_id is a number
+      };
+      
+      console.log('Updating callback settings with payload:', payload);
+      const result = await api.systemadmin.updateCallbackSettings(payload);
 
       handleApiResponse(result, {
         successMessage: 'Callback settings updated successfully!',
         errorMessage: result?.message || 'Failed to update callback settings. Please try again.',
+        onSuccess: () => {
+          // Optionally refresh the keys list to show updated backend_url
+          // This is optional since the UI already shows the updated value
+        }
       });
     } catch (error) {
       console.error('Failed to update callback settings:', error);
