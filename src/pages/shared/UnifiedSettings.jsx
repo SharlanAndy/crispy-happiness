@@ -321,26 +321,24 @@ export default function UnifiedSettings() {
     if (isAdminView) {
       // Admin viewing another user's settings
       if (entityType === 'agent') {
-        // Agent settings - only show profile, permissions, and status
+        // Agent settings - temporarily hide Permissions & Access tab
         return [
           { id: 'profile', label: 'Profile Information', icon: User },
           { id: 'wallet', label: 'Wallet Address', icon: Wallet },
           { id: 'referral', label: 'Referral Information', icon: Cog },
           { id: 'bonus', label: 'Initial Bonus', icon: Gift },
-          { id: 'permissions', label: 'Permissions & Access', icon: Shield },
           { id: 'status', label: 'Account Status', icon: Lock },
         ];
       } else if (entityType === 'user') {
-        // User settings - only show profile, permissions, and status
+        // User settings - temporarily hide Permissions & Access tab
         return [
           { id: 'profile', label: 'Profile Information', icon: User },
           { id: 'wallet', label: 'Wallet Address', icon: Wallet },
           { id: 'referral', label: 'Referral Information', icon: Cog },
-          { id: 'permissions', label: 'Permissions & Access', icon: Shield },
           { id: 'status', label: 'Account Status', icon: Lock },
         ];
       } else {
-        // Merchant settings - show all tabs
+        // Merchant settings - temporarily hide Permissions & Access tab
         return [
           { id: 'info', label: 'Business Information', icon: Book },
           { id: 'business', label: 'Business Address', icon: Building2 },
@@ -350,7 +348,6 @@ export default function UnifiedSettings() {
           { id: 'fees', label: 'Fees Information', icon: Cog },
           { id: 'currency', label: 'Currency Information', icon: CircleDollarSign },
           { id: 'profile', label: 'Profile Information', icon: User },
-          { id: 'permissions', label: 'Permissions & Access', icon: Shield },
           { id: 'status', label: 'Account Status', icon: Lock },
         ];
       }

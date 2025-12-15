@@ -15,7 +15,7 @@ export const MERCHANT_COLUMNS = [
   { key: 'status', label: 'Status' },
 ];
 
-export const MERCHANT_TIERS = ['T1', 'T2', 'T3', 'Merchant'];
+export const MERCHANT_TIERS = ['T1', 'T2', 'T3'];
 
 export const MERCHANT_SEARCH_KEYS = ['merchant_id', 'name', 'type', 'state'];
 

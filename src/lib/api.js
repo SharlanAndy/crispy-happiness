@@ -521,6 +521,42 @@ export const api = {
      */
     getAccountDetails: (id) => request(`${T3SYSTEMADMIN_BASE}/accounts/${id}`, { method: 'GET' }),
 
+    // Currencies Management
+    /**
+     * Get currencies list.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} params - { page }
+     * @returns {Promise<Object>} { success, data: [...], page, limit, total_pages? }
+     */
+    getCurrencies: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`${T3SYSTEMADMIN_BASE}/currencies?${query}`, { method: 'GET' });
+    },
+
+    /**
+     * Get currency settings/details.
+     * Headers: Authorization: Bearer <token>
+     * @param {string|number} id - Currency ID
+     * @returns {Promise<Object>} { success, data: { country_name, currency_code, currency_name, rate, status, created_at, updated_at } }
+     */
+    getCurrencySettings: (id) => request(`${T3SYSTEMADMIN_BASE}/currencies/${id}/settings`, { method: 'GET' }),
+
+    /**
+     * Create a new currency.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} data - { country_name, currency_code, currency_name, rate, status }
+     * @returns {Promise<Object>} { success, message, id }
+     */
+    createCurrency: (data) => request(`${T3SYSTEMADMIN_BASE}/currencies`, { method: 'POST', body: JSON.stringify(data) }),
+
+    /**
+     * Delete a currency.
+     * Headers: Authorization: Bearer <token>
+     * @param {string|number} id - Currency ID
+     * @returns {Promise<Object>} { success, message }
+     */
+    deleteCurrency: (id) => request(`${T3SYSTEMADMIN_BASE}/currencies/${id}`, { method: 'DELETE' }),
+
     // Withdrawal Management
     /**
      * Get withdrawal statistics.
@@ -744,6 +780,42 @@ export const api = {
      * @returns {Promise<Object>} User details
      */
     getUserDetails: (id) => request(`${T3SYSTEMADMIN_BASE}/users/${id}`, { method: 'GET' }),
+
+    // Currencies Management
+    /**
+     * Get currencies list.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} params - { page }
+     * @returns {Promise<Object>} { success, data: [...], page, limit, total_pages? }
+     */
+    getCurrencies: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`${T3SYSTEMADMIN_BASE}/currencies?${query}`, { method: 'GET' });
+    },
+
+    /**
+     * Get currency settings/details.
+     * Headers: Authorization: Bearer <token>
+     * @param {string|number} id - Currency ID
+     * @returns {Promise<Object>} { success, data: { country_name, currency_code, currency_name, rate, status, created_at, updated_at } }
+     */
+    getCurrencySettings: (id) => request(`${T3SYSTEMADMIN_BASE}/currencies/${id}/settings`, { method: 'GET' }),
+
+    /**
+     * Create a new currency.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} data - { country_name, currency_code, currency_name, rate, status }
+     * @returns {Promise<Object>} { success, message, id }
+     */
+    createCurrency: (data) => request(`${T3SYSTEMADMIN_BASE}/currencies`, { method: 'POST', body: JSON.stringify(data) }),
+
+    /**
+     * Delete a currency.
+     * Headers: Authorization: Bearer <token>
+     * @param {string|number} id - Currency ID
+     * @returns {Promise<Object>} { success, message }
+     */
+    deleteCurrency: (id) => request(`${T3SYSTEMADMIN_BASE}/currencies/${id}`, { method: 'DELETE' }),
 
     // Transaction Management
     /**

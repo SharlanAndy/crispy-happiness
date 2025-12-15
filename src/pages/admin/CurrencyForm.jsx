@@ -3,6 +3,8 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Plus, ChevronDown } from 'lucide-react';
 import { PageHeader, Card, Button, FormField } from '../../components/ui';
 import { TextInput } from '../../components/form';
+import { api } from '@/lib/api';
+import { useToast } from '@/contexts/ToastContext';
 
 const COUNTRIES = [
   { value: 'MY', label: 'Malaysia - RM', flag: '🇲🇾', code: 'RM' },
@@ -12,6 +14,7 @@ const COUNTRIES = [
   { value: 'TH', label: 'Thailand - THB', flag: '🇹🇭', code: 'THB' },
   { value: 'PH', label: 'Philippines - PHP', flag: '🇵🇭', code: 'PHP' },
   { value: 'BN', label: 'Brunei - BND', flag: '🇧🇳', code: 'BND' },
+  { value: 'OTHER', label: 'Other', flag: '🌐', code: '' },
 ];
 
 const STATUS_OPTIONS = [
@@ -23,6 +26,7 @@ export default function CurrencyForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { handleApiResponse, showError } = useToast();
   
   const isEditMode = id && id !== 'add';
   const isViewMode = location.pathname.includes('/view');
@@ -32,28 +36,118 @@ export default function CurrencyForm() {
     rate: '',
     status: 'active',
     updatedAt: '',
+    countryLabel: '',
+    otherCountryLabel: '',
   });
 
+  // Fetch currency details for view/edit
   useEffect(() => {
-    if (isEditMode || isViewMode) {
-      // Mock data - replace with actual API call
-      setFormData({
-        country: 'MY',
-        rate: '4.2',
-        status: 'active',
-        updatedAt: '12-11-2025',
-      });
-    }
-  }, [id, isEditMode, isViewMode]);
+    const fetchCurrency = async () => {
+      if (!isEditMode && !isViewMode) return;
+      try {
+        const result = await api.systemadmin.getCurrencySettings(id);
+        if (result && result.success && result.data) {
+          const data = result.data;
+          // Try to match against predefined countries
+          const matchedCountry = COUNTRIES.find(
+            (c) =>
+              c.label === data.currency_name ||
+              c.code === data.currency_code ||
+              c.value === data.country_name
+          );
+
+          if (matchedCountry) {
+            // Known country from list
+            setFormData({
+              country: matchedCountry.value,
+              rate: data.rate != null ? String(data.rate) : '',
+              status: (data.status || 'active').toLowerCase(),
+              updatedAt: data.updated_at
+                ? new Date(data.updated_at).toLocaleString('en-GB')
+                : '',
+              countryLabel: matchedCountry.label,
+              otherCountryLabel: '',
+            });
+          } else {
+            // Country not in list – treat as "Other" and store label separately
+            const fallbackLabel =
+              data.currency_name ||
+              [data.country_name, data.currency_code].filter(Boolean).join(' - ');
+
+            setFormData({
+              country: 'OTHER',
+              rate: data.rate != null ? String(data.rate) : '',
+              status: (data.status || 'active').toLowerCase(),
+              updatedAt: data.updated_at
+                ? new Date(data.updated_at).toLocaleString('en-GB')
+                : '',
+              countryLabel: 'Other',
+              otherCountryLabel: fallbackLabel || '',
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch currency settings:', error);
+        showError(error?.message || 'Failed to fetch currency details. Please try again.');
+      }
+    };
+
+    fetchCurrency();
+  }, [id, isEditMode, isViewMode, showError]);
 
   const handleChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Submit:', formData);
-    navigate('/system-admin/currency');
+
+    try {
+      if (isEditMode) {
+        // No update endpoint specified yet – just navigate back for now
+        navigate('/system-admin/currency');
+        return;
+      }
+
+      const selected = COUNTRIES.find((c) => c.value === formData.country);
+
+      let country_name = '';
+      let currency_code = '';
+      let currency_name = '';
+
+      if (formData.country === 'OTHER') {
+        const custom = (formData.otherCountryLabel || '').trim();
+        country_name = custom;
+        currency_name = custom;
+        currency_code = custom;
+      } else {
+        country_name = selected?.label?.split(' - ')[0] || '';
+        currency_code = selected?.code || '';
+        currency_name = selected?.label || '';
+      }
+
+      const payload = {
+        country_name,
+        currency_code,
+        currency_name,
+        rate: Number(formData.rate),
+        status: formData.status || 'active',
+      };
+
+      const result = await api.systemadmin.createCurrency(payload);
+
+      handleApiResponse(result, {
+        successMessage: result?.message || 'Currency created successfully!',
+        errorMessage: result?.message || 'Failed to create currency. Please try again.',
+      });
+
+      if (result && result.success) {
+        navigate('/system-admin/currency');
+      }
+    } catch (error) {
+      console.error('Failed to submit currency:', error);
+      showError(error?.message || 'Failed to submit currency. Please try again.');
+    }
   };
 
   const selectedCountry = COUNTRIES.find((c) => c.value === formData.country);
@@ -82,35 +176,70 @@ export default function CurrencyForm() {
           <div className="space-y-6">
             <FormField label="Country & Currencies">
               {isEditMode || isViewMode ? (
-                <div className="bg-[#f3f3f5] text-[#1C1B1F] p-3 rounded-md cursor-not-allowed">
-                  {selectedCountry && (
-                    <>
-                      <span className="text-xl mr-2">{selectedCountry.flag}</span>
-                      {selectedCountry.label}
-                    </>
-                  )}
-                </div>
+                formData.country === 'OTHER' ? (
+                  <div className="space-y-2">
+                    {/* Show 'Other' as main field */}
+                    <div className="bg-[#f3f3f5] text-[#1C1B1F] p-3 rounded-md cursor-not-allowed">
+                      Other
+                    </div>
+                    {/* Show actual country/currency from API in a separate input */}
+                    <TextInput
+                      value={formData.otherCountryLabel}
+                      onChange={(e) =>
+                        handleChange('otherCountryLabel', e.target.value)
+                      }
+                      placeholder="Custom country & currency"
+                      className="bg-[#f3f3f5] text-[#1C1B1F]"
+                      disabled={isViewMode}
+                    />
+                  </div>
+                ) : (
+                  <div className="bg-[#f3f3f5] text-[#1C1B1F] p-3 rounded-md cursor-not-allowed">
+                    {selectedCountry && (
+                      <>
+                        <span className="text-xl mr-2">{selectedCountry.flag}</span>
+                        {selectedCountry.label}
+                      </>
+                    )}
+                  </div>
+                )
               ) : (
-                <div className="relative">
-                  <select
-                    value={formData.country}
-                    onChange={(e) => handleChange('country', e.target.value)}
-                    className="flex items-center gap-2 bg-[#f3f3f5] rounded-md p-3 text-sm text-[#1C1B1F] placeholder:text-[#868e8d] w-full pr-10 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-black"
-                    required
-                    disabled={isViewMode}
-                  >
-                    <option value="">Select Country</option>
-                    {COUNTRIES.map((country) => (
-                      <option key={country.value} value={country.value}>
-                        {country.flag} {country.label}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    size={20}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500"
-                  />
-                </div>
+                <>
+                  <div className="relative">
+                    <select
+                      value={formData.country}
+                      onChange={(e) => handleChange('country', e.target.value)}
+                      className="flex items-center gap-2 bg-[#f3f3f5] rounded-md p-3 text-sm text-[#1C1B1F] placeholder:text-[#868e8d] w-full pr-10 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-black"
+                      required
+                      disabled={isViewMode}
+                    >
+                      <option value="">Select Country</option>
+                      {COUNTRIES.map((country) => (
+                        <option key={country.value} value={country.value}>
+                          {country.flag} {country.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      size={20}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500"
+                    />
+                  </div>
+
+                  {!isEditMode && !isViewMode && formData.country === 'OTHER' && (
+                    <div className="mt-3">
+                      <TextInput
+                        value={formData.otherCountryLabel}
+                        onChange={(e) =>
+                          handleChange('otherCountryLabel', e.target.value)
+                        }
+                        placeholder="Enter country & currency name"
+                        className="bg-[#f3f3f5] text-[#1C1B1F]"
+                        required
+                      />
+                    </div>
+                  )}
+                </>
               )}
             </FormField>
 
@@ -133,35 +262,36 @@ export default function CurrencyForm() {
               </div>
             </FormField>
 
-            {(isEditMode || isViewMode) && (
-              <>
-                <FormField label="Status">
-                  <div className="relative">
-                    <select
-                      value={formData.status}
-                      onChange={(e) => handleChange('status', e.target.value)}
-                      className="flex items-center gap-2 bg-[#f3f3f5] rounded-md p-3 text-sm text-[#1C1B1F] placeholder:text-[#868e8d] w-full pr-10 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-black"
-                      disabled={isViewMode}
-                    >
-                      {STATUS_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown
-                      size={20}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500"
-                    />
-                  </div>
-                </FormField>
+            {/* Status is selectable for both create and edit; read-only in view mode */}
+            <FormField label="Status">
+              <div className="relative">
+                <select
+                  value={formData.status}
+                  onChange={(e) => handleChange('status', e.target.value)}
+                  className="flex items-center gap-2 bg-[#f3f3f5] rounded-md p-3 text-sm text-[#1C1B1F] placeholder:text-[#868e8d] w-full pr-10 cursor-pointer appearance-none focus:outline-none focus:ring-2 focus:ring-black"
+                  disabled={isViewMode}
+                  required
+                >
+                  {STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  size={20}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500"
+                />
+              </div>
+            </FormField>
 
-                <FormField label="Update Time">
-                  <div className="bg-[#f3f3f5] text-[#1C1B1F] p-3 rounded-md cursor-not-allowed">
-                    {formData.updatedAt}
-                  </div>
-                </FormField>
-              </>
+            {/* Update time is only relevant when viewing/editing an existing currency */}
+            {(isEditMode || isViewMode) && (
+              <FormField label="Update Time">
+                <div className="bg-[#f3f3f5] text-[#1C1B1F] p-3 rounded-md cursor-not-allowed">
+                  {formData.updatedAt}
+                </div>
+              </FormField>
             )}
           </div>
         </Card>
