@@ -489,72 +489,72 @@ export default function APISettings() {
 
       {/* Create API Key Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[10px] w-full max-w-[600px] max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between py-4 px-6">
-              <h2 className="font-semibold text-2xl text-black">Create New API Key</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-[10px] w-full max-w-[95vw] sm:max-w-[600px] md:max-w-[700px] max-h-[95vh] sm:max-h-[90vh] flex flex-col m-2 sm:m-0">
+            <div className="flex items-center justify-between py-3 px-4 sm:py-4 sm:px-6">
+              <h2 className="font-semibold text-lg sm:text-xl md:text-2xl text-black">Create New API Key</h2>
               <button onClick={() => { 
                 setShowCreateModal(false); 
                 setCreateKeyForm(INITIAL_KEY_DATA);
                 setCreatedKeyData(null);
               }} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
-                <X size={32} className="text-[#868e8d]" />
+                <X size={24} className="sm:w-8 sm:h-8 text-[#868e8d]" />
               </button>
             </div>
 
             {createdKeyData ? (
               // Success view - display response data
-              <div className="flex-1 overflow-y-auto py-4 px-6">
-                <div className="flex flex-col gap-6">
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                    <p className="text-green-800 font-semibold">API key created successfully!</p>
-                    <p className="text-green-700 text-sm mt-1">Please save the secret key - it won't be shown again.</p>
+              <div className="flex-1 overflow-y-auto py-3 px-4 sm:py-4 sm:px-6">
+                <div className="flex flex-col gap-4 sm:gap-6">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4 mb-3 sm:mb-4">
+                    <p className="text-green-800 font-semibold text-sm sm:text-base">API key created successfully!</p>
+                    <p className="text-green-700 text-xs sm:text-sm mt-1">Please save the secret key - it won't be shown again.</p>
                   </div>
                   
                   <FormSection title="Created API Key Information">
                     <FormLabel label="ID">
-                      <div className="px-3 py-2 rounded-md bg-secondary/50 border-none text-sm">
+                      <div className="px-2 sm:px-3 py-2 rounded-md bg-secondary/50 border-none text-xs sm:text-sm">
                         {createdKeyData.id || 'N/A'}
                       </div>
                     </FormLabel>
                     <FormLabel label="Key Name">
-                      <div className="px-3 py-2 rounded-md bg-secondary/50 border-none text-sm">
+                      <div className="px-2 sm:px-3 py-2 rounded-md bg-secondary/50 border-none text-xs sm:text-sm">
                         {createdKeyData.key_name || 'N/A'}
                       </div>
                     </FormLabel>
                     <FormLabel label="API Key">
-                      <div className="flex gap-2">
-                        <div className="flex-1 px-3 py-2 rounded-md bg-secondary/50 border-none text-sm font-mono break-all">
+                      <div className="flex gap-1 sm:gap-2">
+                        <div className="flex-1 px-2 sm:px-3 py-2 rounded-md bg-secondary/50 border-none text-xs sm:text-sm font-mono break-all overflow-x-auto">
                           {createdKeyData.api_key || 'N/A'}
                         </div>
                         <button 
                           onClick={() => copyToClipboard(createdKeyData.api_key || '')}
-                          className="p-2 hover:bg-accent rounded-md"
+                          className="p-1.5 sm:p-2 hover:bg-accent rounded-md flex-shrink-0"
                         >
-                          <Copy size={18} />
+                          <Copy size={16} className="sm:w-[18px] sm:h-[18px]" />
                         </button>
                       </div>
                     </FormLabel>
                     <FormLabel label="Secret Key">
-                      <div className="flex gap-2">
-                        <div className="flex-1 px-3 py-2 rounded-md bg-secondary/50 border-none text-sm font-mono break-all">
+                      <div className="flex gap-1 sm:gap-2">
+                        <div className="flex-1 px-2 sm:px-3 py-2 rounded-md bg-secondary/50 border-none text-xs sm:text-sm font-mono break-all overflow-x-auto">
                           {createdKeyData.secret_key || 'N/A'}
                         </div>
                         <button 
                           onClick={() => copyToClipboard(createdKeyData.secret_key || '')}
-                          className="p-2 hover:bg-accent rounded-md"
+                          className="p-1.5 sm:p-2 hover:bg-accent rounded-md flex-shrink-0"
                         >
-                          <Copy size={18} />
+                          <Copy size={16} className="sm:w-[18px] sm:h-[18px]" />
                         </button>
                       </div>
                     </FormLabel>
                     <FormLabel label="Backend URL">
-                      <div className="px-3 py-2 rounded-md bg-secondary/50 border-none text-sm">
+                      <div className="px-2 sm:px-3 py-2 rounded-md bg-secondary/50 border-none text-xs sm:text-sm break-all">
                         {createdKeyData.backend_url || 'N/A'}
                       </div>
                     </FormLabel>
                     <FormLabel label="Merchant Key">
-                      <div className="px-3 py-2 rounded-md bg-secondary/50 border-none text-sm">
+                      <div className="px-2 sm:px-3 py-2 rounded-md bg-secondary/50 border-none text-xs sm:text-sm">
                         {createdKeyData.merchant_key || 'N/A'}
                       </div>
                     </FormLabel>
@@ -595,7 +595,7 @@ export default function APISettings() {
                   </div>
                 </form>
 
-                <div className="flex gap-4 justify-end py-4 px-6">
+                <div className="flex gap-2 sm:gap-4 justify-end py-3 px-4 sm:py-4 sm:px-6">
                   <button
                     type="button"
                     onClick={() => { 
@@ -603,24 +603,25 @@ export default function APISettings() {
                       setCreateKeyForm(INITIAL_KEY_DATA);
                       setCreatedKeyData(null);
                     }}
-                    className="border border-[#a1abaa] p-3 rounded-md font-semibold text-lg text-black hover:bg-gray-50 transition-colors"
+                    className="border border-[#a1abaa] p-2 sm:p-3 rounded-md font-semibold text-sm sm:text-base md:text-lg text-black hover:bg-gray-50 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     onClick={() => handleCreateNewKey(createKeyForm)}
-                    className="bg-black p-3 rounded-md font-semibold text-lg text-white hover:bg-gray-800 transition-colors flex items-center gap-3"
+                    className="bg-black p-2 sm:p-3 rounded-md font-semibold text-sm sm:text-base md:text-lg text-white hover:bg-gray-800 transition-colors flex items-center gap-2 sm:gap-3"
                   >
-                    <Plus size={24} />
-                    Create Key
+                    <Plus size={18} className="sm:w-6 sm:h-6" />
+                    <span className="hidden sm:inline">Create Key</span>
+                    <span className="sm:hidden">Create</span>
                   </button>
                 </div>
               </>
             )}
             
             {createdKeyData && (
-              <div className="flex gap-4 justify-end py-4 px-6 border-t">
+              <div className="flex gap-2 sm:gap-4 justify-end py-3 px-4 sm:py-4 sm:px-6 border-t">
                 <button
                   type="button"
                   onClick={() => { 
@@ -628,7 +629,7 @@ export default function APISettings() {
                     setCreateKeyForm(INITIAL_KEY_DATA);
                     setCreatedKeyData(null);
                   }}
-                  className="bg-black p-3 rounded-md font-semibold text-lg text-white hover:bg-gray-800 transition-colors"
+                  className="bg-black p-2 sm:p-3 rounded-md font-semibold text-sm sm:text-base md:text-lg text-white hover:bg-gray-800 transition-colors w-full sm:w-auto"
                 >
                   Close
                 </button>
