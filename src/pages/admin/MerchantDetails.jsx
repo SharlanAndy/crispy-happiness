@@ -25,6 +25,8 @@ export default function MerchantDetails() {
   const [transactionsData, setTransactionsData] = useState([]);
   const [chartData, setChartData] = useState([]);
   const [loadingChart, setLoadingChart] = useState(false);
+  const [t3Admins, setT3Admins] = useState([]);
+  const [loadingT3Admins, setLoadingT3Admins] = useState(false);
   
   // Modal and form states for T3 Admin
   const [showWalletModal, setShowWalletModal] = useState(false);
@@ -215,6 +217,33 @@ export default function MerchantDetails() {
     fetchProfitChart();
   }, [id, activeTab, isT3Admin]);
 
+  // Fetch T3 admin list for this merchant (placeholder - actual endpoint to be confirmed)
+  useEffect(() => {
+    const fetchT3Admins = async () => {
+      if (!id) return;
+      try {
+        setLoadingT3Admins(true);
+        const result = await api.systemadmin.getMerchantT3Admins({ merchant_id: id, page: 1 });
+        console.log('[MerchantDetails] T3 admin list response:', result);
+        if (result && result.success && Array.isArray(result.data)) {
+          setT3Admins(result.data);
+        } else {
+          setT3Admins([]);
+        }
+      } catch (error) {
+        console.error('[MerchantDetails] Failed to fetch T3 admins:', error);
+        setT3Admins([]);
+      } finally {
+        setLoadingT3Admins(false);
+      }
+    };
+
+    // Only for system admin view
+    if (!isT3Admin) {
+      fetchT3Admins();
+    }
+  }, [id, isT3Admin]);
+
   // Transform transactions for display
   const transformedTransactions = transactionsData.map(t => ({
     id: `T${String(t.id || '').padStart(6, '0')}`,
@@ -392,37 +421,69 @@ export default function MerchantDetails() {
           </div>
         )}
 
-        {/* Transaction List Section */}
-        <Card title="Transaction List">
-          <div className="flex flex-col gap-5">
-            <SearchBar
-              placeholder="Search Transaction..."
-              value={searchTerm}
-              onChange={handleSearchChange}
-              className="max-w-sm"
-            />
-            {loading ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">Loading transactions...</p>
+        {/* T3 Admin List Section (placeholder table; data wiring once endpoint is finalized) */}
+        {!isT3Admin && (
+          <div className="bg-white rounded-[20px] border border-[#E5E5E5] p-5">
+            <h3 className="text-2xl font-semibold text-black mb-4">T3 Admin List</h3>
+            {loadingT3Admins ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Loading T3 admins...
+              </div>
+            ) : t3Admins.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No T3 admins available
               </div>
             ) : (
-              <DataTable
-                columns={[
-                  { key: 'id', label: 'Trans. ID' },
-                  { key: 'type', label: 'Type' },
-                  { key: 'status', label: 'Status' }
-                ]}
-                data={transactions}
-                actions={transactionActions}
-                pagination={{
-                  currentPage,
-                  totalPages,
-                  onPageChange: setCurrentPage,
-                }}
-              />
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="py-2 px-3">Username</th>
+                    <th className="py-2 px-3">Email</th>
+                    <th className="py-2 px-3">Created Date</th>
+                    <th className="py-2 px-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {t3Admins.map((admin, idx) => (
+                    <tr key={idx} className="border-b last:border-0">
+                      <td className="py-2 px-3">{admin.username || 'N/A'}</td>
+                      <td className="py-2 px-3">{admin.email || 'N/A'}</td>
+                      <td className="py-2 px-3">
+                        {admin.created_at
+                          ? new Date(admin.created_at).toLocaleString('en-GB')
+                          : 'N/A'}
+                      </td>
+                      <td className="py-2 px-3">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            className="p-1.5 rounded-md border border-gray-300 hover:bg-gray-100"
+                            onClick={() =>
+                              console.log('[MerchantDetails] View T3 admin details clicked:', admin)
+                            }
+                          >
+                            <Eye size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            className="p-1.5 rounded-md border border-gray-300 hover:bg-gray-100"
+                            onClick={() =>
+                              console.log('[MerchantDetails] Settings for T3 admin clicked:', admin)
+                            }
+                          >
+                            {/* Reuse Eye icon as placeholder for settings until we wire a modal & icon */}
+                            <Eye size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
-        </Card>
+        )}
+
           </>
         )}
       </div>

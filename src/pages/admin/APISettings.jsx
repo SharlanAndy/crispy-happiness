@@ -157,13 +157,13 @@ export default function APISettings() {
             const latestKey = sortedKeys[0];
             // Set default to latest key on initial load only
             if (isInitialLoad) {
-              setKeys({
+          setKeys({
                 apiKey: latestKey.api_key || latestKey.api_key_full || 'prod_****************ab12',
                 apiKeyFull: latestKey.api_key_full || latestKey.api_key || '', // Store full key for copying
                 keyName: latestKey.key_name || 'N/A',
                 merchantKey: latestKey.merchant_key || 'XyZ123!@#456',
                 callbackUrl: latestKey.backend_url || 'https://your-website.com/api/callback'
-              });
+          });
               setSelectedKeyId(latestKey.id);
               setIsInitialLoad(false);
             }
@@ -294,15 +294,15 @@ export default function APISettings() {
                 });
                 if (sortedKeys.length > 0) {
                   const latestKey = sortedKeys[0];
-                  setKeys({
-                    apiKey: latestKey.api_key || latestKey.api_key_full || 'prod_****************ab12',
+          setKeys({
+            apiKey: latestKey.api_key || latestKey.api_key_full || 'prod_****************ab12',
                     apiKeyFull: latestKey.api_key_full || latestKey.api_key || '',
                     keyName: latestKey.key_name || 'N/A',
-                    merchantKey: latestKey.merchant_key || 'XyZ123!@#456',
-                    callbackUrl: latestKey.backend_url || 'https://your-website.com/api/callback'
-                  });
-                  setSelectedKeyId(latestKey.id);
-                }
+            merchantKey: latestKey.merchant_key || 'XyZ123!@#456',
+            callbackUrl: latestKey.backend_url || 'https://your-website.com/api/callback'
+          });
+          setSelectedKeyId(latestKey.id);
+        }
               }
             }
           }
@@ -342,7 +342,7 @@ export default function APISettings() {
         onSuccess: () => {
           // Optionally refresh the keys list to show updated backend_url
           // This is optional since the UI already shows the updated value
-        }
+      }
       });
     } catch (error) {
       console.error('Failed to update callback settings:', error);

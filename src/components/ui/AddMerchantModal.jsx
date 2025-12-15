@@ -1,14 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { Plus, X, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 import { FormLabel, FormSection, TextInput, TextInputWithSuffix, PasswordInput, SelectInput } from '../form';
 import merchantTypes from '../../constant/merchantTypes.json';
 import countriesAndStates from '../../constant/countriesAndStates.json';
+import { api } from '@/lib/api';
 
 const INITIAL_FORM_DATA = {
   merchantGroup: 'T1',
   username: '',
   email: '',
   password: '',
+  // Additional fields for T3 merchants
+  t3AdminUsername: '',
+  t3AdminPassword: '',
   firstName: '',
   lastName: '',
   phone: '',
@@ -36,6 +40,7 @@ const INITIAL_FORM_DATA = {
   currencies: '🇲🇾 Malaysia - RM',
 };
 
+// Legacy fallback; real options now come from the currencies API.
 const CURRENCY_OPTIONS = ['🇲🇾 Malaysia - RM', '🇸🇬 Singapore - SGD', '🇺🇸 USA - USD'];
 
 const STEPS = [
@@ -51,6 +56,8 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
   const [currentStep, setCurrentStep] = useState(1);
   const [errors, setErrors] = useState({});
+  const [agentOptions, setAgentOptions] = useState([]);
+  const [currencyOptions, setCurrencyOptions] = useState([]);
 
   const countries = Object.keys(countriesAndStates);
   const availableStates = countriesAndStates[formData.country] || [];
@@ -71,8 +78,8 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
   };
 
   const validatePhone = (phone) => {
-    // Basic phone validation - at least 8 digits
-    const phoneRegex = /^[\d\s\-\+\(\)]+$/;
+    // Basic phone validation - at least 8 digits (digits, spaces, +, -, parentheses)
+    const phoneRegex = /^[\d\s+\-()]+$/;
     return phone && phoneRegex.test(phone) && phone.replace(/\D/g, '').length >= 8;
   };
 
@@ -81,6 +88,94 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
     const num = parseFloat(value);
     return !isNaN(num) && num >= 0;
   };
+
+  // Fetch agents dropdown for referral
+  useEffect(() => {
+    const fetchAgentsDropdown = async () => {
+      try {
+        const result = await api.systemadmin.getAgentsDropdown();
+        console.log('[AddMerchantModal] agents dropdown result:', result);
+        if (result && result.success && Array.isArray(result.data)) {
+          const opts = result.data.map((agent) => ({
+            value: agent.referral_id || agent.id?.toString() || agent.username || '',
+            label: agent.display_name || agent.username || agent.referral_id || '',
+          }));
+          setAgentOptions(opts);
+        } else {
+          setAgentOptions([]);
+        }
+      } catch (error) {
+        console.error('[AddMerchantModal] Failed to fetch agents dropdown:', error);
+        setAgentOptions([]);
+      }
+    };
+
+    if (isOpen) {
+      fetchAgentsDropdown();
+    }
+  }, [isOpen]);
+
+  // Fetch currencies for currency select (step 6)
+  useEffect(() => {
+    const fetchCurrencies = async () => {
+      try {
+        const result = await api.systemadmin.getCurrencies({ page: 1 });
+        console.log('[AddMerchantModal] currencies result:', result);
+
+        if (result && result.success && Array.isArray(result.data)) {
+          const opts = result.data.map((c) => {
+            const code = c.currency_code || '';
+            const name = c.currency_name || (c.country_name && code ? `${c.country_name} - ${code}` : code);
+            return {
+              value: code || (c.id != null ? String(c.id) : ''),
+              label: name || code,
+            };
+          });
+          setCurrencyOptions(opts);
+        } else {
+          setCurrencyOptions([]);
+        }
+      } catch (error) {
+        console.error('[AddMerchantModal] Failed to fetch currencies:', error);
+        setCurrencyOptions([]);
+      }
+    };
+
+    if (isOpen) {
+      fetchCurrencies();
+    }
+  }, [isOpen]);
+
+  // Fetch currencies for currency select (step 6)
+  useEffect(() => {
+    const fetchCurrencies = async () => {
+      try {
+        const result = await api.systemadmin.getCurrencies({ page: 1 });
+        console.log('[AddMerchantModal] currencies result:', result);
+
+        if (result && result.success && Array.isArray(result.data)) {
+          const opts = result.data.map((c) => {
+            const code = c.currency_code || '';
+            const name = c.currency_name || (c.country_name && code ? `${c.country_name} - ${code}` : code);
+            return {
+              value: code || (c.id != null ? String(c.id) : ''),
+              label: name || code,
+            };
+          });
+          setCurrencyOptions(opts);
+        } else {
+          setCurrencyOptions([]);
+        }
+      } catch (error) {
+        console.error('[AddMerchantModal] Failed to fetch currencies:', error);
+        setCurrencyOptions([]);
+      }
+    };
+
+    if (isOpen) {
+      fetchCurrencies();
+    }
+  }, [isOpen]);
 
   // Validate current step
   const validateStep = (step) => {
@@ -112,6 +207,15 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
         }
         if (!validateRequired(formData.merchantGroup)) {
           stepErrors.merchantGroup = 'Merchant group is required';
+        }
+        // If T3 group selected, require T3 admin credentials
+        if (formData.merchantGroup === 'T3') {
+          if (!validateRequired(formData.t3AdminUsername)) {
+            stepErrors.t3AdminUsername = 'T3 admin username is required';
+          }
+          if (!validatePassword(formData.t3AdminPassword)) {
+            stepErrors.t3AdminPassword = 'T3 admin password must be at least 6 characters';
+          }
         }
         break;
 
@@ -211,7 +315,9 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
                validateRequired(formData.firstName) &&
                validateRequired(formData.lastName) &&
                validateRequired(formData.phone) && validatePhone(formData.phone) &&
-               validateRequired(formData.merchantGroup);
+               validateRequired(formData.merchantGroup) &&
+               (formData.merchantGroup !== 'T3' ||
+                 (validateRequired(formData.t3AdminUsername) && validatePassword(formData.t3AdminPassword)));
       case 2:
         return validateRequired(formData.companyName) &&
                validateRequired(formData.ssmNumber) &&
@@ -287,7 +393,13 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     const finalMerchantType = formData.merchantType === 'Others' ? formData.merchantTypeOther : formData.merchantType;
-    onSubmit({ ...formData, merchantType: finalMerchantType });
+    const payload = { ...formData, merchantType: finalMerchantType };
+    // If merchant group is not T3, drop T3-specific fields
+    if (payload.merchantGroup !== 'T3') {
+      delete payload.t3AdminUsername;
+      delete payload.t3AdminPassword;
+    }
+    onSubmit(payload);
     handleClose();
   };
 
@@ -671,6 +783,13 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
             {renderField(TextInput, 'Username', 'username', { placeholder: 'Insert username here' })}
             {renderField(TextInput, 'Email', 'email', { placeholder: 'Insert email here', type: 'email' })}
             {renderField(PasswordInput, 'Password', 'password', { placeholder: 'Insert password here' })}
+            {/* Additional T3 Admin credentials when Merchant Group is T3 */}
+            {formData.merchantGroup === 'T3' && (
+              <>
+                {renderField(TextInput, 'T3 Admin Username', 't3AdminUsername', { placeholder: 'Insert T3 admin username here' })}
+                {renderField(PasswordInput, 'T3 Admin Password', 't3AdminPassword', { placeholder: 'Insert T3 admin password here' })}
+              </>
+            )}
             {renderField(TextInput, 'First Name', 'firstName', { placeholder: 'Insert first name here' })}
             {renderField(TextInput, 'Last Name', 'lastName', { placeholder: 'Insert last name here' })}
             {renderField(TextInput, 'Phone', 'phone', { placeholder: 'Insert phone number here', type: 'tel' })}
@@ -781,7 +900,18 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
               {renderField(TextInput, 'Wallet Address', 'walletAddress', { placeholder: 'Insert wallet address here' })}
             </FormSection>
             <FormSection title="Referral Setup">
-              {renderField(TextInput, 'Referral By', 'referralBy', { placeholder: 'Insert referral ID here' })}
+              <FormLabel label="Referral By">
+                <SelectInput
+                  value={formData.sponsorBy}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    handleChange('sponsorBy', value);
+                    // optional: real-time validation if you ever make this required
+                  }}
+                  options={agentOptions}
+                  placeholder="Select Referral"
+                />
+              </FormLabel>
               {renderField(TextInput, 'Referral Fees', 'referralFees', { placeholder: 'eg:1.2' })}
               {renderField(TextInput, 'Remarks', 'referralRemarks', { placeholder: 'Additional remarks' })}
             </FormSection>
@@ -822,7 +952,7 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
                       validateField('currencies', e.target.value);
                     }}
                     className={errors.currencies ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
-                    options={CURRENCY_OPTIONS} 
+                    options={currencyOptions} 
                     placeholder="Select Currencies" 
                   />
                 </FormLabel>
@@ -865,9 +995,9 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
               const isCompleted = currentStep > step.id;
               
               return (
-                <>
+                <Fragment key={step.id}>
                   {/* Step circle */}
-                  <div key={step.id} className="flex-shrink-0 relative z-10">
+                  <div className="flex-shrink-0 relative z-10">
                     <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-semibold transition-colors text-sm sm:text-base ${
                       isActive
                         ? 'bg-black text-white' 
@@ -881,7 +1011,7 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
                   
                   {/* Connecting line - between circles */}
                   {index < STEPS.length - 1 && (
-                    <div key={`line-${step.id}`} className="flex-1 flex-shrink-0 mx-1 sm:mx-2" style={{ minWidth: '8px' }}>
+                    <div className="flex-1 flex-shrink-0 mx-1 sm:mx-2" style={{ minWidth: '8px' }}>
                       <div 
                         className={`w-full h-0.5 transition-colors ${
                           isCompleted ? 'bg-gray-600' : 'bg-gray-200'
@@ -889,7 +1019,7 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
                       />
                     </div>
                   )}
-                </>
+                </Fragment>
               );
             })}
           </div>
@@ -901,8 +1031,8 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
               const isCompleted = currentStep > step.id;
               
               return (
-                <>
-                  <div key={`label-${step.id}`} className="flex-1 flex flex-col items-center" style={{ minWidth: 0 }}>
+                <Fragment key={step.id}>
+                  <div className="flex-1 flex flex-col items-center" style={{ minWidth: 0 }}>
                     <span className={`text-[10px] sm:text-xs text-center w-full px-0.5 sm:px-0 leading-tight break-words ${
                       isActive || isCompleted ? 'text-black font-medium' : 'text-gray-400'
                     }`}>
@@ -911,9 +1041,9 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
                     </span>
                   </div>
                   {index < STEPS.length - 1 && (
-                    <div key={`spacer-${step.id}`} className="flex-1 flex-shrink-0 mx-1 sm:mx-2" style={{ minWidth: '8px' }} />
+                    <div className="flex-1 flex-shrink-0 mx-1 sm:mx-2" style={{ minWidth: '8px' }} />
                   )}
-                </>
+                </Fragment>
               );
             })}
           </div>

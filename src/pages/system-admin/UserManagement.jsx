@@ -197,42 +197,42 @@ export default function UserManagement() {
 
     if (isT3Admin) {
       // For T3 Admin, extract from metadata (existing logic)
-      const totalActiveUsers = usersMeta?.total_users || 
-                               usersMeta?.total_active_users || 
-                               usersMeta?.TotalUsers ||
-                               usersMeta?.TotalActiveUsers ||
-                               0;
+    const totalActiveUsers = usersMeta?.total_users || 
+                             usersMeta?.total_active_users || 
+                             usersMeta?.TotalUsers ||
+                             usersMeta?.TotalActiveUsers ||
+                             0;
 
-      const totalBonusDistributed = usersMeta?.total_bonus_distributed || 
-                                    usersMeta?.total_bonus || 
-                                    usersMeta?.TotalBonusDistributed ||
-                                    usersMeta?.TotalBonus ||
-                                    0;
-
-      const totalSpendingVolume = usersMeta?.total_spending_volume || 
-                                  usersMeta?.total_incoming_funds || 
-                                  usersMeta?.total_spend ||
-                                  usersMeta?.TotalSpendingVolume ||
-                                  usersMeta?.TotalIncomingFunds ||
+    const totalBonusDistributed = usersMeta?.total_bonus_distributed || 
+                                  usersMeta?.total_bonus || 
+                                  usersMeta?.TotalBonusDistributed ||
+                                  usersMeta?.TotalBonus ||
                                   0;
 
-      return [
-        { 
-          label: 'Total Active User', 
-          value: totalActiveUsers.toString(), 
-          lastUpdate: lastUpdate 
-        },
-        { 
-          label: 'Total Bonus Distributed', 
-          value: `${totalBonusDistributed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
-          lastUpdate: lastUpdate 
-        },
-        { 
-          label: 'Total Spending Volume', 
-          value: `${totalSpendingVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
-          lastUpdate: lastUpdate 
-        },
-      ];
+    const totalSpendingVolume = usersMeta?.total_spending_volume || 
+                                usersMeta?.total_incoming_funds || 
+                                usersMeta?.total_spend ||
+                                usersMeta?.TotalSpendingVolume ||
+                                usersMeta?.TotalIncomingFunds ||
+                                0;
+
+    return [
+      { 
+        label: 'Total Active User', 
+        value: totalActiveUsers.toString(), 
+        lastUpdate: lastUpdate 
+      },
+      { 
+        label: 'Total Bonus Distributed', 
+        value: `${totalBonusDistributed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
+        lastUpdate: lastUpdate 
+      },
+      { 
+        label: 'Total Spending Volume', 
+        value: `${totalSpendingVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
+        lastUpdate: lastUpdate 
+      },
+    ];
     } else {
       // For System Admin, calculate from actual user data array
       // Calculate Total Active User: count users with status === 'active' (case-insensitive)

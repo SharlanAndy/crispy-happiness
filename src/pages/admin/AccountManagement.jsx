@@ -122,13 +122,13 @@ export default function AccountManagement() {
 
   const handleSubmit = async () => {
     if (modalState.mode === 'create') {
-      try {
+        try {
         // Use the correct API endpoint with the required payload structure
         const payload = {
-          username: formData.username,
-          email: formData.email,
-          password: formData.password,
-          wallet_address: formData.walletAddress
+            username: formData.username,
+            email: formData.email,
+            password: formData.password,
+            wallet_address: formData.walletAddress
         };
         
         console.log('Creating account with payload:', payload);
@@ -140,19 +140,19 @@ export default function AccountManagement() {
           onSuccess: async () => {
             // Refresh accounts list
             if (isT3Admin) {
-              const fetchResult = await t3Service.getAccounts({ page: currentPage, search: searchTerm });
-              if (fetchResult.success) {
-                const transformed = fetchResult.data.map(acc => ({
-                  id: acc.id.toString(),
-                  username: acc.username,
-                  character: acc.character || 'Finance',
-                  lastLogin: acc.last_login ? new Date(acc.last_login).toLocaleString('en-GB') : 'Never',
-                  created: acc.created_at ? new Date(acc.created_at).toLocaleString('en-GB') : '',
-                  status: acc.status || 'Active'
-                }));
-                setAccountsData(transformed);
-              }
+            const fetchResult = await t3Service.getAccounts({ page: currentPage, search: searchTerm });
+            if (fetchResult.success) {
+              const transformed = fetchResult.data.map(acc => ({
+                id: acc.id.toString(),
+                username: acc.username,
+                character: acc.character || 'Finance',
+                lastLogin: acc.last_login ? new Date(acc.last_login).toLocaleString('en-GB') : 'Never',
+                created: acc.created_at ? new Date(acc.created_at).toLocaleString('en-GB') : '',
+                status: acc.status || 'Active'
+              }));
+              setAccountsData(transformed);
             }
+          }
           }
         });
         

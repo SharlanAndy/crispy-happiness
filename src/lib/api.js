@@ -774,6 +774,13 @@ export const api = {
      */
     createAgent: (data) => request(`${T3SYSTEMADMIN_BASE}/agents`, { method: 'POST', body: JSON.stringify(data) }),
 
+  /**
+   * Get agents dropdown list for referrals (T1/T2/T3).
+   * Headers: Authorization: Bearer <token>
+   * @returns {Promise<Object>} { success, data: [...] }
+   */
+  getAgentsDropdown: () => request(`${T3SYSTEMADMIN_BASE}/agents/dropdown`, { method: 'GET' }),
+
     // User Management
     /**
      * Get user list.
@@ -860,6 +867,18 @@ export const api = {
     getTransactions: (params = {}) => {
       const query = new URLSearchParams(params).toString();
       return request(`${T3SYSTEMADMIN_BASE}/transactions?${query}`, { method: 'GET' });
+    },
+
+    /**
+     * Get T3 admin list for a merchant (placeholder - endpoint details to be provided).
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} params - e.g. { merchant_id, page }
+     * @returns {Promise<Object>} { success, data: [...] }
+     */
+    getMerchantT3Admins: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      // TODO: update path when backend endpoint is confirmed
+      return request(`${T3SYSTEMADMIN_BASE}/merchants/t3-admins?${query}`, { method: 'GET' });
     },
 
     /**
