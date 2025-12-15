@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Eye, Settings, Trash2 } from 'lucide-react';
 import { StatCard, InfoSection, Card, DataTable, SearchBar, PageHeader, ConfirmDialog } from '../../components/ui';
 import { filterAndPaginate } from '@/lib/pagination';
-import { STATS, USER_INFO, SPONSOR_INFO, WALLET_ADDRESS_INFO, BONUS_INFO, ALL_NETWORK_DATA } from '../../constant/agentMockData';
+import { api } from '@/lib/api';
+import { ALL_NETWORK_DATA } from '../../constant/agentMockData';
 
 const ITEMS_PER_PAGE = 10;
 const NETWORK_SEARCH_KEYS = ['id', 'volume', 'bonus', 'sponsorL1', 'sponsorL2', 'join', 'status', 'referrer'];
@@ -37,6 +38,37 @@ export default function AgentDetails() {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, item: null });
+  const [agentDetails, setAgentDetails] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch agent details from API
+  useEffect(() => {
+    const fetchAgentDetails = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const result = await api.systemadmin.getAgentDetails(id);
+        
+        if (result && result.success && result.data) {
+          setAgentDetails(result.data);
+        } else {
+          setError(result?.message || 'Failed to fetch agent details.');
+          setAgentDetails(null);
+        }
+      } catch (err) {
+        console.error('Error fetching agent details:', err);
+        setError('Failed to fetch agent details. Please try again.');
+        setAgentDetails(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchAgentDetails();
+    }
+  }, [id]);
 
   // Scroll to top when page changes
   useEffect(() => {
@@ -80,6 +112,61 @@ export default function AgentDetails() {
     bonus: <span className="text-[#166534] font-bold">{totalBonus.toLocaleString()} U</span>
   }), [totalBonus]);
 
+  // Transform API data to UI format
+  const stats = useMemo(() => {
+    if (!agentDetails) return [];
+    
+    const totalReferral = (agentDetails.TotalSponsorL1 || 0) + (agentDetails.TotalSponsorL2 || 0);
+    const totalVolume = (agentDetails.TotalVolume || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const totalBonus = (agentDetails.BonusContributed || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    
+    return [
+      { label: 'Total Referral', value: totalReferral.toString(), lastUpdate: agentDetails.CreatedAt ? new Date(agentDetails.CreatedAt).toLocaleDateString('en-GB') : 'N/A' },
+      { label: 'Total Contributed Volume', value: `${totalVolume} USDT`, lastUpdate: agentDetails.CreatedAt ? new Date(agentDetails.CreatedAt).toLocaleDateString('en-GB') : 'N/A' },
+      { label: 'Total Bonus Received', value: `${totalBonus} USDT`, lastUpdate: agentDetails.CreatedAt ? new Date(agentDetails.CreatedAt).toLocaleDateString('en-GB') : 'N/A' },
+    ];
+  }, [agentDetails]);
+
+  const userInfo = useMemo(() => {
+    if (!agentDetails) return [];
+    
+    const fullName = [agentDetails.FirstName, agentDetails.LastName].filter(Boolean).join(' ') || 'N/A';
+    const joinDate = agentDetails.CreatedAt ? new Date(agentDetails.CreatedAt).toLocaleString('en-GB') : 'N/A';
+    const status = agentDetails.Status || 'N/A';
+    
+    return [
+      { label: "Agent ID", value: agentDetails.ReferralID || agentDetails.ID?.toString() || 'N/A' },
+      { label: 'Username', value: agentDetails.Username || 'N/A' },
+      { label: 'Full Name', value: fullName },
+      { label: 'Join Date', value: joinDate },
+      { label: 'Status', value: status.charAt(0).toUpperCase() + status.slice(1), badge: true },
+    ];
+  }, [agentDetails]);
+
+  const walletAddressInfo = useMemo(() => {
+    if (!agentDetails) return [];
+    return [
+      { label: 'Wallet Address', value: agentDetails.WalletAddress || 'N/A' },
+    ];
+  }, [agentDetails]);
+
+  const sponsorInfo = useMemo(() => {
+    if (!agentDetails) return [];
+    return [
+      { label: 'Referral ID', value: agentDetails.ReferralID || 'N/A' },
+    ];
+  }, [agentDetails]);
+
+  const bonusInfo = useMemo(() => {
+    if (!agentDetails) return [];
+    const bonusContributed = (agentDetails.BonusContributed || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return [
+      { label: 'Total Bonus Contributed', value: `${bonusContributed} U` },
+      { label: 'Total Sponsor L1', value: (agentDetails.TotalSponsorL1 || 0).toString() },
+      { label: 'Total Sponsor L2', value: (agentDetails.TotalSponsorL2 || 0).toString() },
+    ];
+  }, [agentDetails]);
+
   const actions = [{
     icon: <Eye size={16} />,
     onClick: (row) => navigate(`/system-admin/agents/${row.id}`),
@@ -95,6 +182,40 @@ export default function AgentDetails() {
     tooltip: 'Delete',
   }];
 
+  const handleDelete = async (item) => {
+    // TODO: Implement delete functionality
+    console.log('Delete agent:', item);
+    setDeleteConfirm({ isOpen: false, item: null });
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Agent Details"
+          description="Overview the Details of Agent Information"
+        />
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">Loading agent details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Agent Details"
+          description="Overview the Details of Agent Information"
+        />
+        <div className="text-center py-8">
+          <p className="text-red-500">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="space-y-6">
@@ -104,17 +225,17 @@ export default function AgentDetails() {
         />
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {STATS.map((stat, idx) => (
+          {stats.map((stat, idx) => (
             <StatCard key={idx} {...stat} />
           ))}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <InfoSection title="Agent's Information" items={USER_INFO} columns={1} />
+          <InfoSection title="Agent's Information" items={userInfo} columns={1} />
           <div className="grid grid-rows-1 gap-6">
-            <InfoSection title="Wallet Address" items={WALLET_ADDRESS_INFO} columns={1} />
-            <InfoSection title="Sponsor Information" items={SPONSOR_INFO} columns={1} />
-            <InfoSection title="Bonus" items={BONUS_INFO} columns={1} />
+            <InfoSection title="Wallet Address" items={walletAddressInfo} columns={1} />
+            <InfoSection title="Sponsor Information" items={sponsorInfo} columns={1} />
+            <InfoSection title="Bonus" items={bonusInfo} columns={1} />
           </div>
         </div>
 

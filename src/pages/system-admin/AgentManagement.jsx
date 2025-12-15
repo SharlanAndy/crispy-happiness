@@ -118,13 +118,12 @@ export default function AgentManagement() {
   const handleCreateAgent = async (agentData) => {
     try {
       // Transform form data to match API expected format
+      // API requires: username, email, password, agent_type
       const apiData = {
+        username: agentData.username,
         email: agentData.email,
         password: agentData.password,
-        wallet_address: agentData.walletAddress,
-        sponsor_id: agentData.sponsorBy || '',
-        initial_bonus: agentData.initialBonus ? parseFloat(agentData.initialBonus) : 0,
-        bonus_currency: agentData.currency || 'USDT',
+        agent_type: agentData.agent_type,
       };
 
       const result = await api.systemadmin.createAgent(apiData);

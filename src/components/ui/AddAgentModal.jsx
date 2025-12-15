@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { Plus, X } from 'lucide-react';
-import { FormLabel, FormSection, TextInput, PasswordInput, TextInputWithDropdown } from '../form';
+import { FormLabel, FormSection, TextInput, PasswordInput, SelectInput } from '../form';
 
 const INITIAL_AGENT_DATA = {
+  username: '',
   email: '',
   password: '',
-  walletAddress: '',
-  initialBonus: '',
-  currency: 'USDT'
+  agent_type: ''
 };
 
-const CURRENCY_OPTIONS = ['USDT', 'USDC', 'ETH'];
+const AGENT_TYPE_OPTIONS = [
+  { value: 't1', label: 'T1' },
+  { value: 't2', label: 'T2' }
+];
 
 export default function AddAgentModal({ isOpen, onClose, onSubmit }) {
   const [formData, setFormData] = useState(INITIAL_AGENT_DATA);
@@ -34,24 +36,6 @@ export default function AddAgentModal({ isOpen, onClose, onSubmit }) {
 
   // Reusable field renderer
   const renderField = (Component, label, field, props = {}) => {
-    // Special handling for TextInputWithDropdown
-    if (Component === TextInputWithDropdown && props.dropdownField) {
-      const { dropdownField, dropdownOptions, ...restProps } = props;
-      return (
-        <FormLabel label={label}>
-          <Component
-            value={formData[field]}
-            onChange={(e) => handleChange(field, e.target.value)}
-            dropdownValue={formData[dropdownField]}
-            onDropdownChange={(e) => handleChange(dropdownField, e.target.value)}
-            dropdownOptions={dropdownOptions}
-            {...restProps}
-          />
-        </FormLabel>
-      );
-    }
-
-    // Default rendering for other components
     return (
       <FormLabel label={label}>
         <Component
@@ -81,29 +65,17 @@ export default function AddAgentModal({ isOpen, onClose, onSubmit }) {
           <div className="flex flex-col gap-6">
             {/* Agent's Information */}
             <FormSection title="Agent's Information">
-              {renderField(TextInput, 'Email Address', 'email', { placeholder: 'agent@example.com', type: 'email' })}
-              {renderField(PasswordInput, 'Password', 'password', { placeholder: 'Insert password here' })}
-            </FormSection>
-
-            {/* Wallet Setup */}
-            <FormSection title="Wallet Setup">
-              {renderField(TextInput, 'Wallet Address', 'walletAddress', { placeholder: 'Insert wallet address here' })}
-            </FormSection>
-
-            {/* Sponsor Setup */}
-            <FormSection title="Sponsor Setup">
-              {renderField(TextInput, 'Sponsor By', 'sponsorBy', { placeholder: 'Insert referral ID here' })}
-            </FormSection>
-
-            {/* Initial Bonus Settings */}
-            <FormSection title="Initial Bonus Settings">
-              {renderField(TextInputWithDropdown, 'Initial Bonus Amount', 'initialBonus', {
-                type: 'number',
-                placeholder: '0.00',
-                step: '0.01',
-                dropdownField: 'currency',
-                dropdownOptions: CURRENCY_OPTIONS
-              })}
+              {renderField(TextInput, 'Username', 'username', { placeholder: 'Enter username', required: true })}
+              {renderField(TextInput, 'Email Address', 'email', { placeholder: 'agent@example.com', type: 'email', required: true })}
+              {renderField(PasswordInput, 'Password', 'password', { placeholder: 'Insert password here', required: true })}
+              <FormLabel label="Agent Type">
+                <SelectInput
+                  value={formData.agent_type}
+                  onChange={(e) => handleChange('agent_type', e.target.value)}
+                  options={AGENT_TYPE_OPTIONS}
+                  placeholder="Select agent type"
+                />
+              </FormLabel>
             </FormSection>
           </div>
         </form>
