@@ -517,6 +517,13 @@ export const api = {
 
     // Withdrawal Management
     /**
+     * Get withdrawal statistics.
+     * Headers: Authorization: Bearer <token>
+     * @returns {Promise<Object>} { success, data: { approved_count, pending_count, rejected_count, total_amount } }
+     */
+    getWithdrawalStats: () => request(`${T3SYSTEMADMIN_BASE}/withdrawals/stats`, { method: 'GET' }),
+
+    /**
      * Get pending withdrawal applications.
      * Headers: Authorization: Bearer <token>
      * @param {Object} params - { page, search, status }
@@ -843,6 +850,49 @@ export const api = {
       const query = new URLSearchParams(params).toString();
       return request(`${T3SYSTEMADMIN_BASE}/activities?${query}`, { method: 'GET' });
     },
+
+    // Withdrawal Statistics
+    /**
+     * Get withdrawal statistics.
+     * Headers: Authorization: Bearer <token>
+     * @returns {Promise<Object>} { success, data: { approved_count, pending_count, rejected_count, total_amount } }
+     */
+    getWithdrawalStats: () => request(`${T3SYSTEMADMIN_BASE}/withdrawals/stats`, { method: 'GET' }),
+
+    // API Keys & Logs
+    /**
+     * Get API keys list.
+     * Headers: Authorization: Bearer <token>
+     * @returns {Promise<Object>} { success, data: [...] }
+     */
+    getAPIKeys: () => request(`${T3SYSTEMADMIN_BASE}/api-keys`, { method: 'GET' }),
+
+    /**
+     * Create a new API key.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} data - { key_name, backend_url, merchant_key }
+     * @returns {Promise<Object>} { success, message, data: { id, key_name, api_key, secret_key, merchant_key, backend_url } }
+     */
+    createAPIKey: (data) => request(`${T3SYSTEMADMIN_BASE}/api-keys`, { method: 'POST', body: JSON.stringify(data) }),
+
+    /**
+     * Get API logs.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} params - { page, search }
+     * @returns {Promise<Object>} { success, data: [...], page, limit }
+     */
+    getAPILogs: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`${T3SYSTEMADMIN_BASE}/api-logs?${query}`, { method: 'GET' });
+    },
+
+    /**
+     * Update callback settings.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} data - { backend_url, key_id }
+     * @returns {Promise<Object>} { success, message }
+     */
+    updateCallbackSettings: (data) => request(`${T3SYSTEMADMIN_BASE}/callback-settings`, { method: 'PUT', body: JSON.stringify(data) }),
   },
 
   // ============================================================================

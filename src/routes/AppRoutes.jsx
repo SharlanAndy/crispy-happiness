@@ -80,6 +80,7 @@ export default function AppRoutes() {
           <Route path="logs" element={<SystemLogs />} />
           <Route path="transactions" element={<TransactionManagement />} />
           <Route path="transactions/:id" element={<TransactionDetails />} />
+          <Route path="withdrawal-history" element={<WithdrawalHistory />} />
           <Route path="currency" element={<CurrencyManagement />} />
           <Route path="currency/add" element={<CurrencyForm />} />
           <Route path="currency/:id/view" element={<CurrencyForm />} />

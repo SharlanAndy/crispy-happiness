@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader } from '../../components/ui';
 import { filterAndPaginate } from '@/lib/pagination';
 import { t3Service } from '@/services/t3Service';
+import { api } from '@/lib/api';
 
 const ITEMS_PER_PAGE = 10;
 const SEARCH_KEYS = ['id', 'wallet', 'amount'];
@@ -42,12 +43,50 @@ const WITHDRAWALS_BY_STATUS = {
 
 export default function WithdrawalHistory() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState('approved');
   const [loading, setLoading] = useState(true);
   const [withdrawalsData, setWithdrawalsData] = useState({ approved: [], rejected: [] });
-  const [statsData, setStatsData] = useState(null);
+  const [withdrawalStats, setWithdrawalStats] = useState(null);
+
+  // Detect if accessed from System Admin or T3 Admin
+  const isSystemAdmin = location.pathname.startsWith('/system-admin');
+
+  // Fetch withdrawal stats from API
+  useEffect(() => {
+    const fetchWithdrawalStats = async () => {
+      try {
+        console.log('Fetching withdrawal stats...');
+        const statsResult = await api.systemadmin.getWithdrawalStats();
+        console.log('Withdrawal stats result:', statsResult);
+        if (statsResult && statsResult.success && statsResult.data) {
+          setWithdrawalStats(statsResult.data);
+        } else {
+          console.warn('Withdrawal stats response invalid:', statsResult);
+          // Default to 0 if no data
+          setWithdrawalStats({
+            approved_count: 0,
+            pending_count: 0,
+            rejected_count: 0,
+            total_amount: 0
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch withdrawal stats:', error);
+        console.error('Error details:', error.response || error.message);
+        // Default to 0 on error
+        setWithdrawalStats({
+          approved_count: 0,
+          pending_count: 0,
+          rejected_count: 0,
+          total_amount: 0
+        });
+      }
+    };
+    fetchWithdrawalStats();
+  }, []);
 
   // Fetch withdrawals history
   useEffect(() => {
@@ -82,16 +121,7 @@ export default function WithdrawalHistory() {
           setWithdrawalsData(prev => ({ ...prev, rejected }));
         }
 
-        // Calculate stats
-        const totalApproved = approvedResult.success ? approvedResult.data.length : 0;
-        const totalRejected = rejectedResult.success ? rejectedResult.data.length : 0;
-        const totalAmount = [...(approvedResult.success ? approvedResult.data : []), ...(rejectedResult.success ? rejectedResult.data : [])]
-          .reduce((sum, w) => sum + (w.amount || 0), 0);
-        setStatsData({
-          approved: totalApproved,
-          rejected: totalRejected,
-          totalAmount: totalAmount
-        });
+        // Stats are now fetched from the stats endpoint, no need to calculate here
       } catch (error) {
         console.error('Failed to fetch withdrawal history:', error);
         setWithdrawalsData({ approved: [], rejected: [] });
@@ -100,7 +130,7 @@ export default function WithdrawalHistory() {
       }
     };
     fetchWithdrawals();
-  }, [currentPage, activeTab]);
+  }, [currentPage, activeTab, isSystemAdmin, withdrawalStats]);
 
   // Dynamic columns based on active tab
   const columns = useMemo(() => [
@@ -131,19 +161,21 @@ export default function WithdrawalHistory() {
     setSearchTerm('');
   };
 
+  const basePath = isSystemAdmin ? '/system-admin' : '/t3-admin';
+  
   const actions = useMemo(() => [
     {
       icon: <Eye size={16} />,
-      onClick: (row) => navigate(`/t3-admin/withdrawals/${row.id}`, { 
+      onClick: (row) => navigate(`${basePath}/withdrawals/${row.id}`, { 
         state: { 
           fromHistory: true, 
-          returnPath: '/t3-admin/withdrawal-history',
+          returnPath: `${basePath}/withdrawal-history`,
           withdrawalStatus: row.status
         } 
       }),
       tooltip: 'View Details',
     },
-  ], [navigate]);
+  ], [navigate, basePath]);
 
   return (
     <div className="space-y-6">
@@ -155,17 +187,17 @@ export default function WithdrawalHistory() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <StatCard 
           label="Total Withdraw Approve" 
-          value={statsData?.approved?.toString() || '0'} 
+          value={(withdrawalStats?.approved_count || 0).toString()} 
           lastUpdate={new Date().toLocaleDateString('en-GB')} 
         />
         <StatCard 
           label="Total Withdraw Reject" 
-          value={statsData?.rejected?.toString() || '0'} 
+          value={(withdrawalStats?.rejected_count || 0).toString()} 
           lastUpdate={new Date().toLocaleDateString('en-GB')} 
         />
         <StatCard 
           label="Total Withdraw Amount" 
-          value={`${(statsData?.totalAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`} 
+          value={`${(withdrawalStats?.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`} 
           lastUpdate={new Date().toLocaleDateString('en-GB')} 
         />
       </div>

@@ -15,13 +15,14 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [usersData, setUsersData] = useState([]);
   const [usersMeta, setUsersMeta] = useState(null); // Store metadata from users endpoint
+  const [allUsersForStats, setAllUsersForStats] = useState([]); // Store all users from page 1 for stats calculation (System Admin only)
   const [paginationMeta, setPaginationMeta] = useState({ total: 0, limit: 20, page: 1 }); // Store pagination metadata
 
   // Detect if accessed from T3 Admin or System Admin
   const isT3Admin = location.pathname.startsWith('/t3-admin');
   const basePath = isT3Admin ? '/t3-admin' : '/system-admin';
 
-  // Fetch stats from users endpoint (page 1)
+  // Fetch stats from users endpoint (page 1) - for System Admin, store raw data for stats calculation
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -32,14 +33,22 @@ export default function UserManagement() {
             setUsersMeta(statsResult.meta || statsResult);
           }
         } else {
+          // System Admin - fetch page 1 to get all users for stats calculation
           const statsResult = await api.systemadmin.getUsers({ page: 1 });
           if (statsResult && statsResult.success) {
-            // Store metadata from page 1 for stats - check both meta and root level
+            // Store metadata from page 1 for last update date
             setUsersMeta(statsResult.meta || statsResult);
+            // Store raw user data from page 1 for stats calculation
+            setAllUsersForStats(statsResult.data || []);
+          } else {
+            setUsersMeta(null);
+            setAllUsersForStats([]);
           }
         }
       } catch (error) {
         console.error('Failed to fetch stats:', error);
+        setUsersMeta(null);
+        setAllUsersForStats([]);
       }
     };
     fetchStats();
@@ -91,7 +100,10 @@ export default function UserManagement() {
               spend: `${(user.total_spend || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
               bonus: `${(user.total_bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
               join: user.join_time ? new Date(user.join_time).toLocaleString('en-GB') : 'N/A',
-              status: user.status || 'Active'
+              status: user.status || 'Active',
+              rawTotalBonus: user.total_bonus || 0, // Store raw bonus value for calculations
+              rawTotalSpend: user.total_spend || 0, // Store raw spend value for calculations
+              rawStatus: user.status || '' // Store raw status for filtering
             }));
             setUsersData(transformed);
             
@@ -153,7 +165,7 @@ export default function UserManagement() {
   // Use data directly from API (server-side pagination)
   const users = usersData;
 
-  // Extract stats from users endpoint response
+  // Calculate stats from users data (for System Admin) or from metadata (for T3 Admin)
   const stats = useMemo(() => {
     // Get last updated date from users endpoint response, default to today
     const getLastUpdated = () => {
@@ -183,44 +195,81 @@ export default function UserManagement() {
 
     const lastUpdate = getLastUpdated();
 
-    // Extract values from users endpoint response - check both root level and meta
-    const totalActiveUsers = usersMeta?.total_users || 
-                             usersMeta?.total_active_users || 
-                             usersMeta?.TotalUsers ||
-                             usersMeta?.TotalActiveUsers ||
-                             0;
+    if (isT3Admin) {
+      // For T3 Admin, extract from metadata (existing logic)
+      const totalActiveUsers = usersMeta?.total_users || 
+                               usersMeta?.total_active_users || 
+                               usersMeta?.TotalUsers ||
+                               usersMeta?.TotalActiveUsers ||
+                               0;
 
-    const totalBonusDistributed = usersMeta?.total_bonus_distributed || 
-                                  usersMeta?.total_bonus || 
-                                  usersMeta?.TotalBonusDistributed ||
-                                  usersMeta?.TotalBonus ||
+      const totalBonusDistributed = usersMeta?.total_bonus_distributed || 
+                                    usersMeta?.total_bonus || 
+                                    usersMeta?.TotalBonusDistributed ||
+                                    usersMeta?.TotalBonus ||
+                                    0;
+
+      const totalSpendingVolume = usersMeta?.total_spending_volume || 
+                                  usersMeta?.total_incoming_funds || 
+                                  usersMeta?.total_spend ||
+                                  usersMeta?.TotalSpendingVolume ||
+                                  usersMeta?.TotalIncomingFunds ||
                                   0;
 
-    const totalSpendingVolume = usersMeta?.total_spending_volume || 
-                                usersMeta?.total_incoming_funds || 
-                                usersMeta?.total_spend ||
-                                usersMeta?.TotalSpendingVolume ||
-                                usersMeta?.TotalIncomingFunds ||
-                                0;
+      return [
+        { 
+          label: 'Total Active User', 
+          value: totalActiveUsers.toString(), 
+          lastUpdate: lastUpdate 
+        },
+        { 
+          label: 'Total Bonus Distributed', 
+          value: `${totalBonusDistributed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
+          lastUpdate: lastUpdate 
+        },
+        { 
+          label: 'Total Spending Volume', 
+          value: `${totalSpendingVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
+          lastUpdate: lastUpdate 
+        },
+      ];
+    } else {
+      // For System Admin, calculate from actual user data array
+      // Calculate Total Active User: count users with status === 'active' (case-insensitive)
+      const totalActiveUsers = allUsersForStats.filter(user => {
+        const status = (user.status || '').toLowerCase();
+        return status === 'active';
+      }).length;
 
-    return [
-      { 
-        label: 'Total Active User', 
-        value: totalActiveUsers.toString(), 
-        lastUpdate: lastUpdate 
-      },
-      { 
-        label: 'Total Bonus Distributed', 
-        value: `${totalBonusDistributed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
-        lastUpdate: lastUpdate 
-      },
-      { 
-        label: 'Total Spending Volume', 
-        value: `${totalSpendingVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
-        lastUpdate: lastUpdate 
-      },
-    ];
-  }, [usersMeta]);
+      // Calculate Total Bonus Distributed: sum of all total_bonus values
+      const totalBonusDistributed = allUsersForStats.reduce((sum, user) => {
+        return sum + (user.total_bonus || 0);
+      }, 0);
+
+      // Calculate Total Spending Volume: sum of all total_spend values
+      const totalSpendingVolume = allUsersForStats.reduce((sum, user) => {
+        return sum + (user.total_spend || 0);
+      }, 0);
+
+      return [
+        { 
+          label: 'Total Active User', 
+          value: totalActiveUsers.toString(), 
+          lastUpdate: lastUpdate 
+        },
+        { 
+          label: 'Total Bonus Distributed', 
+          value: `${totalBonusDistributed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
+          lastUpdate: lastUpdate 
+        },
+        { 
+          label: 'Total Spending Volume', 
+          value: `${totalSpendingVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
+          lastUpdate: lastUpdate 
+        },
+      ];
+    }
+  }, [usersMeta, allUsersForStats, isT3Admin]);
 
   // Different columns for T3 Admin vs System Admin
   const columns = isT3Admin ? [

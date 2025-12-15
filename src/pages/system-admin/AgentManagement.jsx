@@ -17,7 +17,7 @@ export default function AgentManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [agentsData, setAgentsData] = useState([]);
-  const [dashboardData, setDashboardData] = useState(null);
+  const [agentsMeta, setAgentsMeta] = useState(null);
   const { handleApiResponse, showError } = useToast();
 
   // Fetch agents data
@@ -25,10 +25,7 @@ export default function AgentManagement() {
     const fetchAgents = async () => {
       try {
         setLoading(true);
-        const [agentsResult, dashboardResult] = await Promise.all([
-          api.systemadmin.getAgents({ page: 1 }), // Fetch all, filter client-side
-          api.systemadmin.getDashboard()
-        ]);
+        const agentsResult = await api.systemadmin.getAgents({ page: 1 });
 
         if (agentsResult && agentsResult.success) {
           const transformed = agentsResult.data.map(a => ({
@@ -37,19 +34,21 @@ export default function AgentManagement() {
             l1: (a.level1 || 0).toString(),
             l2: (a.level2 || 0).toString(),
             join: a.join_time ? new Date(a.join_time).toLocaleString('en-GB') : 'N/A',
-            status: a.status || 'Active'
+            status: a.status || 'Active',
+            rawBonus: a.bonus || 0, // Store raw bonus value for calculations
+            rawStatus: a.status || '' // Store raw status for filtering
           }));
           setAgentsData(transformed);
+          // Store meta information from response
+          setAgentsMeta(agentsResult.meta || agentsResult);
         } else {
           setAgentsData([]);
-        }
-
-        if (dashboardResult && dashboardResult.success) {
-          setDashboardData(dashboardResult.data);
+          setAgentsMeta(null);
         }
       } catch (error) {
         console.error('Failed to fetch agents:', error);
         setAgentsData([]);
+        setAgentsMeta(null);
       } finally {
         setLoading(false);
       }
@@ -68,38 +67,61 @@ export default function AgentManagement() {
     [agentsData, searchTerm, currentPage]
   );
 
-  // Helper function to get last updated date from API or fallback
-  const getLastUpdated = () => {
-    if (dashboardData) {
-      // Try different possible field names from API
-      const lastUpdated = dashboardData.last_updated_date ||
-                          dashboardData.last_updated || 
-                          dashboardData.updated_at || 
-                          dashboardData.last_update ||
-                          dashboardData.updated_at_date;
-      
-      if (lastUpdated) {
-        try {
-          const date = new Date(lastUpdated);
-          if (!isNaN(date.getTime())) {
-            return date.toLocaleDateString('en-GB');
+  // Calculate stats from agents data
+  const stats = useMemo(() => {
+    // Helper function to get last updated date from API or fallback to today
+    const getLastUpdated = () => {
+      if (agentsMeta) {
+        // Try different possible field names from API
+        const lastUpdated = agentsMeta.last_updated_date ||
+                            agentsMeta.last_updated || 
+                            agentsMeta.updated_at || 
+                            agentsMeta.last_update ||
+                            agentsMeta.updated_at_date ||
+                            agentsMeta.LastUpdated ||
+                            agentsMeta.UpdatedAt;
+        
+        if (lastUpdated) {
+          try {
+            const date = new Date(lastUpdated);
+            if (!isNaN(date.getTime())) {
+              return date.toLocaleDateString('en-GB');
+            }
+          } catch (e) {
+            console.warn('Failed to parse last_updated date:', e);
           }
-        } catch (e) {
-          console.warn('Failed to parse last_updated date:', e);
         }
       }
-    }
-    // Fallback to today's date
-    return new Date().toLocaleDateString('en-GB');
-  };
+      // Default to today's date
+      return new Date().toLocaleDateString('en-GB');
+    };
 
-  const stats = dashboardData ? [
-    { label: 'Total Active Agent', value: dashboardData.total_active_agents?.toString() || '0', lastUpdate: getLastUpdated() },
-    { label: 'Total Bonus Distributed', value: `${(dashboardData.total_bonus_distributed || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, lastUpdate: getLastUpdated() },
-  ] : [
-    { label: 'Total Active Agent', value: '0', lastUpdate: 'No data' },
-    { label: 'Total Bonus Distributed', value: '0.00 USDT', lastUpdate: 'No data' },
-  ];
+    const lastUpdate = getLastUpdated();
+
+    // Calculate Total Active Agent: count agents with status === 'active' (case-insensitive)
+    const totalActiveAgents = agentsData.filter(a => {
+      const status = (a.rawStatus || '').toLowerCase();
+      return status === 'active';
+    }).length;
+
+    // Calculate Total Bonus Distributed: sum of all bonus values
+    const totalBonusDistributed = agentsData.reduce((sum, a) => {
+      return sum + (a.rawBonus || 0);
+    }, 0);
+
+    return [
+      { 
+        label: 'Total Active Agent', 
+        value: totalActiveAgents.toString(), 
+        lastUpdate: lastUpdate 
+      },
+      { 
+        label: 'Total Bonus Distributed', 
+        value: `${totalBonusDistributed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
+        lastUpdate: lastUpdate 
+      },
+    ];
+  }, [agentsData, agentsMeta]);
 
   const columns = [
     { key: 'id', label: 'Agent ID' },
@@ -136,10 +158,7 @@ export default function AgentManagement() {
 
       if (result && result.success) {
         // Refresh agent list
-        const [agentsResult, dashboardResult] = await Promise.all([
-          api.systemadmin.getAgents({ page: 1 }),
-          api.systemadmin.getDashboard()
-        ]);
+        const agentsResult = await api.systemadmin.getAgents({ page: 1 });
 
         if (agentsResult && agentsResult.success) {
           const transformed = agentsResult.data.map(a => ({
@@ -148,13 +167,12 @@ export default function AgentManagement() {
             l1: (a.level1 || 0).toString(),
             l2: (a.level2 || 0).toString(),
             join: a.join_time ? new Date(a.join_time).toLocaleString('en-GB') : 'N/A',
-            status: a.status || 'Active'
+            status: a.status || 'Active',
+            rawBonus: a.bonus || 0,
+            rawStatus: a.status || ''
           }));
           setAgentsData(transformed);
-        }
-
-        if (dashboardResult && dashboardResult.success) {
-          setDashboardData(dashboardResult.data);
+          setAgentsMeta(agentsResult.meta || agentsResult);
         }
 
         setShowAddModal(false);

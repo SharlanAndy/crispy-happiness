@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, Check, X } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, ConfirmDialog, VerificationModal } from '../../components/ui';
 import { filterAndPaginate } from '@/lib/pagination';
 import { t3Service } from '@/services/t3Service';
+import { api } from '@/lib/api';
 
 const ITEMS_PER_PAGE = 10;
 const SEARCH_KEYS = ['id', 'merchant', 'wallet', 'ref'];
@@ -34,13 +35,51 @@ const COLUMNS = [
 
 export default function WithdrawalManagement() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
   const [approveModal, setApproveModal] = useState({ isOpen: false, item: null });
   const [rejectConfirm, setRejectConfirm] = useState({ isOpen: false, item: null });
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [withdrawalsData, setWithdrawalsData] = useState([]);
-  const [statsData, setStatsData] = useState(null);
+  const [withdrawalStats, setWithdrawalStats] = useState(null);
+
+  // Detect if accessed from System Admin or T3 Admin
+  const isSystemAdmin = location.pathname.startsWith('/system-admin');
+
+  // Fetch withdrawal stats from API
+  useEffect(() => {
+    const fetchWithdrawalStats = async () => {
+      try {
+        console.log('Fetching withdrawal stats...');
+        const statsResult = await api.systemadmin.getWithdrawalStats();
+        console.log('Withdrawal stats result:', statsResult);
+        if (statsResult && statsResult.success && statsResult.data) {
+          setWithdrawalStats(statsResult.data);
+        } else {
+          console.warn('Withdrawal stats response invalid:', statsResult);
+          // Default to 0 if no data
+          setWithdrawalStats({
+            approved_count: 0,
+            pending_count: 0,
+            rejected_count: 0,
+            total_amount: 0
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch withdrawal stats:', error);
+        console.error('Error details:', error.response || error.message);
+        // Default to 0 on error
+        setWithdrawalStats({
+          approved_count: 0,
+          pending_count: 0,
+          rejected_count: 0,
+          total_amount: 0
+        });
+      }
+    };
+    fetchWithdrawalStats();
+  }, []);
 
   // Fetch withdrawals data
   useEffect(() => {
@@ -66,14 +105,8 @@ export default function WithdrawalManagement() {
             rawData: w // Keep raw data for API calls
           }));
           setWithdrawalsData(transformed);
-          
-          // Calculate stats
-          const totalPending = result.data.length;
-          const totalAmount = result.data.reduce((sum, w) => sum + (w.amount || 0), 0);
-          setStatsData({
-            pending: totalPending,
-            totalAmount: totalAmount
-          });
+        } else {
+          setWithdrawalsData([]);
         }
       } catch (error) {
         console.error('Failed to fetch withdrawals:', error);
@@ -127,6 +160,11 @@ export default function WithdrawalManagement() {
           }));
           setWithdrawalsData(transformed);
         }
+        // Refresh stats
+        const statsResult = await api.systemadmin.getWithdrawalStats();
+        if (statsResult && statsResult.success && statsResult.data) {
+          setWithdrawalStats(statsResult.data);
+        }
       } else {
         alert('Failed to approve withdrawal. Please try again.');
       }
@@ -164,6 +202,11 @@ export default function WithdrawalManagement() {
             rawData: w
           }));
           setWithdrawalsData(transformed);
+        }
+        // Refresh stats
+        const statsResult = await api.systemadmin.getWithdrawalStats();
+        if (statsResult && statsResult.success && statsResult.data) {
+          setWithdrawalStats(statsResult.data);
         }
       } else {
         alert('Failed to reject withdrawal. Please try again.');
@@ -209,17 +252,17 @@ export default function WithdrawalManagement() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <StatCard 
             label="Current Withdraw Application" 
-            value={statsData?.pending?.toString() || '0'} 
+            value={(withdrawalStats?.pending_count || 0).toString()} 
             lastUpdate={new Date().toLocaleDateString('en-GB')} 
           />
           <StatCard 
             label="Total Withdraw Approve" 
-            value="N/A" 
+            value={(withdrawalStats?.approved_count || 0).toString()} 
             lastUpdate={new Date().toLocaleDateString('en-GB')} 
           />
           <StatCard 
             label="Total Withdraw Amount" 
-            value={`${(statsData?.totalAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`} 
+            value={`${(withdrawalStats?.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`} 
             lastUpdate={new Date().toLocaleDateString('en-GB')} 
           />
         </div>
