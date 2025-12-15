@@ -67,9 +67,9 @@ export default function BonusManagement() {
       try {
         setLoading(true);
         const params = { page: currentPage };
-        if (searchTerm && searchTerm.trim()) {
-          params.search = searchTerm.trim();
-        }
+        // Add search parameter with lowercase tab value (system, partner, agent, merchant, user)
+        // Default to 'system' if activeBonus is not set
+        params.search = (activeBonus || 'System').toLowerCase();
         const result = await api.systemadmin.getBonusClaims(params);
         if (result && result.success) {
           const transformed = result.data.map(b => ({
@@ -96,7 +96,7 @@ export default function BonusManagement() {
       }
     };
     fetchBonusClaims();
-  }, [currentPage, searchTerm]);
+  }, [currentPage, searchTerm, activeBonus]);
 
   // Fetch bonus unclaims - fetch all pages if pagination is supported
   useEffect(() => {
@@ -107,10 +107,13 @@ export default function BonusManagement() {
         let page = 1;
         let hasMorePages = true;
         const limit = 20; // Default limit from API response
+        // Add search parameter with lowercase tab value (system, partner, agent, merchant, user)
+        // Default to 'system' if activeBonusUnclaim is not set
+        const searchParam = (activeBonusUnclaim || 'System').toLowerCase();
 
         // Fetch all pages sequentially
         while (hasMorePages) {
-          const result = await api.systemadmin.getBonusUnclaims({ page });
+          const result = await api.systemadmin.getBonusUnclaims({ page, search: searchParam });
           
           if (result && result.success && result.data && Array.isArray(result.data)) {
             // Add current page data
@@ -139,9 +142,9 @@ export default function BonusManagement() {
               }
             }
           } else {
-            // If first page fails, try without pagination parameter
+            // If first page fails, try without pagination parameter but with search
             if (page === 1) {
-              const resultNoPage = await api.systemadmin.getBonusUnclaims();
+              const resultNoPage = await api.systemadmin.getBonusUnclaims({ search: searchParam });
               if (resultNoPage && resultNoPage.success && resultNoPage.data && Array.isArray(resultNoPage.data)) {
                 allUnclaims = resultNoPage.data;
               }
@@ -172,7 +175,7 @@ export default function BonusManagement() {
       }
     };
     fetchBonusUnclaims();
-  }, []); // Fetch once on mount
+  }, [activeBonusUnclaim]); // Fetch once on mount
 
   // Fetch monthly bonus
   useEffect(() => {
@@ -278,27 +281,56 @@ export default function BonusManagement() {
 
   const BONUS_TIERS = ['System', 'Partner', 'Agent', 'Merchant', 'User'];
 
-  // Filter by bonus tier first, then search and paginate
-  const filteredClaimList = bonusClaimsData.filter(item => item.bonusTier === activeBonus);
+  // No need to filter by bonus tier client-side since API handles it via search parameter
+  // Only apply client-side search if user has entered a search term
   const { data: claimList, totalPages } = useMemo(
-    () => filterAndPaginate(filteredClaimList, searchTerm, TRANSACTION_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
-    [filteredClaimList, searchTerm, currentPage]
+    () => {
+      if (searchTerm && searchTerm.trim()) {
+        // If user has entered search, filter client-side
+        const filtered = bonusClaimsData.filter(item => 
+          TRANSACTION_SEARCH_KEYS.some(key => {
+            const value = item[key]?.toString().toLowerCase() || '';
+            return value.includes(searchTerm.toLowerCase());
+          })
+        );
+        return filterAndPaginate(filtered, '', TRANSACTION_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE);
+      }
+      // Otherwise, just paginate the API-filtered data
+      return filterAndPaginate(bonusClaimsData, '', TRANSACTION_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE);
+    },
+    [bonusClaimsData, searchTerm, currentPage]
   );
 
-  const filteredUnclaimList = bonusUnclaimsData.filter(item => item.bonusTier === activeBonusUnclaim);
+  // No need to filter by bonus tier client-side since API handles it via search parameter
+  // Only apply client-side search if user has entered a search term
   const { data: unclaimList, totalPages: totalPagesUnclaim } = useMemo(
-    () => filterAndPaginate(filteredUnclaimList, searchTermUnclaim, ['id', 'status'], currentPageUnclaim, ITEMS_PER_PAGE),
-    [filteredUnclaimList, searchTermUnclaim, currentPageUnclaim]
+    () => {
+      if (searchTermUnclaim && searchTermUnclaim.trim()) {
+        // If user has entered search, filter client-side
+        const filtered = bonusUnclaimsData.filter(item => 
+          ['id', 'status'].some(key => {
+            const value = item[key]?.toString().toLowerCase() || '';
+            return value.includes(searchTermUnclaim.toLowerCase());
+          })
+        );
+        return filterAndPaginate(filtered, '', ['id', 'status'], currentPageUnclaim, ITEMS_PER_PAGE);
+      }
+      // Otherwise, just paginate the API-filtered data
+      return filterAndPaginate(bonusUnclaimsData, '', ['id', 'status'], currentPageUnclaim, ITEMS_PER_PAGE);
+    },
+    [bonusUnclaimsData, searchTermUnclaim, currentPageUnclaim]
   );
 
   const handleBonusChange = (bonusTier) => {
     setActiveBonus(bonusTier);
     setCurrentPage(1);
+    setSearchTerm(''); // Clear search when changing tabs
   };
 
   const handleBonusChangeUnclaim = (bonusTier) => {
     setActiveBonusUnclaim(bonusTier);
     setCurrentPageUnclaim(1);
+    setSearchTermUnclaim(''); // Clear search when changing tabs
   };
 
   // Handle search - reset to page 1

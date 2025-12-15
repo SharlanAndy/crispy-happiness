@@ -463,9 +463,15 @@ export const api = {
     /**
      * Get weekly incoming and outgoing funds data.
      * Headers: Authorization: Bearer <token>
-     * @returns {Promise<Object>} { success, data: { data: { incoming, outgoing } } }
+     * @param {Object} params - { filter: 'daily' | 'weekly' | 'monthly' | 'yearly' }
+     * @returns {Promise<Object>} { success, data: { data: { incoming: [], outgoing: [] }, date_range: "", filter: "weekly" } }
      */
-    getWeeklyFunds: () => request(`${T3SYSTEMADMIN_BASE}/funds/weekly`, { method: 'GET' }),
+    getWeeklyFunds: (params = {}) => {
+      // Default to 'weekly' if no filter is provided
+      const filterParams = { filter: params.filter || 'weekly' };
+      const query = new URLSearchParams(filterParams).toString();
+      return request(`${T3SYSTEMADMIN_BASE}/funds/weekly?${query}`, { method: 'GET' });
+    },
 
     // User Management
     /**

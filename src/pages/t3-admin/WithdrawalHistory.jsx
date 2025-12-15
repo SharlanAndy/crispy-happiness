@@ -96,7 +96,7 @@ export default function WithdrawalHistory() {
         // Fetch all history (no page param - using client-side pagination and search)
         const [approvedResult, rejectedResult] = await Promise.all([
           t3Service.getWithdrawalHistory({ page: 1, status: 'approved' }), // Fetch all, paginate client-side
-          t3Service.getWithdrawalHistory({ page: 1, status: 'rejected' }) // Fetch all, paginate client-side
+          t3Service.getWithdrawalHistory({ page: 1, status: 'reject' }) // Fetch all, paginate client-side
         ]);
 
         if (approvedResult.success) {

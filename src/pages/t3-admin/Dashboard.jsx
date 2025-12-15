@@ -10,9 +10,9 @@ export default function T3AdminDashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState('weekly'); // 'daily', 'weekly', 'monthly', 'yearly'
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingWeeklyFunds, setLoadingWeeklyFunds] = useState(false);
   const [dashboardData, setDashboardData] = useState(null);
   const [weeklyFundsData, setWeeklyFundsData] = useState(null);
-  const [loadingWeeklyFunds, setLoadingWeeklyFunds] = useState(false);
 
   // Calculate start date based on period from today
   const calculateStartDate = (period) => {
@@ -79,12 +79,14 @@ export default function T3AdminDashboard() {
     fetchDashboard();
   }, []);
 
-  // Fetch weekly funds data
+  // Fetch weekly funds data with filter parameter
   useEffect(() => {
     const fetchWeeklyFunds = async () => {
       try {
         setLoadingWeeklyFunds(true);
-        const result = await api.t3admin.getWeeklyFunds();
+        // Send filter parameter based on selected period (default to 'weekly')
+        const filter = selectedPeriod || 'weekly';
+        const result = await api.t3admin.getWeeklyFunds({ filter });
         if (result && result.success) {
           setWeeklyFundsData(result.data);
         } else {
@@ -98,7 +100,7 @@ export default function T3AdminDashboard() {
       }
     };
     fetchWeeklyFunds();
-  }, []);
+  }, [selectedPeriod]);
 
   // Scroll to top when page changes
   useEffect(() => {
@@ -133,10 +135,10 @@ export default function T3AdminDashboard() {
 
   // Transform API data to chart format
   const weeklyChartData = useMemo(() => {
-    // If API data is available and has the expected structure
-    // API response: { success: true, data: { data: { incoming, outgoing } } }
-    if (weeklyFundsData) {
-      const fundsData = weeklyFundsData.data || weeklyFundsData;
+    // API response structure: { success: true, data: { data: { incoming: [], outgoing: [] }, date_range: "", filter: "weekly" } }
+    // weeklyFundsData is the response.data object, so we access weeklyFundsData.data for the funds data
+    if (weeklyFundsData && weeklyFundsData.data) {
+      const fundsData = weeklyFundsData.data;
       const incoming = fundsData?.incoming;
       const outgoing = fundsData?.outgoing;
       
@@ -344,7 +346,7 @@ export default function T3AdminDashboard() {
           <div className="w-full">
             {loadingWeeklyFunds ? (
               <div className="h-[420px] flex items-center justify-center">
-                <p className="text-muted-foreground">Loading weekly funds data...</p>
+                <p className="text-muted-foreground">Loading funds data...</p>
               </div>
             ) : weeklyChartData && weeklyChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={420} minHeight={420}>
@@ -368,19 +370,19 @@ export default function T3AdminDashboard() {
             ) : (
               <div className="h-[420px] flex flex-col items-center justify-center">
                 <p className="text-muted-foreground mb-2">No weekly funds data available</p>
-                {weeklyFundsData && (
+                {weeklyFundsData && weeklyFundsData.data && (
                   <div className="text-sm text-muted-foreground space-y-1">
                     {(() => {
-                      const fundsData = weeklyFundsData.data || weeklyFundsData;
+                      const fundsData = weeklyFundsData.data;
                       const incoming = fundsData.incoming;
                       const outgoing = fundsData.outgoing;
                       return (
                         <>
                           {incoming !== null && incoming !== undefined && (
-                            <p>Incoming: {incoming || 0}</p>
+                            <p>Incoming: {Array.isArray(incoming) ? incoming.length : incoming || 0}</p>
                           )}
                           {outgoing !== null && outgoing !== undefined && (
-                            <p>Outgoing: {outgoing || 0}</p>
+                            <p>Outgoing: {Array.isArray(outgoing) ? outgoing.length : outgoing || 0}</p>
                           )}
                           {(incoming === null || incoming === undefined) && (outgoing === null || outgoing === undefined) && (
                             <p className="text-xs">Data is currently unavailable</p>

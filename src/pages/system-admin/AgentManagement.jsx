@@ -67,16 +67,16 @@ export default function AgentManagement() {
     [agentsData, searchTerm, currentPage]
   );
 
-  // Calculate stats from agents data
+  // Calculate stats from API response
   const stats = useMemo(() => {
     // Helper function to get last updated date from API or fallback to today
     const getLastUpdated = () => {
       if (agentsMeta) {
         // Try different possible field names from API
-        const lastUpdated = agentsMeta.last_updated_date ||
+        const lastUpdated = agentsMeta.last_update ||
+                            agentsMeta.last_updated_date ||
                             agentsMeta.last_updated || 
                             agentsMeta.updated_at || 
-                            agentsMeta.last_update ||
                             agentsMeta.updated_at_date ||
                             agentsMeta.LastUpdated ||
                             agentsMeta.UpdatedAt;
@@ -88,7 +88,7 @@ export default function AgentManagement() {
               return date.toLocaleDateString('en-GB');
             }
           } catch (e) {
-            console.warn('Failed to parse last_updated date:', e);
+            console.warn('Failed to parse last_update date:', e);
           }
         }
       }
@@ -98,16 +98,11 @@ export default function AgentManagement() {
 
     const lastUpdate = getLastUpdated();
 
-    // Calculate Total Active Agent: count agents with status === 'active' (case-insensitive)
-    const totalActiveAgents = agentsData.filter(a => {
-      const status = (a.rawStatus || '').toLowerCase();
-      return status === 'active';
-    }).length;
+    // Get Total Active Agent from API response
+    const totalActiveAgents = agentsMeta?.total_active_agents ?? 0;
 
-    // Calculate Total Bonus Distributed: sum of all bonus values
-    const totalBonusDistributed = agentsData.reduce((sum, a) => {
-      return sum + (a.rawBonus || 0);
-    }, 0);
+    // Get Total Bonus Distributed from API response
+    const totalBonusDistributed = agentsMeta?.total_agent_bonus ?? 0;
 
     return [
       { 
@@ -121,7 +116,7 @@ export default function AgentManagement() {
         lastUpdate: lastUpdate 
       },
     ];
-  }, [agentsData, agentsMeta]);
+  }, [agentsMeta]);
 
   const columns = [
     { key: 'id', label: 'Agent ID' },
@@ -172,6 +167,7 @@ export default function AgentManagement() {
             rawStatus: a.status || ''
           }));
           setAgentsData(transformed);
+          // Store full response including total_active_agents, total_agent_bonus, and last_update
           setAgentsMeta(agentsResult.meta || agentsResult);
         }
 
