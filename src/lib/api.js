@@ -51,7 +51,7 @@ async function request(endpoint, options = {}) {
     let responseData;
     try {
       responseData = await response.json();
-    } catch (parseError) {
+    } catch {
       // If response is not JSON, create error object
       const text = await response.text();
       responseData = { 
