@@ -5,6 +5,7 @@ import { StatCard, DataTable, SearchBar, PageHeader, ConfirmDialog, Verification
 import { filterAndPaginate } from '@/lib/pagination';
 import { t3Service } from '@/services/t3Service';
 import { api } from '@/lib/api';
+import { useToast } from '@/contexts/ToastContext';
 
 const ITEMS_PER_PAGE = 10;
 const SEARCH_KEYS = ['id', 'merchant', 'wallet', 'ref'];
@@ -36,6 +37,7 @@ const COLUMNS = [
 export default function WithdrawalManagement() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { showSuccess, showError } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [approveModal, setApproveModal] = useState({ isOpen: false, item: null });
   const [rejectConfirm, setRejectConfirm] = useState({ isOpen: false, item: null });
@@ -140,7 +142,7 @@ export default function WithdrawalManagement() {
     try {
       const result = await t3Service.approveWithdrawal(withdrawalId);
       if (result.success) {
-        alert('Withdrawal approved successfully!');
+        showSuccess('Withdrawal approved successfully!');
         // Refresh the list
         const refreshResult = await t3Service.getWithdrawalApplications({ 
           page: currentPage, 
@@ -166,11 +168,11 @@ export default function WithdrawalManagement() {
           setWithdrawalStats(statsResult.data);
         }
       } else {
-        alert('Failed to approve withdrawal. Please try again.');
+        showError('Failed to approve withdrawal. Please try again.');
       }
     } catch (error) {
       console.error('Failed to approve withdrawal:', error);
-      alert('Failed to approve withdrawal. Please try again.');
+      showError('Failed to approve withdrawal. Please try again.');
     } finally {
       setApproveModal({ isOpen: false, item: null });
     }
@@ -183,7 +185,7 @@ export default function WithdrawalManagement() {
     try {
       const result = await t3Service.rejectWithdrawal(withdrawalId);
       if (result.success) {
-        alert('Withdrawal rejected successfully!');
+        showSuccess('Withdrawal rejected successfully!');
         // Refresh the list
         const refreshResult = await t3Service.getWithdrawalApplications({ 
           page: currentPage, 
@@ -209,11 +211,11 @@ export default function WithdrawalManagement() {
           setWithdrawalStats(statsResult.data);
         }
       } else {
-        alert('Failed to reject withdrawal. Please try again.');
+        showError('Failed to reject withdrawal. Please try again.');
       }
     } catch (error) {
       console.error('Failed to reject withdrawal:', error);
-      alert('Failed to reject withdrawal. Please try again.');
+      showError('Failed to reject withdrawal. Please try again.');
     } finally {
       setRejectConfirm({ isOpen: false, item: null });
     }

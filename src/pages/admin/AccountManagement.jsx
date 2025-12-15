@@ -5,6 +5,8 @@ import { StatCard, DataTable, SearchBar, PageHeader, Modal, Button, FormField, C
 import { TextInput, PasswordInput } from '../../components/form';
 import { filterAndPaginate } from '@/lib/pagination';
 import { t3Service } from '@/services/t3Service';
+import { api } from '@/lib/api';
+import { useToast } from '@/contexts/ToastContext';
 
 const ITEMS_PER_PAGE = 10;
 const SEARCH_KEYS = ['id', 'username', 'character', 'status'];
@@ -27,6 +29,7 @@ const COLUMNS = [
 export default function AccountManagement() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { showSuccess, showError, handleApiResponse } = useToast();
   const [modalState, setModalState] = useState({ isOpen: false, mode: 'create', editingId: null });
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, item: null });
   const [searchTerm, setSearchTerm] = useState('');
@@ -119,36 +122,47 @@ export default function AccountManagement() {
 
   const handleSubmit = async () => {
     if (modalState.mode === 'create') {
-      if (isT3Admin) {
-        try {
-          const result = await t3Service.createAccount({
-            username: formData.username,
-            email: formData.email,
-            password: formData.password,
-            wallet_address: formData.walletAddress
-          });
-          if (result.success) {
+      try {
+        // Use the correct API endpoint with the required payload structure
+        const payload = {
+          username: formData.username,
+          email: formData.email,
+          password: formData.password,
+          wallet_address: formData.walletAddress
+        };
+        
+        console.log('Creating account with payload:', payload);
+        const result = await api.t3admin.createAccount(payload);
+        
+        handleApiResponse(result, {
+          successMessage: 'Account created successfully!',
+          errorMessage: result?.message || 'Failed to create account. Please try again.',
+          onSuccess: async () => {
             // Refresh accounts list
-            const fetchResult = await t3Service.getAccounts({ page: currentPage, search: searchTerm });
-            if (fetchResult.success) {
-              const transformed = fetchResult.data.map(acc => ({
-                id: acc.id.toString(),
-                username: acc.username,
-                character: acc.character || 'Finance',
-                lastLogin: acc.last_login ? new Date(acc.last_login).toLocaleString('en-GB') : 'Never',
-                created: acc.created_at ? new Date(acc.created_at).toLocaleString('en-GB') : '',
-                status: acc.status || 'Active'
-              }));
-              setAccountsData(transformed);
+            if (isT3Admin) {
+              const fetchResult = await t3Service.getAccounts({ page: currentPage, search: searchTerm });
+              if (fetchResult.success) {
+                const transformed = fetchResult.data.map(acc => ({
+                  id: acc.id.toString(),
+                  username: acc.username,
+                  character: acc.character || 'Finance',
+                  lastLogin: acc.last_login ? new Date(acc.last_login).toLocaleString('en-GB') : 'Never',
+                  created: acc.created_at ? new Date(acc.created_at).toLocaleString('en-GB') : '',
+                  status: acc.status || 'Active'
+                }));
+                setAccountsData(transformed);
+              }
             }
           }
-        } catch (error) {
-          console.error('Failed to create account:', error);
-          alert('Failed to create account. Please try again.');
+        });
+        
+        if (!result || !result.success) {
           return;
         }
-      } else {
-        console.log('Creating finance account:', formData);
+      } catch (error) {
+        console.error('Failed to create account:', error);
+        showError('Failed to create account. Please try again.');
+        return;
       }
     } else {
       console.log('Updating finance account:', modalState.editingId, formData);

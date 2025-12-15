@@ -7,6 +7,7 @@ import { PasswordInput, TextInput } from '@/components/form';
 import { filterAndPaginate } from '@/lib/pagination';
 import { t3Service } from '@/services/t3Service';
 import { api, T3SYSTEMADMIN_BASE } from '@/lib/api';
+import { useToast } from '@/contexts/ToastContext';
 
 const ITEMS_PER_PAGE = 10;
 const TRANSACTION_SEARCH_KEYS = ['id', 'type', 'status'];
@@ -15,6 +16,7 @@ export default function MerchantDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { showError } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('Today');
   const [currentPage, setCurrentPage] = useState(1);
@@ -255,7 +257,7 @@ export default function MerchantDetails() {
   // Handle password update
   const handlePasswordUpdate = () => {
     if (passwordForm.new !== passwordForm.confirm) {
-      alert('Passwords do not match');
+      showError('Passwords do not match');
       return;
     }
     // TODO: Add API call to update password

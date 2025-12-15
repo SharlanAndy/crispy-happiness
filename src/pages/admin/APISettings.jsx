@@ -230,8 +230,8 @@ export default function APISettings() {
         // Store the newly created key to show secret_key (only shown once)
         setNewlyCreatedKey(result.data);
         
-        // Show success message with key details (using alert for important secret key info)
-        alert(`API Key created!\nAPI Key: ${result.data.api_key}\nSecret Key: ${result.data.secret_key}\n\nPlease save the secret key - it won't be shown again!`);
+        // Show success message with key details
+        showSuccess(`API Key created! API Key: ${result.data.api_key}. Secret Key: ${result.data.secret_key}. Please save the secret key - it won't be shown again!`, 10000);
         
           // Refresh keys list
           const keysResult = await api.systemadmin.getAPIKeys();

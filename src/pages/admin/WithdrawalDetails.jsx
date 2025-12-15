@@ -3,11 +3,13 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Check, X } from 'lucide-react';
 import { InfoSection, Button, PageHeader, ConfirmDialog, VerificationModal } from '../../components/ui';
 import { t3Service } from '@/services/t3Service';
+import { useToast } from '@/contexts/ToastContext';
 
 export default function WithdrawalDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { showSuccess, showError } = useToast();
   const [currentPage] = useState(1);
   const [approveModal, setApproveModal] = useState(false);
   const [rejectConfirm, setRejectConfirm] = useState(false);
@@ -112,14 +114,14 @@ export default function WithdrawalDetails() {
     try {
       const result = await t3Service.approveWithdrawal(id);
       if (result.success) {
-        alert('Withdrawal approved successfully!');
+        showSuccess('Withdrawal approved successfully!');
         navigate(-1); // Go back after approval
       } else {
-        alert('Failed to approve withdrawal. Please try again.');
+        showError('Failed to approve withdrawal. Please try again.');
       }
     } catch (error) {
       console.error('Failed to approve withdrawal:', error);
-      alert('Failed to approve withdrawal. Please try again.');
+      showError('Failed to approve withdrawal. Please try again.');
     } finally {
       setApproveModal(false);
     }
@@ -129,14 +131,14 @@ export default function WithdrawalDetails() {
     try {
       const result = await t3Service.rejectWithdrawal(id);
       if (result.success) {
-        alert('Withdrawal rejected successfully!');
+        showSuccess('Withdrawal rejected successfully!');
         navigate(-1); // Go back after rejection
       } else {
-        alert('Failed to reject withdrawal. Please try again.');
+        showError('Failed to reject withdrawal. Please try again.');
       }
     } catch (error) {
       console.error('Failed to reject withdrawal:', error);
-      alert('Failed to reject withdrawal. Please try again.');
+      showError('Failed to reject withdrawal. Please try again.');
     } finally {
       setRejectConfirm(false);
     }
