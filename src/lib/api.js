@@ -550,6 +550,19 @@ export const api = {
     createCurrency: (data) => request(`${T3SYSTEMADMIN_BASE}/currencies`, { method: 'POST', body: JSON.stringify(data) }),
 
     /**
+     * Update an existing currency.
+     * Headers: Authorization: Bearer <token>
+     * @param {string|number} id - Currency ID
+     * @param {Object} data - { rate, status }
+     * @returns {Promise<Object>} { success, message }
+     */
+    updateCurrency: (id, data) =>
+      request(`${T3SYSTEMADMIN_BASE}/currencies/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    /**
      * Delete a currency.
      * Headers: Authorization: Bearer <token>
      * @param {string|number} id - Currency ID
@@ -808,6 +821,19 @@ export const api = {
      * @returns {Promise<Object>} { success, message, id }
      */
     createCurrency: (data) => request(`${T3SYSTEMADMIN_BASE}/currencies`, { method: 'POST', body: JSON.stringify(data) }),
+
+    /**
+     * Update an existing currency.
+     * Headers: Authorization: Bearer <token>
+     * @param {string|number} id - Currency ID
+     * @param {Object} data - { rate, status }
+     * @returns {Promise<Object>} { success, message }
+     */
+    updateCurrency: (id, data) =>
+      request(`${T3SYSTEMADMIN_BASE}/currencies/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
 
     /**
      * Delete a currency.

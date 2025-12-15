@@ -104,8 +104,22 @@ export default function CurrencyForm() {
 
     try {
       if (isEditMode) {
-        // No update endpoint specified yet – just navigate back for now
-        navigate('/system-admin/currency');
+        // Update existing currency: only rate and status are allowed to change
+        const payload = {
+          rate: Number(formData.rate),
+          status: formData.status || 'active',
+        };
+
+        const result = await api.systemadmin.updateCurrency(id, payload);
+
+        handleApiResponse(result, {
+          successMessage: result?.message || 'Currency updated successfully!',
+          errorMessage: result?.message || 'Failed to update currency. Please try again.',
+        });
+
+        if (result && result.success) {
+          navigate('/system-admin/currency');
+        }
         return;
       }
 
@@ -178,20 +192,14 @@ export default function CurrencyForm() {
               {isEditMode || isViewMode ? (
                 formData.country === 'OTHER' ? (
                   <div className="space-y-2">
-                    {/* Show 'Other' as main field */}
+                    {/* Show 'Other' as main field (read-only) */}
                     <div className="bg-[#f3f3f5] text-[#1C1B1F] p-3 rounded-md cursor-not-allowed">
                       Other
                     </div>
-                    {/* Show actual country/currency from API in a separate input */}
-                    <TextInput
-                      value={formData.otherCountryLabel}
-                      onChange={(e) =>
-                        handleChange('otherCountryLabel', e.target.value)
-                      }
-                      placeholder="Custom country & currency"
-                      className="bg-[#f3f3f5] text-[#1C1B1F]"
-                      disabled={isViewMode}
-                    />
+                    {/* Show actual country/currency label as read-only text */}
+                    <div className="bg-[#f3f3f5] text-[#1C1B1F] p-3 rounded-md cursor-not-allowed">
+                      {formData.otherCountryLabel || '-'}
+                    </div>
                   </div>
                 ) : (
                   <div className="bg-[#f3f3f5] text-[#1C1B1F] p-3 rounded-md cursor-not-allowed">
@@ -246,11 +254,14 @@ export default function CurrencyForm() {
             <FormField label="Rate">
               <div className="flex items-center gap-4">
                 <TextInput
-                  type="number"
+                  type="text"
                   value={formData.rate}
-                  onChange={(e) => handleChange('rate', e.target.value)}
-                  placeholder="eg: 4.5"
-                  step="0.01"
+                  onChange={(e) => {
+                    // Allow digits only
+                    const digitsOnly = e.target.value.replace(/\D/g, '');
+                    handleChange('rate', digitsOnly);
+                  }}
+                  placeholder="eg: 4"
                   className="bg-[#f3f3f5] text-[#1C1B1F]"
                   required
                   disabled={isViewMode}
