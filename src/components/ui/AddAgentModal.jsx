@@ -126,12 +126,12 @@ export default function AddAgentModal({ isOpen, onClose, onSubmit }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg w-full max-w-[600px] max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="bg-white rounded-lg w-full max-w-[700px] max-h-[90vh] flex flex-col overflow-hidden">
         {/* Fixed Header */}
-        <div className="flex items-center justify-between py-2.5 px-4 border-b">
-          <h2 className="font-semibold text-xl text-black">Add New Agent</h2>
+        <div className="flex items-center justify-between py-4 px-6 border-b border-gray-200">
+          <h2 className="font-semibold text-2xl text-black">Add New Agent</h2>
           <button onClick={handleClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
-            <X size={24} className="text-[#868e8d]" />
+            <X size={32} className="text-[#868e8d]" />
           </button>
         </div>
 
@@ -139,30 +139,30 @@ export default function AddAgentModal({ isOpen, onClose, onSubmit }) {
         <form onSubmit={handleSubmit} className="py-3 px-4 overflow-y-auto flex-1">
           <div className="flex flex-col gap-3">
             {/* Agent Type and Upline - At the top, collapsible */}
-            <div className="border rounded-lg">
+            <div className="border rounded-3xl">
               <button
                 type="button"
                 onClick={() => setIsTypeSectionCollapsed(!isTypeSectionCollapsed)}
-                className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors"
+                className="w-full flex items-center justify-between p-8 rounded-3xl transition-colors"
               >
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-sm">Agent Type & Upline</span>
+                  <div className="font-semibold text-lg text-black">Agent Type & Upline</div>
                   {formData.agent_type && (
-                    <span className="text-xs text-gray-500">
+                    <div className="text-xs text-gray-500">
                       ({AGENT_TYPE_OPTIONS.find(opt => opt.value === formData.agent_type)?.label || formData.agent_type.toUpperCase()}
                       {selectedUplineName && ` • ${selectedUplineName}`})
-                    </span>
+                    </div>
                   )}
                 </div>
                 {isTypeSectionCollapsed ? (
-                  <ChevronDown size={18} className="text-gray-500" />
+                  <ChevronDown size={24} className="text-gray-500" />
                 ) : (
-                  <ChevronUp size={18} className="text-gray-500" />
+                  <ChevronUp size={24} className="text-gray-500" />
                 )}
               </button>
               
               {!isTypeSectionCollapsed && (
-                <div className="px-3 pb-3 space-y-3">
+                <div className="px-8 pb-8 space-y-5">
                   <FormLabel label="Agent Type">
                     <SelectInput
                       value={formData.agent_type}
