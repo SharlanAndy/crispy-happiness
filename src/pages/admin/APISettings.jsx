@@ -2,13 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { Copy, RefreshCw, Save, Plus, X } from 'lucide-react';
 import { Card, FormField, Button, PageHeader, DataTable, SearchBar } from '../../components/ui';
 import { FormLabel, FormSection, TextInput } from '../../components/form';
-import { filterAndPaginate } from '@/lib/pagination';
 import { api } from '@/lib/api';
 import { useToast } from '@/contexts/ToastContext';
-
-const ITEMS_PER_PAGE = 10;
-const LOG_SEARCH_KEYS = ['date', 'endpoint', 'status', 'ip'];
-const API_KEY_SEARCH_KEYS = ['key_name', 'api_key', 'backend_url', 'merchant_key', 'status'];
 
 const API_KEY_COLUMNS = [
   { key: 'key_name', label: 'Key Name' },
@@ -112,6 +107,10 @@ export default function APISettings() {
   const [createKeyForm, setCreateKeyForm] = useState(INITIAL_KEY_DATA);
   const [newlyCreatedKey, setNewlyCreatedKey] = useState(null);
   const [createdKeyData, setCreatedKeyData] = useState(null); // Store the full response data
+  const [hasNextPageLogs, setHasNextPageLogs] = useState(false);
+  const [hasNextPageKeys, setHasNextPageKeys] = useState(false);
+  const [paginationMetaLogs, setPaginationMetaLogs] = useState({ limit: 20, page: 1, total: null });
+  const [paginationMetaKeys, setPaginationMetaKeys] = useState({ limit: 20, page: 1, total: null });
   const { handleApiResponse, showError, showSuccess } = useToast();
 
   // Fetch API keys and logs
@@ -120,28 +119,73 @@ export default function APISettings() {
       try {
         setLoading(true);
         console.log('Fetching API keys...');
+        const keysParams = { page: apiKeysPage };
         const [keysResult, logsResult] = await Promise.all([
-          api.systemadmin.getAPIKeys(),
-          api.systemadmin.getAPILogs({ page: 1 }) // Fetch all logs, paginate client-side
+          api.systemadmin.getAPIKeys(keysParams),
+          api.systemadmin.getAPILogs({ page: currentPage })
         ]);
         console.log('API Keys result:', keysResult);
 
         if (keysResult && keysResult.success && keysResult.data) {
+          const dataArray = Array.isArray(keysResult.data) ? keysResult.data : [];
+          const limit = keysResult.limit || 20;
+          const page = keysResult.page || apiKeysPage;
+          const total = keysResult.total || null;
+          
+          setPaginationMetaKeys({ limit, page, total });
+          
           // Transform all keys, even if array is empty
-          const transformed = Array.isArray(keysResult.data) 
-            ? keysResult.data.map(key => ({
-                id: key.id,
-                key_name: key.key_name || 'N/A',
-                api_key: key.api_key || key.api_key_full || 'N/A',
-                api_key_full: key.api_key_full || key.api_key || 'N/A',
-                backend_url: key.backend_url || 'N/A',
-                merchant_key: key.merchant_key || 'N/A',
-                status: key.status || 'active',
-                created_at: key.created_at || '',
-                updated_at: key.updated_at || ''
-              }))
-            : [];
+          const transformed = dataArray.map(key => ({
+            id: key.id,
+            key_name: key.key_name || 'N/A',
+            api_key: key.api_key || key.api_key_full || 'N/A',
+            api_key_full: key.api_key_full || key.api_key || 'N/A',
+            backend_url: key.backend_url || 'N/A',
+            merchant_key: key.merchant_key || 'N/A',
+            status: key.status || 'active',
+            created_at: key.created_at || '',
+            updated_at: key.updated_at || ''
+          }));
           setApiKeys(transformed);
+
+          // Determine if there's a next page for keys
+          if (total !== null) {
+            setHasNextPageKeys(page * limit < total);
+          } else if (dataArray.length < limit) {
+            setHasNextPageKeys(false);
+          } else if (dataArray.length === limit && page === 1) {
+            const checkNextPage = async () => {
+              try {
+                const nextPageResult = await api.systemadmin.getAPIKeys({ page: 2 });
+                if (nextPageResult && nextPageResult.success) {
+                  const nextPageData = Array.isArray(nextPageResult.data) ? nextPageResult.data : [];
+                  setHasNextPageKeys(nextPageData.length > 0);
+                } else {
+                  setHasNextPageKeys(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPageKeys(false);
+              }
+            };
+            checkNextPage();
+          } else if (dataArray.length === limit && page > 1) {
+            const checkNextPage = async () => {
+              try {
+                const nextPageResult = await api.systemadmin.getAPIKeys({ page: page + 1 });
+                if (nextPageResult && nextPageResult.success) {
+                  const nextPageData = Array.isArray(nextPageResult.data) ? nextPageResult.data : [];
+                  setHasNextPageKeys(nextPageData.length > 0);
+                } else {
+                  setHasNextPageKeys(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPageKeys(false);
+              }
+            };
+            checkNextPage();
+          }
           
           // Find the latest API key (by created_at or id) and set as default
           if (transformed.length > 0 && keysResult.data.length > 0) {
@@ -174,40 +218,138 @@ export default function APISettings() {
         }
 
         if (logsResult && logsResult.success) {
-          const transformed = logsResult.data.map(log => ({
+          const dataArray = logsResult.data || [];
+          const limit = logsResult.limit || 20;
+          const page = logsResult.page || currentPage;
+          const total = logsResult.total || null;
+          
+          setPaginationMetaLogs({ limit, page, total });
+          
+          const transformed = dataArray.map(log => ({
             date: log.created_at ? new Date(log.created_at).toLocaleString('en-GB') : '',
             endpoint: log.event_endpoint || '',
             status: `${log.status} ${log.status === '200' ? 'OK' : log.status === '201' ? 'Created' : log.status === '404' ? 'Not Found' : log.status === '500' ? 'Error' : ''}`,
             ip: log.ip_address || ''
           }));
           setLogsData(transformed);
+
+          // Determine if there's a next page for logs
+          if (total !== null) {
+            setHasNextPageLogs(page * limit < total);
+          } else if (dataArray.length < limit) {
+            setHasNextPageLogs(false);
+          } else if (dataArray.length === limit && page === 1) {
+            const checkNextPage = async () => {
+              try {
+                const nextPageResult = await api.systemadmin.getAPILogs({ page: 2 });
+                if (nextPageResult && nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPageLogs(nextPageData.length > 0);
+                } else {
+                  setHasNextPageLogs(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPageLogs(false);
+              }
+            };
+            checkNextPage();
+          } else if (dataArray.length === limit && page > 1) {
+            const checkNextPage = async () => {
+              try {
+                const nextPageResult = await api.systemadmin.getAPILogs({ page: page + 1 });
+                if (nextPageResult && nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPageLogs(nextPageData.length > 0);
+                } else {
+                  setHasNextPageLogs(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPageLogs(false);
+              }
+            };
+            checkNextPage();
+          }
         }
       } catch (error) {
         console.error('Failed to fetch API settings:', error);
         console.error('Error details:', error.response || error.message);
         setApiKeys([]);
         setLogsData([]);
+        setHasNextPageKeys(false);
+        setHasNextPageLogs(false);
       } finally {
         setLoading(false);
       }
     };
     fetchData();
-  }, []);
+  }, [currentPage, apiKeysPage]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
 
-  // Apply client-side search and pagination (local fuzzy search)
-  const { data: logs, totalPages } = useMemo(
-    () => filterAndPaginate(logsData, searchTerm, LOG_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
-    [logsData, searchTerm, currentPage]
-  );
+  // Calculate total pages for logs
+  const totalPages = useMemo(() => {
+    if (paginationMetaLogs.total !== null && paginationMetaLogs.total !== undefined) {
+      return Math.ceil(paginationMetaLogs.total / paginationMetaLogs.limit);
+    }
+    if (logsData.length < paginationMetaLogs.limit) {
+      return paginationMetaLogs.page;
+    }
+    if (logsData.length === paginationMetaLogs.limit) {
+      return hasNextPageLogs ? paginationMetaLogs.page + 1 : paginationMetaLogs.page;
+    }
+    return 1;
+  }, [paginationMetaLogs, logsData.length, hasNextPageLogs]);
 
-  const { data: filteredApiKeys, totalPages: apiKeysTotalPages } = useMemo(
-    () => filterAndPaginate(apiKeys, apiKeysSearchTerm, API_KEY_SEARCH_KEYS, apiKeysPage, ITEMS_PER_PAGE),
-    [apiKeys, apiKeysSearchTerm, apiKeysPage]
-  );
+  // Apply client-side search only (API handles pagination)
+  const logs = useMemo(() => {
+    if (!searchTerm || !searchTerm.trim()) {
+      return logsData;
+    }
+    const searchLower = searchTerm.toLowerCase().trim();
+    return logsData.filter(log => {
+      return (
+        log.date?.toLowerCase().includes(searchLower) ||
+        log.endpoint?.toLowerCase().includes(searchLower) ||
+        log.status?.toLowerCase().includes(searchLower) ||
+        log.ip?.toLowerCase().includes(searchLower)
+      );
+    });
+  }, [logsData, searchTerm]);
+
+  // Calculate total pages for API keys
+  const apiKeysTotalPages = useMemo(() => {
+    if (paginationMetaKeys.total !== null && paginationMetaKeys.total !== undefined) {
+      return Math.ceil(paginationMetaKeys.total / paginationMetaKeys.limit);
+    }
+    if (apiKeys.length < paginationMetaKeys.limit) {
+      return paginationMetaKeys.page;
+    }
+    if (apiKeys.length === paginationMetaKeys.limit) {
+      return hasNextPageKeys ? paginationMetaKeys.page + 1 : paginationMetaKeys.page;
+    }
+    return 1;
+  }, [paginationMetaKeys, apiKeys.length, hasNextPageKeys]);
+
+  // Apply client-side search only (API handles pagination)
+  const filteredApiKeys = useMemo(() => {
+    if (!apiKeysSearchTerm || !apiKeysSearchTerm.trim()) {
+      return apiKeys;
+    }
+    const searchLower = apiKeysSearchTerm.toLowerCase().trim();
+    return apiKeys.filter(key => {
+      return (
+        key.key_name?.toLowerCase().includes(searchLower) ||
+        key.api_key?.toLowerCase().includes(searchLower) ||
+        key.backend_url?.toLowerCase().includes(searchLower) ||
+        key.merchant_key?.toLowerCase().includes(searchLower) ||
+        key.status?.toLowerCase().includes(searchLower)
+      );
+    });
+  }, [apiKeys, apiKeysSearchTerm]);
 
   // Handle row click to update Key's Information
   const handleKeyRowClick = (row) => {
@@ -447,6 +589,7 @@ export default function APISettings() {
             onChange={(value) => {
               setApiKeysSearchTerm(value);
               setApiKeysPage(1);
+              setHasNextPageKeys(false); // Reset next page check when search changes
             }}
             className="max-w-sm"
           />
@@ -472,6 +615,7 @@ export default function APISettings() {
             onChange={(value) => {
               setSearchTerm(value);
               setCurrentPage(1);
+              setHasNextPageLogs(false); // Reset next page check when search changes
             }}
             className="max-w-sm"
           />

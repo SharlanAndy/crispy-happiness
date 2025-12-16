@@ -3,13 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, Settings, Trash2, Plus } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, Modal, Button, FormField, ConfirmDialog } from '../../components/ui';
 import { TextInput, PasswordInput } from '../../components/form';
-import { filterAndPaginate } from '@/lib/pagination';
 import { t3Service } from '@/services/t3Service';
 import { api } from '@/lib/api';
 import { useToast } from '@/contexts/ToastContext';
-
-const ITEMS_PER_PAGE = 10;
-const SEARCH_KEYS = ['id', 'username', 'character', 'status'];
 
 // Removed ALL_ACCOUNTS mock data - using real API data only
 
@@ -37,6 +33,8 @@ export default function AccountManagement() {
   const [loading, setLoading] = useState(true);
   const [accountsData, setAccountsData] = useState([]);
   const [totalAccounts, setTotalAccounts] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [paginationMeta, setPaginationMeta] = useState({ limit: 20, page: 1, total: null });
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -60,11 +58,22 @@ export default function AccountManagement() {
 
       try {
         setLoading(true);
-        // Fetch all accounts (no search param - using client-side fuzzy search)
-        const result = await t3Service.getAccounts({ page: 1, search: '' }); // Fetch all, filter client-side
+        const params = { page: currentPage };
+        if (searchTerm && searchTerm.trim()) {
+          params.search = searchTerm.trim();
+        }
+        
+        const result = await t3Service.getAccounts(params);
         if (result.success) {
+          const dataArray = result.data || [];
+          const limit = result.limit || 20;
+          const page = result.page || currentPage;
+          const total = result.total || null;
+          
+          setPaginationMeta({ limit, page, total });
+          
           // Transform API data to match table format
-          const transformed = result.data.map(acc => ({
+          const transformed = dataArray.map(acc => ({
             id: acc.id.toString(),
             username: acc.username,
             character: acc.character || 'Finance',
@@ -73,12 +82,66 @@ export default function AccountManagement() {
             status: acc.status || 'Active'
           }));
           setAccountsData(transformed);
-          setTotalAccounts(result.total || transformed.length);
+          setTotalAccounts(total || transformed.length);
+
+          // Determine if there's a next page
+          if (total !== null) {
+            setHasNextPage(page * limit < total);
+          } else if (dataArray.length < limit) {
+            setHasNextPage(false);
+          } else if (dataArray.length === limit && page === 1) {
+            // Check page 2
+            const checkNextPage = async () => {
+              try {
+                const nextPageParams = { page: 2 };
+                if (searchTerm && searchTerm.trim()) {
+                  nextPageParams.search = searchTerm.trim();
+                }
+                const nextPageResult = await t3Service.getAccounts(nextPageParams);
+                if (nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPage(nextPageData.length > 0);
+                } else {
+                  setHasNextPage(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPage(false);
+              }
+            };
+            checkNextPage();
+          } else if (dataArray.length === limit && page > 1) {
+            // Check next page
+            const checkNextPage = async () => {
+              try {
+                const nextPageParams = { page: page + 1 };
+                if (searchTerm && searchTerm.trim()) {
+                  nextPageParams.search = searchTerm.trim();
+                }
+                const nextPageResult = await t3Service.getAccounts(nextPageParams);
+                if (nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPage(nextPageData.length > 0);
+                } else {
+                  setHasNextPage(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPage(false);
+              }
+            };
+            checkNextPage();
+          }
+        } else {
+          setAccountsData([]);
+          setTotalAccounts(0);
+          setHasNextPage(false);
         }
       } catch (error) {
         console.error('Failed to fetch accounts:', error);
-        setAccountsData(ALL_ACCOUNTS);
-        setTotalAccounts(ALL_ACCOUNTS.length);
+        setAccountsData([]);
+        setTotalAccounts(0);
+        setHasNextPage(false);
       } finally {
         setLoading(false);
       }
@@ -90,14 +153,40 @@ export default function AccountManagement() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
 
-  const { data: accounts, totalPages } = useMemo(
-    () => filterAndPaginate(accountsData, searchTerm, SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
-    [accountsData, searchTerm, currentPage]
-  );
+  // Calculate total pages based on API response
+  const totalPages = useMemo(() => {
+    if (paginationMeta.total !== null && paginationMeta.total !== undefined) {
+      return Math.ceil(paginationMeta.total / paginationMeta.limit);
+    }
+    if (accountsData.length < paginationMeta.limit) {
+      return paginationMeta.page;
+    }
+    if (accountsData.length === paginationMeta.limit) {
+      return hasNextPage ? paginationMeta.page + 1 : paginationMeta.page;
+    }
+    return 1;
+  }, [paginationMeta, accountsData.length, hasNextPage]);
+
+  // Apply client-side search only (API handles pagination)
+  const accounts = useMemo(() => {
+    if (!searchTerm || !searchTerm.trim()) {
+      return accountsData;
+    }
+    const searchLower = searchTerm.toLowerCase().trim();
+    return accountsData.filter(acc => {
+      return (
+        acc.id?.toLowerCase().includes(searchLower) ||
+        acc.username?.toLowerCase().includes(searchLower) ||
+        acc.character?.toLowerCase().includes(searchLower) ||
+        acc.status?.toLowerCase().includes(searchLower)
+      );
+    });
+  }, [accountsData, searchTerm]);
 
   const handleSearchChange = (value) => {
     setSearchTerm(value);
     setCurrentPage(1);
+    setHasNextPage(false); // Reset next page check when search changes
   };
 
   const handleOpenCreate = () => {

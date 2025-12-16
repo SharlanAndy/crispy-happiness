@@ -4,11 +4,7 @@ import { Eye, Calendar, Check } from 'lucide-react';
 import { StatCard, PageHeader, ConfirmDialog, BonusListCard } from '../../components/ui';
 import SelectWithIcon from '../../components/ui/SelectWithIcon';
 import MonthlyBonusTable from '../../components/ui/MonthlyBonusTable';
-import { filterAndPaginate } from '@/lib/pagination';
 import { api } from '@/lib/api';
-
-const ITEMS_PER_PAGE = 10;
-const TRANSACTION_SEARCH_KEYS = ['id', 'wallet', 'status'];
 
 export default function BonusManagement() {
   const navigate = useNavigate();
@@ -25,6 +21,10 @@ export default function BonusManagement() {
   const [bonusClaimsData, setBonusClaimsData] = useState([]);
   const [bonusUnclaimsData, setBonusUnclaimsData] = useState([]);
   const [monthlyData, setMonthlyData] = useState(null);
+  const [hasNextPageClaim, setHasNextPageClaim] = useState(false);
+  const [hasNextPageUnclaim, setHasNextPageUnclaim] = useState(false);
+  const [paginationMetaClaim, setPaginationMetaClaim] = useState({ limit: 20, page: 1, total: null });
+  const [paginationMetaUnclaim, setPaginationMetaUnclaim] = useState({ limit: 20, page: 1, total: null });
 
   // Generate month options for the past 12 months
   const getMonthOptions = () => {
@@ -72,7 +72,14 @@ export default function BonusManagement() {
         params.search = (activeBonus || 'System').toLowerCase();
         const result = await api.systemadmin.getBonusClaims(params);
         if (result && result.success) {
-          const transformed = result.data.map(b => ({
+          const dataArray = result.data || [];
+          const limit = result.limit || 20;
+          const page = result.page || currentPage;
+          const total = result.total || null;
+          
+          setPaginationMetaClaim({ limit, page, total });
+          
+          const transformed = dataArray.map(b => ({
             id: b.id, // Store numeric ID for API calls
             displayId: `tx-${b.id}`, // Display ID with tx- prefix
             wallet: b.username || `U${b.user_id}` || 'N/A',
@@ -85,77 +92,85 @@ export default function BonusManagement() {
             rawData: b // Keep raw data for reference
           }));
           setBonusClaimsData(transformed);
+
+          // Determine if there's a next page
+          if (total !== null) {
+            setHasNextPageClaim(page * limit < total);
+          } else if (dataArray.length < limit) {
+            setHasNextPageClaim(false);
+          } else if (dataArray.length === limit && page === 1) {
+            // Check page 2
+            const checkNextPage = async () => {
+              try {
+                const nextPageParams = { page: 2, search: params.search };
+                const nextPageResult = await api.systemadmin.getBonusClaims(nextPageParams);
+                if (nextPageResult && nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPageClaim(nextPageData.length > 0);
+                } else {
+                  setHasNextPageClaim(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPageClaim(false);
+              }
+            };
+            checkNextPage();
+          } else if (dataArray.length === limit && page > 1) {
+            // Check next page
+            const checkNextPage = async () => {
+              try {
+                const nextPageParams = { page: page + 1, search: params.search };
+                const nextPageResult = await api.systemadmin.getBonusClaims(nextPageParams);
+                if (nextPageResult && nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPageClaim(nextPageData.length > 0);
+                } else {
+                  setHasNextPageClaim(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPageClaim(false);
+              }
+            };
+            checkNextPage();
+          }
         } else {
           setBonusClaimsData([]);
+          setHasNextPageClaim(false);
         }
       } catch (error) {
         console.error('Failed to fetch bonus claims:', error);
         setBonusClaimsData([]);
+        setHasNextPageClaim(false);
       } finally {
         setLoading(false);
       }
     };
     fetchBonusClaims();
-  }, [currentPage, searchTerm, activeBonus]);
+  }, [currentPage, activeBonus]);
 
-  // Fetch bonus unclaims - fetch all pages if pagination is supported
+  // Fetch bonus unclaims
   useEffect(() => {
     const fetchBonusUnclaims = async () => {
       try {
         setLoadingUnclaim(true);
-        let allUnclaims = [];
-        let page = 1;
-        let hasMorePages = true;
-        const limit = 20; // Default limit from API response
+        const params = { page: currentPageUnclaim };
         // Add search parameter with lowercase tab value (system, partner, agent, merchant, user)
         // Default to 'system' if activeBonusUnclaim is not set
-        const searchParam = (activeBonusUnclaim || 'System').toLowerCase();
-
-        // Fetch all pages sequentially
-        while (hasMorePages) {
-          const result = await api.systemadmin.getBonusUnclaims({ page, search: searchParam });
+        params.search = (activeBonusUnclaim || 'System').toLowerCase();
+        
+        const result = await api.systemadmin.getBonusUnclaims(params);
+        
+        if (result && result.success && result.data && Array.isArray(result.data)) {
+          const dataArray = result.data || [];
+          const limit = result.limit || 20;
+          const page = result.page || currentPageUnclaim;
+          const total = result.total || null;
           
-          if (result && result.success && result.data && Array.isArray(result.data)) {
-            // Add current page data
-            allUnclaims = [...allUnclaims, ...result.data];
-            
-            // Check if there are more pages
-            if (result.total !== undefined && result.limit !== undefined) {
-              // API provides pagination metadata
-              const totalPages = Math.ceil(result.total / result.limit);
-              hasMorePages = page < totalPages;
-            } else if (result.data.length < limit) {
-              // If current page has fewer items than limit, it's the last page
-              hasMorePages = false;
-            } else {
-              // No metadata and got full page - assume there might be more
-              // Will check next page in next iteration
-            }
-            
-            // Increment page for next iteration (if we're continuing)
-            if (hasMorePages) {
-              page++;
-              // Safety limit to prevent infinite loops
-              if (page > 100) {
-                console.warn('Reached safety limit for pagination, stopping');
-                hasMorePages = false;
-              }
-            }
-          } else {
-            // If first page fails, try without pagination parameter but with search
-            if (page === 1) {
-              const resultNoPage = await api.systemadmin.getBonusUnclaims({ search: searchParam });
-              if (resultNoPage && resultNoPage.success && resultNoPage.data && Array.isArray(resultNoPage.data)) {
-                allUnclaims = resultNoPage.data;
-              }
-            }
-            hasMorePages = false;
-          }
-        }
-
-        // Transform all fetched data
-        if (allUnclaims.length > 0) {
-          const transformed = allUnclaims.map(b => ({
+          setPaginationMetaUnclaim({ limit, page, total });
+          
+          const transformed = dataArray.map(b => ({
             id: b.user_id ? `U${b.user_id}` : b.referral_id || 'N/A',
             bonus: `${(b.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${b.currency || 'USDT'}`,
             update: b.created_at ? new Date(b.created_at).toLocaleString('en-GB') : 'N/A',
@@ -164,18 +179,63 @@ export default function BonusManagement() {
             rawData: b // Keep raw data for reference
           }));
           setBonusUnclaimsData(transformed);
+
+          // Determine if there's a next page
+          if (total !== null) {
+            setHasNextPageUnclaim(page * limit < total);
+          } else if (dataArray.length < limit) {
+            setHasNextPageUnclaim(false);
+          } else if (dataArray.length === limit && page === 1) {
+            // Check page 2
+            const checkNextPage = async () => {
+              try {
+                const nextPageParams = { page: 2, search: params.search };
+                const nextPageResult = await api.systemadmin.getBonusUnclaims(nextPageParams);
+                if (nextPageResult && nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPageUnclaim(nextPageData.length > 0);
+                } else {
+                  setHasNextPageUnclaim(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPageUnclaim(false);
+              }
+            };
+            checkNextPage();
+          } else if (dataArray.length === limit && page > 1) {
+            // Check next page
+            const checkNextPage = async () => {
+              try {
+                const nextPageParams = { page: page + 1, search: params.search };
+                const nextPageResult = await api.systemadmin.getBonusUnclaims(nextPageParams);
+                if (nextPageResult && nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPageUnclaim(nextPageData.length > 0);
+                } else {
+                  setHasNextPageUnclaim(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPageUnclaim(false);
+              }
+            };
+            checkNextPage();
+          }
         } else {
           setBonusUnclaimsData([]);
+          setHasNextPageUnclaim(false);
         }
       } catch (error) {
         console.error('Failed to fetch bonus unclaims:', error);
         setBonusUnclaimsData([]);
+        setHasNextPageUnclaim(false);
       } finally {
         setLoadingUnclaim(false);
       }
     };
     fetchBonusUnclaims();
-  }, [activeBonusUnclaim]); // Fetch once on mount
+  }, [currentPageUnclaim, activeBonusUnclaim]);
 
   // Fetch monthly bonus
   useEffect(() => {
@@ -281,67 +341,94 @@ export default function BonusManagement() {
 
   const BONUS_TIERS = ['System', 'Partner', 'Agent', 'Merchant', 'User'];
 
-  // No need to filter by bonus tier client-side since API handles it via search parameter
-  // Only apply client-side search if user has entered a search term
-  const { data: claimList, totalPages } = useMemo(
-    () => {
-      if (searchTerm && searchTerm.trim()) {
-        // If user has entered search, filter client-side
-        const filtered = bonusClaimsData.filter(item => 
-          TRANSACTION_SEARCH_KEYS.some(key => {
-            const value = item[key]?.toString().toLowerCase() || '';
-            return value.includes(searchTerm.toLowerCase());
-          })
-        );
-        return filterAndPaginate(filtered, '', TRANSACTION_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE);
-      }
-      // Otherwise, just paginate the API-filtered data
-      return filterAndPaginate(bonusClaimsData, '', TRANSACTION_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE);
-    },
-    [bonusClaimsData, searchTerm, currentPage]
-  );
+  // Calculate total pages for claims
+  const totalPages = useMemo(() => {
+    if (paginationMetaClaim.total !== null && paginationMetaClaim.total !== undefined) {
+      return Math.ceil(paginationMetaClaim.total / paginationMetaClaim.limit);
+    }
+    if (bonusClaimsData.length < paginationMetaClaim.limit) {
+      return paginationMetaClaim.page;
+    }
+    if (bonusClaimsData.length === paginationMetaClaim.limit) {
+      return hasNextPageClaim ? paginationMetaClaim.page + 1 : paginationMetaClaim.page;
+    }
+    return 1;
+  }, [paginationMetaClaim, bonusClaimsData.length, hasNextPageClaim]);
 
-  // No need to filter by bonus tier client-side since API handles it via search parameter
-  // Only apply client-side search if user has entered a search term
-  const { data: unclaimList, totalPages: totalPagesUnclaim } = useMemo(
-    () => {
-      if (searchTermUnclaim && searchTermUnclaim.trim()) {
-        // If user has entered search, filter client-side
-        const filtered = bonusUnclaimsData.filter(item => 
-          ['id', 'status'].some(key => {
-            const value = item[key]?.toString().toLowerCase() || '';
-            return value.includes(searchTermUnclaim.toLowerCase());
-          })
-        );
-        return filterAndPaginate(filtered, '', ['id', 'status'], currentPageUnclaim, ITEMS_PER_PAGE);
-      }
-      // Otherwise, just paginate the API-filtered data
-      return filterAndPaginate(bonusUnclaimsData, '', ['id', 'status'], currentPageUnclaim, ITEMS_PER_PAGE);
-    },
-    [bonusUnclaimsData, searchTermUnclaim, currentPageUnclaim]
-  );
+  // Apply client-side search only (API handles pagination)
+  const claimList = useMemo(() => {
+    if (!searchTerm || !searchTerm.trim()) {
+      return bonusClaimsData.map(item => ({
+        ...item,
+        id: item.displayId || `tx-${item.id}`
+      }));
+    }
+    const searchLower = searchTerm.toLowerCase().trim();
+    return bonusClaimsData.filter(item => {
+      return (
+        item.displayId?.toLowerCase().includes(searchLower) ||
+        item.wallet?.toLowerCase().includes(searchLower) ||
+        item.status?.toLowerCase().includes(searchLower)
+      );
+    }).map(item => ({
+      ...item,
+      id: item.displayId || `tx-${item.id}`
+    }));
+  }, [bonusClaimsData, searchTerm]);
+
+  // Calculate total pages for unclaims
+  const totalPagesUnclaim = useMemo(() => {
+    if (paginationMetaUnclaim.total !== null && paginationMetaUnclaim.total !== undefined) {
+      return Math.ceil(paginationMetaUnclaim.total / paginationMetaUnclaim.limit);
+    }
+    if (bonusUnclaimsData.length < paginationMetaUnclaim.limit) {
+      return paginationMetaUnclaim.page;
+    }
+    if (bonusUnclaimsData.length === paginationMetaUnclaim.limit) {
+      return hasNextPageUnclaim ? paginationMetaUnclaim.page + 1 : paginationMetaUnclaim.page;
+    }
+    return 1;
+  }, [paginationMetaUnclaim, bonusUnclaimsData.length, hasNextPageUnclaim]);
+
+  // Apply client-side search only (API handles pagination)
+  const unclaimList = useMemo(() => {
+    if (!searchTermUnclaim || !searchTermUnclaim.trim()) {
+      return bonusUnclaimsData;
+    }
+    const searchLower = searchTermUnclaim.toLowerCase().trim();
+    return bonusUnclaimsData.filter(item => {
+      return (
+        item.id?.toLowerCase().includes(searchLower) ||
+        item.status?.toLowerCase().includes(searchLower)
+      );
+    });
+  }, [bonusUnclaimsData, searchTermUnclaim]);
 
   const handleBonusChange = (bonusTier) => {
     setActiveBonus(bonusTier);
     setCurrentPage(1);
     setSearchTerm(''); // Clear search when changing tabs
+    setHasNextPageClaim(false); // Reset next page check
   };
 
   const handleBonusChangeUnclaim = (bonusTier) => {
     setActiveBonusUnclaim(bonusTier);
     setCurrentPageUnclaim(1);
     setSearchTermUnclaim(''); // Clear search when changing tabs
+    setHasNextPageUnclaim(false); // Reset next page check
   };
 
   // Handle search - reset to page 1
   const handleSearchChange = (value) => {
     setSearchTerm(value);
     setCurrentPage(1);
+    setHasNextPageClaim(false); // Reset next page check when search changes
   };
 
   const handleSearchChangeUnclaim = (value) => {
     setSearchTermUnclaim(value);
     setCurrentPageUnclaim(1);
+    setHasNextPageUnclaim(false); // Reset next page check when search changes
   };
 
   const bonusLists = [{

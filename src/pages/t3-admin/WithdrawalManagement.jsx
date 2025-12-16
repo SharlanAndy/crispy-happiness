@@ -2,13 +2,9 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, Check, X } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, ConfirmDialog, VerificationModal } from '../../components/ui';
-import { filterAndPaginate } from '@/lib/pagination';
 import { t3Service } from '@/services/t3Service';
 import { api } from '@/lib/api';
 import { useToast } from '@/contexts/ToastContext';
-
-const ITEMS_PER_PAGE = 10;
-const SEARCH_KEYS = ['id', 'merchant', 'wallet', 'ref'];
 
 const STATS = [
   { label: 'Current Withdraw Application', value: '10', lastUpdate: '17-11-2025' },
@@ -45,6 +41,8 @@ export default function WithdrawalManagement() {
   const [loading, setLoading] = useState(true);
   const [withdrawalsData, setWithdrawalsData] = useState([]);
   const [withdrawalStats, setWithdrawalStats] = useState(null);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [paginationMeta, setPaginationMeta] = useState({ limit: 20, page: 1, total: null });
 
   // Detect if accessed from System Admin or T3 Admin
   const isSystemAdmin = location.pathname.startsWith('/system-admin');
@@ -88,15 +86,25 @@ export default function WithdrawalManagement() {
     const fetchWithdrawals = async () => {
       try {
         setLoading(true);
-        // Fetch all applications (no search param - using client-side fuzzy search)
-        const result = await t3Service.getWithdrawalApplications({ 
-          page: 1, 
-          search: '', // Fetch all, filter client-side
+        const params = { 
+          page: currentPage, 
           status: 'pending'
-        });
+        };
+        if (searchTerm && searchTerm.trim()) {
+          params.search = searchTerm.trim();
+        }
+        
+        const result = await t3Service.getWithdrawalApplications(params);
         
         if (result.success) {
-          const transformed = result.data.map(w => ({
+          const dataArray = result.data || [];
+          const limit = result.limit || 20;
+          const page = result.page || currentPage;
+          const total = result.total || null;
+          
+          setPaginationMeta({ limit, page, total });
+          
+          const transformed = dataArray.map(w => ({
             id: w.application_id || w.id?.toString(),
             merchant: w.merchant_order_no || 'N/A',
             amount: `${(w.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
@@ -107,12 +115,63 @@ export default function WithdrawalManagement() {
             rawData: w // Keep raw data for API calls
           }));
           setWithdrawalsData(transformed);
+
+          // Determine if there's a next page
+          if (total !== null) {
+            setHasNextPage(page * limit < total);
+          } else if (dataArray.length < limit) {
+            setHasNextPage(false);
+          } else if (dataArray.length === limit && page === 1) {
+            // Check page 2
+            const checkNextPage = async () => {
+              try {
+                const nextPageParams = { page: 2, status: 'pending' };
+                if (searchTerm && searchTerm.trim()) {
+                  nextPageParams.search = searchTerm.trim();
+                }
+                const nextPageResult = await t3Service.getWithdrawalApplications(nextPageParams);
+                if (nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPage(nextPageData.length > 0);
+                } else {
+                  setHasNextPage(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPage(false);
+              }
+            };
+            checkNextPage();
+          } else if (dataArray.length === limit && page > 1) {
+            // Check next page
+            const checkNextPage = async () => {
+              try {
+                const nextPageParams = { page: page + 1, status: 'pending' };
+                if (searchTerm && searchTerm.trim()) {
+                  nextPageParams.search = searchTerm.trim();
+                }
+                const nextPageResult = await t3Service.getWithdrawalApplications(nextPageParams);
+                if (nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPage(nextPageData.length > 0);
+                } else {
+                  setHasNextPage(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPage(false);
+              }
+            };
+            checkNextPage();
+          }
         } else {
           setWithdrawalsData([]);
+          setHasNextPage(false);
         }
       } catch (error) {
         console.error('Failed to fetch withdrawals:', error);
         setWithdrawalsData([]);
+        setHasNextPage(false);
       } finally {
         setLoading(false);
       }
@@ -125,14 +184,27 @@ export default function WithdrawalManagement() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
 
-  const { data: withdrawals, totalPages } = useMemo(
-    () => filterAndPaginate(withdrawalsData, searchTerm, SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
-    [withdrawalsData, searchTerm, currentPage]
-  );
+  // Calculate total pages based on API response
+  const totalPages = useMemo(() => {
+    if (paginationMeta.total !== null && paginationMeta.total !== undefined) {
+      return Math.ceil(paginationMeta.total / paginationMeta.limit);
+    }
+    if (withdrawalsData.length < paginationMeta.limit) {
+      return paginationMeta.page;
+    }
+    if (withdrawalsData.length === paginationMeta.limit) {
+      return hasNextPage ? paginationMeta.page + 1 : paginationMeta.page;
+    }
+    return 1;
+  }, [paginationMeta, withdrawalsData.length, hasNextPage]);
+
+  // Use withdrawals data directly from API (no client-side pagination)
+  const withdrawals = withdrawalsData;
 
   const handleSearchChange = (value) => {
     setSearchTerm(value);
     setCurrentPage(1);
+    setHasNextPage(false); // Reset next page check when search changes
   };
 
   const handleApproveWithVerification = async (credentials) => {

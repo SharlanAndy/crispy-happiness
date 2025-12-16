@@ -3,8 +3,6 @@ import { ChevronDown } from 'lucide-react';
 import { DataTable, PageHeader } from '@/components/ui';
 import { api } from '@/lib/api';
 
-const ITEMS_PER_PAGE = 10;
-
 const LEVEL_COLORS = {
   INFO: 'bg-[#DCFCE7] text-[#166534]',
   WARNING: 'bg-[#FDF9C9] text-[#7D4F1F]',
@@ -47,6 +45,8 @@ export default function SystemLogs() {
   const [filters, setFilters] = useState(FILTERS.map(f => f.default));
   const [loading, setLoading] = useState(true);
   const [logsData, setLogsData] = useState([]);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [paginationMeta, setPaginationMeta] = useState({ limit: 20, page: 1, total: null });
 
   // Fetch logs data
   useEffect(() => {
@@ -55,13 +55,21 @@ export default function SystemLogs() {
         setLoading(true);
         const [dateRange, levelFilter, statusFilter] = filters;
         const params = {
+          page: currentPage,
           ...(dateRange !== 'all' && { date_range: dateRange }),
           ...(levelFilter !== 'all' && { level: levelFilter }),
           ...(statusFilter !== 'all' && { status: statusFilter }),
         };
         const result = await api.systemadmin.getLogs(params);
         if (result && result.success) {
-          const transformed = result.data.map(log => ({
+          const dataArray = result.data || [];
+          const limit = result.limit || 20;
+          const page = result.page || currentPage;
+          const total = result.total || null;
+          
+          setPaginationMeta({ limit, page, total });
+          
+          const transformed = dataArray.map(log => ({
             dateTime: log.created_at ? new Date(log.created_at).toLocaleString('en-GB') : 'N/A',
             level: log.level || 'INFO',
             source: log.source || 'N/A',
@@ -70,12 +78,67 @@ export default function SystemLogs() {
             ip: log.ip_address || 'N/A'
           }));
           setLogsData(transformed);
+
+          // Determine if there's a next page
+          if (total !== null) {
+            setHasNextPage(page * limit < total);
+          } else if (dataArray.length < limit) {
+            setHasNextPage(false);
+          } else if (dataArray.length === limit && page === 1) {
+            // Check page 2
+            const checkNextPage = async () => {
+              try {
+                const nextPageParams = {
+                  page: 2,
+                  ...(dateRange !== 'all' && { date_range: dateRange }),
+                  ...(levelFilter !== 'all' && { level: levelFilter }),
+                  ...(statusFilter !== 'all' && { status: statusFilter }),
+                };
+                const nextPageResult = await api.systemadmin.getLogs(nextPageParams);
+                if (nextPageResult && nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPage(nextPageData.length > 0);
+                } else {
+                  setHasNextPage(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPage(false);
+              }
+            };
+            checkNextPage();
+          } else if (dataArray.length === limit && page > 1) {
+            // Check next page
+            const checkNextPage = async () => {
+              try {
+                const nextPageParams = {
+                  page: page + 1,
+                  ...(dateRange !== 'all' && { date_range: dateRange }),
+                  ...(levelFilter !== 'all' && { level: levelFilter }),
+                  ...(statusFilter !== 'all' && { status: statusFilter }),
+                };
+                const nextPageResult = await api.systemadmin.getLogs(nextPageParams);
+                if (nextPageResult && nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPage(nextPageData.length > 0);
+                } else {
+                  setHasNextPage(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPage(false);
+              }
+            };
+            checkNextPage();
+          }
         } else {
           setLogsData([]);
+          setHasNextPage(false);
         }
       } catch (error) {
         console.error('Failed to fetch logs:', error);
         setLogsData([]);
+        setHasNextPage(false);
       } finally {
         setLoading(false);
       }
@@ -87,13 +150,22 @@ export default function SystemLogs() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
 
-  const { logs, totalPages } = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return { 
-      logs: logsData.slice(start, start + ITEMS_PER_PAGE), 
-      totalPages: Math.ceil(logsData.length / ITEMS_PER_PAGE) 
-    };
-  }, [logsData, currentPage]);
+  // Calculate total pages based on API response
+  const totalPages = useMemo(() => {
+    if (paginationMeta.total !== null && paginationMeta.total !== undefined) {
+      return Math.ceil(paginationMeta.total / paginationMeta.limit);
+    }
+    if (logsData.length < paginationMeta.limit) {
+      return paginationMeta.page;
+    }
+    if (logsData.length === paginationMeta.limit) {
+      return hasNextPage ? paginationMeta.page + 1 : paginationMeta.page;
+    }
+    return 1;
+  }, [paginationMeta, logsData.length, hasNextPage]);
+
+  // Use logs data directly from API (no client-side pagination)
+  const logs = logsData;
 
   const columns = [
     { key: 'dateTime', label: 'Time' },
@@ -107,6 +179,7 @@ export default function SystemLogs() {
   const handleFilterChange = (idx, value) => {
     setFilters(prev => prev.map((v, i) => i === idx ? value : v));
     setCurrentPage(1);
+    setHasNextPage(false); // Reset next page check when filter changes
   };
 
   return (

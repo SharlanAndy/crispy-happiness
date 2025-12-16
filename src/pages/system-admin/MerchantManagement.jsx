@@ -23,6 +23,8 @@ export default function MerchantManagement() {
   const [merchantsData, setMerchantsData] = useState([]);
   const [dashboardData, setDashboardData] = useState(null);
   const [totalPages, setTotalPages] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [paginationMeta, setPaginationMeta] = useState({ limit: 20, page: 1, total: null });
   const [summaryStats, setSummaryStats] = useState({
     t1: { count: 0, lastUpdate: null },
     t2: { count: 0, lastUpdate: null },
@@ -120,7 +122,14 @@ export default function MerchantManagement() {
         ]);
 
         if (merchantsResult && merchantsResult.success) {
-          const transformed = merchantsResult.data.map(m => ({
+          const dataArray = merchantsResult.data || [];
+          const limit = merchantsResult.limit || 20;
+          const page = merchantsResult.page || currentPage;
+          const total = merchantsResult.total || null;
+          
+          setPaginationMeta({ limit, page, total });
+          
+          const transformed = dataArray.map(m => ({
             id: m.id, // Keep numeric id for navigation/actions
             merchant_id: m.merchant_id || 'N/A', // Use merchant_id directly from API for display
             name: m.company_name || 'N/A',
@@ -131,15 +140,62 @@ export default function MerchantManagement() {
           }));
           setMerchantsData(transformed);
           
-          // Set total pages from API response if available
+          // Determine if there's a next page
+          if (total !== null) {
+            // If API provides total count, calculate if there's a next page
+            setHasNextPage(page * limit < total);
+          } else if (dataArray.length < limit) {
+            // Less than limit items means this is the last page
+            setHasNextPage(false);
+          } else if (dataArray.length === limit && page === 1) {
+            // Exactly limit items on page 1 - need to check page 2
+            const checkNextPage = async () => {
+              try {
+                const nextPageResult = await api.systemadmin.getMerchants({ page: 2, type });
+                if (nextPageResult && nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPage(nextPageData.length > 0);
+                } else {
+                  setHasNextPage(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPage(false);
+              }
+            };
+            checkNextPage();
+          } else if (dataArray.length === limit && page > 1) {
+            // On page 2+ with exactly limit items, there might be more
+            const checkNextPage = async () => {
+              try {
+                const nextPageResult = await api.systemadmin.getMerchants({ page: page + 1, type });
+                if (nextPageResult && nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPage(nextPageData.length > 0);
+                } else {
+                  setHasNextPage(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPage(false);
+              }
+            };
+            checkNextPage();
+          }
+          
+          // Set total pages from API response if available, otherwise calculate
           if (merchantsResult.total_pages) {
             setTotalPages(merchantsResult.total_pages);
           } else if (merchantsResult.meta?.totalPages) {
             setTotalPages(merchantsResult.meta.totalPages);
+          } else if (total !== null) {
+            setTotalPages(Math.ceil(total / limit));
           }
+          // Note: hasNextPage will be set asynchronously, totalPages will be updated via useEffect
         } else {
           setMerchantsData([]);
           setTotalPages(1);
+          setHasNextPage(false);
         }
 
         if (dashboardResult && dashboardResult.success) {
@@ -160,6 +216,17 @@ export default function MerchantManagement() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
+
+  // Calculate total pages based on pagination metadata and hasNextPage
+  useEffect(() => {
+    if (paginationMeta.total !== null && paginationMeta.total !== undefined) {
+      setTotalPages(Math.ceil(paginationMeta.total / paginationMeta.limit));
+    } else if (merchantsData.length < paginationMeta.limit) {
+      setTotalPages(paginationMeta.page);
+    } else if (merchantsData.length === paginationMeta.limit) {
+      setTotalPages(hasNextPage ? paginationMeta.page + 1 : paginationMeta.page);
+    }
+  }, [paginationMeta, merchantsData.length, hasNextPage]);
 
   // Apply search filter (client-side search on already filtered API data)
   const filteredMerchants = useMemo(
@@ -286,6 +353,7 @@ export default function MerchantManagement() {
   const handleTierChange = (tier) => {
     setActiveTier(tier);
     setCurrentPage(1);
+    setHasNextPage(false); // Reset next page check when tier changes
   };
 
   const handleSearchChange = (value) => {

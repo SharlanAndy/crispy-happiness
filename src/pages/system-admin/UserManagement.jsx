@@ -17,6 +17,7 @@ export default function UserManagement() {
   const [usersMeta, setUsersMeta] = useState(null); // Store metadata from users endpoint
   const [allUsersForStats, setAllUsersForStats] = useState([]); // Store all users from page 1 for stats calculation (System Admin only)
   const [paginationMeta, setPaginationMeta] = useState({ total: 0, limit: 20, page: 1 }); // Store pagination metadata
+  const [hasNextPage, setHasNextPage] = useState(false);
 
   // Detect if accessed from T3 Admin or System Admin
   const isT3Admin = location.pathname.startsWith('/t3-admin');
@@ -145,22 +146,19 @@ export default function UserManagement() {
     }
     
     // If total is not provided, use heuristic based on data length vs limit:
-    // - If data.length < limit: This is the last page (e.g., 19 items with limit 20 = 1 page)
-    // - If data.length === limit: There might be more pages, show at least current + 1
+    // - If data.length < limit: This is the last page
+    // - If data.length === limit: Check hasNextPage to determine if there's more
     if (usersData.length > 0) {
       if (usersData.length < paginationMeta.limit) {
-        // Fewer items than limit means this is the last page
         return paginationMeta.page;
       } else if (usersData.length === paginationMeta.limit) {
-        // Full page of data, there might be more pages
-        // Show at least current page + 1, but will adjust when user navigates
-        return paginationMeta.page + 1;
+        return hasNextPage ? paginationMeta.page + 1 : paginationMeta.page;
       }
     }
     
     // Default to 1 page if no data
     return 1;
-  }, [paginationMeta, usersData.length]);
+  }, [paginationMeta, usersData.length, hasNextPage]);
 
   // Use data directly from API (server-side pagination)
   const users = usersData;
@@ -360,7 +358,11 @@ export default function UserManagement() {
               <SearchBar
                 placeholder="Search User..."
                 value={searchTerm}
-                onChange={setSearchTerm}
+                onChange={(value) => {
+                  setSearchTerm(value);
+                  setCurrentPage(1);
+                  setHasNextPage(false); // Reset next page check when search changes
+                }}
                 className="max-w-sm"
               />
 

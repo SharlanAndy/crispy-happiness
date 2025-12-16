@@ -2,12 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader } from '../../components/ui';
-import { filterAndPaginate } from '@/lib/pagination';
 import { t3Service } from '@/services/t3Service';
 import { api } from '@/lib/api';
-
-const ITEMS_PER_PAGE = 10;
-const SEARCH_KEYS = ['id', 'wallet', 'amount'];
 
 const TABS = [
   { id: 'approved', label: 'Withdraw Approve' },
@@ -50,6 +46,10 @@ export default function WithdrawalHistory() {
   const [loading, setLoading] = useState(true);
   const [withdrawalsData, setWithdrawalsData] = useState({ approved: [], rejected: [] });
   const [withdrawalStats, setWithdrawalStats] = useState(null);
+  const [hasNextPageApproved, setHasNextPageApproved] = useState(false);
+  const [hasNextPageRejected, setHasNextPageRejected] = useState(false);
+  const [paginationMetaApproved, setPaginationMetaApproved] = useState({ limit: 20, page: 1, total: null });
+  const [paginationMetaRejected, setPaginationMetaRejected] = useState({ limit: 20, page: 1, total: null });
 
   // Detect if accessed from System Admin or T3 Admin
   const isSystemAdmin = location.pathname.startsWith('/system-admin');
@@ -93,14 +93,27 @@ export default function WithdrawalHistory() {
     const fetchWithdrawals = async () => {
       try {
         setLoading(true);
-        // Fetch all history (no page param - using client-side pagination and search)
+        const paramsApproved = { page: currentPage, status: 'approved' };
+        const paramsRejected = { page: currentPage, status: 'reject' };
+        if (searchTerm && searchTerm.trim()) {
+          paramsApproved.search = searchTerm.trim();
+          paramsRejected.search = searchTerm.trim();
+        }
+        
         const [approvedResult, rejectedResult] = await Promise.all([
-          t3Service.getWithdrawalHistory({ page: 1, status: 'approved' }), // Fetch all, paginate client-side
-          t3Service.getWithdrawalHistory({ page: 1, status: 'reject' }) // Fetch all, paginate client-side
+          t3Service.getWithdrawalHistory(paramsApproved),
+          t3Service.getWithdrawalHistory(paramsRejected)
         ]);
 
         if (approvedResult.success) {
-          const approved = approvedResult.data.map(w => ({
+          const dataArray = approvedResult.data || [];
+          const limit = approvedResult.limit || 20;
+          const page = approvedResult.page || currentPage;
+          const total = approvedResult.total || null;
+          
+          setPaginationMetaApproved({ limit, page, total });
+          
+          const approved = dataArray.map(w => ({
             id: w.application_id || w.id?.toString(),
             amount: `${(w.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
             wallet: w.wallet_address ? `${w.wallet_address.substring(0, 6)}....${w.wallet_address.substring(w.wallet_address.length - 5)}` : 'N/A',
@@ -108,10 +121,64 @@ export default function WithdrawalHistory() {
             status: 'Approved'
           }));
           setWithdrawalsData(prev => ({ ...prev, approved }));
+
+          // Determine if there's a next page for approved
+          if (total !== null) {
+            setHasNextPageApproved(page * limit < total);
+          } else if (dataArray.length < limit) {
+            setHasNextPageApproved(false);
+          } else if (dataArray.length === limit && page === 1) {
+            const checkNextPage = async () => {
+              try {
+                const nextPageParams = { page: 2, status: 'approved' };
+                if (searchTerm && searchTerm.trim()) {
+                  nextPageParams.search = searchTerm.trim();
+                }
+                const nextPageResult = await t3Service.getWithdrawalHistory(nextPageParams);
+                if (nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPageApproved(nextPageData.length > 0);
+                } else {
+                  setHasNextPageApproved(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPageApproved(false);
+              }
+            };
+            checkNextPage();
+          } else if (dataArray.length === limit && page > 1) {
+            const checkNextPage = async () => {
+              try {
+                const nextPageParams = { page: page + 1, status: 'approved' };
+                if (searchTerm && searchTerm.trim()) {
+                  nextPageParams.search = searchTerm.trim();
+                }
+                const nextPageResult = await t3Service.getWithdrawalHistory(nextPageParams);
+                if (nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPageApproved(nextPageData.length > 0);
+                } else {
+                  setHasNextPageApproved(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPageApproved(false);
+              }
+            };
+            checkNextPage();
+          }
         }
 
         if (rejectedResult.success) {
-          const rejected = rejectedResult.data.map(w => ({
+          const dataArray = rejectedResult.data || [];
+          const limit = rejectedResult.limit || 20;
+          const page = rejectedResult.page || currentPage;
+          const total = rejectedResult.total || null;
+          
+          setPaginationMetaRejected({ limit, page, total });
+          
+          const rejected = dataArray.map(w => ({
             id: w.application_id || w.id?.toString(),
             amount: `${(w.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
             wallet: w.wallet_address ? `${w.wallet_address.substring(0, 6)}....${w.wallet_address.substring(w.wallet_address.length - 5)}` : 'N/A',
@@ -119,18 +186,65 @@ export default function WithdrawalHistory() {
             status: 'Rejected'
           }));
           setWithdrawalsData(prev => ({ ...prev, rejected }));
-        }
 
-        // Stats are now fetched from the stats endpoint, no need to calculate here
+          // Determine if there's a next page for rejected
+          if (total !== null) {
+            setHasNextPageRejected(page * limit < total);
+          } else if (dataArray.length < limit) {
+            setHasNextPageRejected(false);
+          } else if (dataArray.length === limit && page === 1) {
+            const checkNextPage = async () => {
+              try {
+                const nextPageParams = { page: 2, status: 'reject' };
+                if (searchTerm && searchTerm.trim()) {
+                  nextPageParams.search = searchTerm.trim();
+                }
+                const nextPageResult = await t3Service.getWithdrawalHistory(nextPageParams);
+                if (nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPageRejected(nextPageData.length > 0);
+                } else {
+                  setHasNextPageRejected(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPageRejected(false);
+              }
+            };
+            checkNextPage();
+          } else if (dataArray.length === limit && page > 1) {
+            const checkNextPage = async () => {
+              try {
+                const nextPageParams = { page: page + 1, status: 'reject' };
+                if (searchTerm && searchTerm.trim()) {
+                  nextPageParams.search = searchTerm.trim();
+                }
+                const nextPageResult = await t3Service.getWithdrawalHistory(nextPageParams);
+                if (nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPageRejected(nextPageData.length > 0);
+                } else {
+                  setHasNextPageRejected(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPageRejected(false);
+              }
+            };
+            checkNextPage();
+          }
+        }
       } catch (error) {
         console.error('Failed to fetch withdrawal history:', error);
         setWithdrawalsData({ approved: [], rejected: [] });
+        setHasNextPageApproved(false);
+        setHasNextPageRejected(false);
       } finally {
         setLoading(false);
       }
     };
     fetchWithdrawals();
-  }, [currentPage, activeTab, isSystemAdmin, withdrawalStats]);
+  }, [currentPage, activeTab, searchTerm, isSystemAdmin]);
 
   // Dynamic columns based on active tab
   const columns = useMemo(() => [
@@ -145,20 +259,40 @@ export default function WithdrawalHistory() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
 
-  const { data: withdrawals, totalPages } = useMemo(
-    () => filterAndPaginate(withdrawalsData[activeTab] || [], searchTerm, SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
-    [withdrawalsData, activeTab, searchTerm, currentPage]
-  );
+  // Calculate total pages based on active tab
+  const totalPages = useMemo(() => {
+    const meta = activeTab === 'approved' ? paginationMetaApproved : paginationMetaRejected;
+    const hasNext = activeTab === 'approved' ? hasNextPageApproved : hasNextPageRejected;
+    const data = withdrawalsData[activeTab] || [];
+    
+    if (meta.total !== null && meta.total !== undefined) {
+      return Math.ceil(meta.total / meta.limit);
+    }
+    if (data.length < meta.limit) {
+      return meta.page;
+    }
+    if (data.length === meta.limit) {
+      return hasNext ? meta.page + 1 : meta.page;
+    }
+    return 1;
+  }, [activeTab, paginationMetaApproved, paginationMetaRejected, hasNextPageApproved, hasNextPageRejected, withdrawalsData]);
+
+  // Use withdrawals data directly from API (no client-side pagination)
+  const withdrawals = withdrawalsData[activeTab] || [];
 
   const handleSearchChange = (value) => {
     setSearchTerm(value);
     setCurrentPage(1);
+    setHasNextPageApproved(false);
+    setHasNextPageRejected(false);
   };
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     setCurrentPage(1);
     setSearchTerm('');
+    setHasNextPageApproved(false);
+    setHasNextPageRejected(false);
   };
 
   const basePath = isSystemAdmin ? '/system-admin' : '/t3-admin';

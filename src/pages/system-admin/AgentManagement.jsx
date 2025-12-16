@@ -2,12 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, Settings, Trash2, Plus } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, ConfirmDialog, AddAgentModal } from '../../components/ui';
-import { filterAndPaginate } from '@/lib/pagination';
 import { api } from '@/lib/api';
 import { useToast } from '@/contexts/ToastContext';
-
-const ITEMS_PER_PAGE = 10;
-const AGENT_SEARCH_KEYS = ['id', 'status', 'bonus', 'l1', 'l2', 'join'];
 
 export default function AgentManagement() {
   const navigate = useNavigate();
@@ -18,6 +14,8 @@ export default function AgentManagement() {
   const [loading, setLoading] = useState(true);
   const [agentsData, setAgentsData] = useState([]);
   const [agentsMeta, setAgentsMeta] = useState(null);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [paginationMeta, setPaginationMeta] = useState({ limit: 20, page: 1, total: null });
   const { handleApiResponse, showError } = useToast();
 
   // Fetch agents data
@@ -27,13 +25,20 @@ export default function AgentManagement() {
     const fetchAgents = async () => {
       try {
         setLoading(true);
-        const agentsResult = await api.systemadmin.getAgents({ page: 1 });
+        const agentsResult = await api.systemadmin.getAgents({ page: currentPage });
 
         // Check if request was aborted
         if (abortController.signal.aborted) return;
 
         if (agentsResult && agentsResult.success) {
-          const transformed = agentsResult.data.map(a => ({
+          const dataArray = agentsResult.data || [];
+          const limit = agentsResult.limit || 20;
+          const page = agentsResult.page || currentPage;
+          const total = agentsResult.total || null;
+          
+          setPaginationMeta({ limit, page, total });
+          
+          const transformed = dataArray.map(a => ({
             id: a.id || 'N/A',
             bonus: `${(a.bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
             l1: (a.level1 || 0).toString(),
@@ -46,9 +51,51 @@ export default function AgentManagement() {
           setAgentsData(transformed);
           // Store meta information from response
           setAgentsMeta(agentsResult.meta || agentsResult);
+
+          // Determine if there's a next page
+          if (total !== null) {
+            setHasNextPage(page * limit < total);
+          } else if (dataArray.length < limit) {
+            setHasNextPage(false);
+          } else if (dataArray.length === limit && page === 1) {
+            // Check page 2
+            const checkNextPage = async () => {
+              try {
+                const nextPageResult = await api.systemadmin.getAgents({ page: 2 });
+                if (nextPageResult && nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPage(nextPageData.length > 0);
+                } else {
+                  setHasNextPage(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPage(false);
+              }
+            };
+            checkNextPage();
+          } else if (dataArray.length === limit && page > 1) {
+            // Check next page
+            const checkNextPage = async () => {
+              try {
+                const nextPageResult = await api.systemadmin.getAgents({ page: page + 1 });
+                if (nextPageResult && nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPage(nextPageData.length > 0);
+                } else {
+                  setHasNextPage(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPage(false);
+              }
+            };
+            checkNextPage();
+          }
         } else {
           setAgentsData([]);
           setAgentsMeta(null);
+          setHasNextPage(false);
         }
       } catch (error) {
         // Ignore abort errors
@@ -57,6 +104,7 @@ export default function AgentManagement() {
         if (!abortController.signal.aborted) {
           setAgentsData([]);
           setAgentsMeta(null);
+          setHasNextPage(false);
         }
       } finally {
         if (!abortController.signal.aborted) {
@@ -71,18 +119,44 @@ export default function AgentManagement() {
     return () => {
       abortController.abort();
     };
-  }, []);
+  }, [currentPage]);
 
   // Scroll to top when page changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
 
-  // Apply search and pagination
-  const { data: agents, totalPages } = useMemo(
-    () => filterAndPaginate(agentsData, searchTerm, AGENT_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
-    [agentsData, searchTerm, currentPage]
-  );
+  // Calculate total pages based on API response
+  const totalPages = useMemo(() => {
+    if (paginationMeta.total !== null && paginationMeta.total !== undefined) {
+      return Math.ceil(paginationMeta.total / paginationMeta.limit);
+    }
+    if (agentsData.length < paginationMeta.limit) {
+      return paginationMeta.page;
+    }
+    if (agentsData.length === paginationMeta.limit) {
+      return hasNextPage ? paginationMeta.page + 1 : paginationMeta.page;
+    }
+    return 1;
+  }, [paginationMeta, agentsData.length, hasNextPage]);
+
+  // Apply client-side search only (API handles pagination)
+  const agents = useMemo(() => {
+    if (!searchTerm || !searchTerm.trim()) {
+      return agentsData;
+    }
+    const searchLower = searchTerm.toLowerCase().trim();
+    return agentsData.filter(a => {
+      return (
+        a.id?.toLowerCase().includes(searchLower) ||
+        a.status?.toLowerCase().includes(searchLower) ||
+        a.bonus?.toLowerCase().includes(searchLower) ||
+        a.l1?.includes(searchLower) ||
+        a.l2?.includes(searchLower) ||
+        a.join?.toLowerCase().includes(searchLower)
+      );
+    });
+  }, [agentsData, searchTerm]);
 
   // Calculate stats from API response
   const stats = useMemo(() => {
@@ -190,7 +264,7 @@ export default function AgentManagement() {
 
       if (result && result.success) {
         // Refresh agent list
-        const agentsResult = await api.systemadmin.getAgents({ page: 1 });
+        const agentsResult = await api.systemadmin.getAgents({ page: currentPage });
 
         if (agentsResult && agentsResult.success) {
           const transformed = agentsResult.data.map(a => ({
@@ -219,6 +293,7 @@ export default function AgentManagement() {
   const handleSearchChange = (value) => {
     setSearchTerm(value);
     setCurrentPage(1);
+    setHasNextPage(false); // Reset next page check when search changes
   };
 
   const actions = [{

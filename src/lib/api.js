@@ -628,9 +628,13 @@ export const api = {
     /**
      * Get API keys list.
      * Headers: Authorization: Bearer <token>
-     * @returns {Promise<Object>} { success, data: [...] }
+     * @param {Object} params - { page }
+     * @returns {Promise<Object>} { success, data: [...], page, limit }
      */
-    getAPIKeys: () => request(`${T3SYSTEMADMIN_BASE}/api-keys`, { method: 'GET' }),
+    getAPIKeys: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`${T3SYSTEMADMIN_BASE}/api-keys${query ? `?${query}` : ''}`, { method: 'GET' });
+    },
 
     /**
      * Create a new API key.
@@ -1016,9 +1020,13 @@ export const api = {
     /**
      * Get API keys list.
      * Headers: Authorization: Bearer <token>
-     * @returns {Promise<Object>} { success, data: [...] }
+     * @param {Object} params - { page }
+     * @returns {Promise<Object>} { success, data: [...], page, limit }
      */
-    getAPIKeys: () => request(`${T3SYSTEMADMIN_BASE}/api-keys`, { method: 'GET' }),
+    getAPIKeys: (params = {}) => {
+      const query = new URLSearchParams(params).toString();
+      return request(`${T3SYSTEMADMIN_BASE}/api-keys${query ? `?${query}` : ''}`, { method: 'GET' });
+    },
 
     /**
      * Create a new API key.
