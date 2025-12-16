@@ -1,6 +1,6 @@
 // SVG and image imports - only used assets
 const imgVector = '/crispy-happiness/assets/daceceeedd04ffe8e1b739dc844cef3cef214de9.svg';
-const imgVector1 = '/crispy-happiness/assets/d9c8a0dc7d541e46213c9acc950ea8966ffb8813.svg';
+const imgVector1 = '/favicon.svg';
 const imgVector2 = '/crispy-happiness/assets/27ba44e0dce8953e3f58c2eaab9e3ebd52abf9f7.svg';
 const img = '/crispy-happiness/assets/775c47cce24e49d316ba326bdbb0435a2aff7290.svg';
 const img1 = '/crispy-happiness/assets/ea67677c096e07d6f9e23f8fea648b2f68795f71.svg';
