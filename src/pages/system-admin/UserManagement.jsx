@@ -23,23 +23,18 @@ export default function UserManagement() {
   const isT3Admin = location.pathname.startsWith('/t3-admin');
   const basePath = isT3Admin ? '/t3-admin' : '/system-admin';
 
-  // Fetch stats from users endpoint (page 1) - for System Admin, store raw data for stats calculation
+  // Fetch stats from users endpoint (page 1) - for System Admin only
+  // For T3 Admin, stats are fetched via fetchUsers which includes summary in response
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        if (isT3Admin) {
-          const statsResult = await t3Service.getUsers({ page: 1 });
-          if (statsResult.success) {
-            // Store metadata from page 1 for stats - check both meta and root level
-            setUsersMeta(statsResult.meta || statsResult);
-          }
-        } else {
-          // System Admin - fetch page 1 to get all users for stats calculation
+        if (!isT3Admin) {
+          // System Admin - fetch page 1 to get summary or all users for stats calculation
           const statsResult = await api.systemadmin.getUsers({ page: 1 });
           if (statsResult && statsResult.success) {
-            // Store metadata from page 1 for last update date
-            setUsersMeta(statsResult.meta || statsResult);
-            // Store raw user data from page 1 for stats calculation
+            // Store summary object if available, otherwise fallback to meta or full response
+            setUsersMeta(statsResult.summary || statsResult.meta || statsResult);
+            // Store raw user data from page 1 for stats calculation (fallback if no summary)
             setAllUsersForStats(statsResult.data || []);
           } else {
             setUsersMeta(null);
@@ -80,16 +75,65 @@ export default function UserManagement() {
             }));
             setUsersData(transformed);
             
+            // Update summary if available (summary represents overall stats, not page-specific)
+            if (usersResult.summary) {
+              setUsersMeta(usersResult.summary);
+            } else if (!usersMeta && currentPage === 1) {
+              // If no summary in response and we don't have meta yet, try to fetch it
+              // This handles cases where summary might not be included in the response
+              console.warn('Summary not found in API response');
+            }
+            
             // Store pagination metadata
             const limit = usersResult.limit || usersResult.meta?.limit || 20;
             const total = usersResult.total || usersResult.meta?.total;
             const page = usersResult.page || usersResult.meta?.page || currentPage;
+            const dataLength = usersResult.data?.length || 0;
+            
+            // Use summary.total_active_users as hint if total is not provided
+            const summaryTotal = usersResult.summary?.total_active_users;
+            const effectiveTotal = total !== undefined && total !== null 
+              ? total 
+              : (summaryTotal !== undefined ? summaryTotal : null);
             
             setPaginationMeta({
-              total: total !== undefined ? total : (usersResult.data.length < limit ? (page - 1) * limit + usersResult.data.length : null),
+              total: effectiveTotal !== null ? effectiveTotal : (dataLength < limit ? (page - 1) * limit + dataLength : null),
               limit: limit,
               page: page
             });
+            
+            // If no total provided and we have exactly limit items, check if there's a next page
+            if (effectiveTotal === null && dataLength === limit) {
+              const checkNextPage = async () => {
+                try {
+                  const nextPageParams = { page: page + 1 };
+                  if (searchTerm && searchTerm.trim()) {
+                    nextPageParams.search = searchTerm.trim();
+                  }
+                  const nextPageResult = await t3Service.getUsers(nextPageParams);
+                  
+                  if (nextPageResult.success) {
+                    const nextPageData = nextPageResult.data || [];
+                    setHasNextPage(nextPageData.length > 0);
+                    // If next page has data, update total estimate
+                    if (nextPageData.length > 0) {
+                      setPaginationMeta(prev => ({
+                        ...prev,
+                        total: page * limit + nextPageData.length // Estimate: at least this many
+                      }));
+                    }
+                  } else {
+                    setHasNextPage(false);
+                  }
+                } catch (error) {
+                  console.error('Failed to check next page:', error);
+                  setHasNextPage(false);
+                }
+              };
+              checkNextPage();
+            } else {
+              setHasNextPage(effectiveTotal !== null && effectiveTotal !== undefined ? page * limit < effectiveTotal : false);
+            }
           }
         } else {
           // System Admin - fetch from systemadmin API
@@ -108,19 +152,65 @@ export default function UserManagement() {
             }));
             setUsersData(transformed);
             
+            // Update summary if available (summary represents overall stats, not page-specific)
+            if (usersResult.summary) {
+              setUsersMeta(usersResult.summary);
+            }
+            
             // Store pagination metadata
             const limit = usersResult.limit || usersResult.meta?.limit || 20;
             const total = usersResult.total || usersResult.meta?.total;
             const page = usersResult.page || usersResult.meta?.page || currentPage;
+            const dataLength = usersResult.data?.length || 0;
+            
+            // Use summary.total_active_users as hint if total is not provided
+            const summaryTotal = usersResult.summary?.total_active_users;
+            const effectiveTotal = total !== undefined && total !== null 
+              ? total 
+              : (summaryTotal !== undefined ? summaryTotal : null);
             
             setPaginationMeta({
-              total: total !== undefined ? total : (usersResult.data.length < limit ? (page - 1) * limit + usersResult.data.length : null),
+              total: effectiveTotal !== null ? effectiveTotal : (dataLength < limit ? (page - 1) * limit + dataLength : null),
               limit: limit,
               page: page
             });
+            
+            // If no total provided and we have exactly limit items, check if there's a next page
+            if (effectiveTotal === null && dataLength === limit) {
+              const checkNextPage = async () => {
+                try {
+                  const nextPageParams = { page: page + 1 };
+                  if (searchTerm && searchTerm.trim()) {
+                    nextPageParams.search = searchTerm.trim();
+                  }
+                  const nextPageResult = await api.systemadmin.getUsers(nextPageParams);
+                  
+                  if (nextPageResult && nextPageResult.success) {
+                    const nextPageData = nextPageResult.data || [];
+                    setHasNextPage(nextPageData.length > 0);
+                    // If next page has data, update total estimate
+                    if (nextPageData.length > 0) {
+                      setPaginationMeta(prev => ({
+                        ...prev,
+                        total: page * limit + nextPageData.length // Estimate: at least this many
+                      }));
+                    }
+                  } else {
+                    setHasNextPage(false);
+                  }
+                } catch (error) {
+                  console.error('Failed to check next page:', error);
+                  setHasNextPage(false);
+                }
+              };
+              checkNextPage();
+            } else {
+              setHasNextPage(effectiveTotal !== null && effectiveTotal !== undefined ? page * limit < effectiveTotal : false);
+            }
           } else {
             setUsersData([]);
             setPaginationMeta({ total: 0, limit: 20, page: 1 });
+            setHasNextPage(false);
           }
         }
       } catch (error) {
@@ -168,7 +258,9 @@ export default function UserManagement() {
     // Get last updated date from users endpoint response, default to today
     const getLastUpdated = () => {
       if (usersMeta) {
-        const lastUpdated = usersMeta.last_updated_date ||
+        // For T3 Admin, check summary object first, then fallback to root level
+        const lastUpdated = (isT3Admin && usersMeta.last_updated_date) ||
+                           usersMeta.last_updated_date ||
                            usersMeta.last_updated || 
                            usersMeta.updated_at || 
                            usersMeta.last_update ||
@@ -178,7 +270,31 @@ export default function UserManagement() {
         
         if (lastUpdated) {
           try {
-            const date = new Date(lastUpdated);
+            // Handle date format: "2025-12-16 14:13:47" (YYYY-MM-DD HH:mm:ss)
+            // Parse manually to avoid timezone conversion issues
+            let date;
+            if (typeof lastUpdated === 'string') {
+              // Check if it's in format "YYYY-MM-DD HH:mm:ss" or "YYYY-MM-DD"
+              const dateTimeMatch = lastUpdated.match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2}):(\d{2}))?/);
+              if (dateTimeMatch) {
+                // Extract year, month, day (and optionally time)
+                const year = parseInt(dateTimeMatch[1], 10);
+                const month = parseInt(dateTimeMatch[2], 10) - 1; // Month is 0-indexed
+                const day = parseInt(dateTimeMatch[3], 10);
+                const hour = dateTimeMatch[4] ? parseInt(dateTimeMatch[4], 10) : 0;
+                const minute = dateTimeMatch[5] ? parseInt(dateTimeMatch[5], 10) : 0;
+                const second = dateTimeMatch[6] ? parseInt(dateTimeMatch[6], 10) : 0;
+                
+                // Create date in local timezone to avoid day shift
+                date = new Date(year, month, day, hour, minute, second);
+              } else {
+                // Fallback to standard Date parsing
+                date = new Date(lastUpdated);
+              }
+            } else {
+              date = new Date(lastUpdated);
+            }
+            
             if (!isNaN(date.getTime())) {
               return date.toLocaleDateString('en-GB');
             }
@@ -194,60 +310,25 @@ export default function UserManagement() {
     const lastUpdate = getLastUpdated();
 
     if (isT3Admin) {
-      // For T3 Admin, extract from metadata (existing logic)
-    const totalActiveUsers = usersMeta?.total_users || 
-                             usersMeta?.total_active_users || 
-                             usersMeta?.TotalUsers ||
-                             usersMeta?.TotalActiveUsers ||
-                             0;
+      // For T3 Admin, extract from summary object in API response
+      const totalActiveUsers = usersMeta?.total_active_users || 
+                               usersMeta?.total_users || 
+                               usersMeta?.TotalUsers ||
+                               usersMeta?.TotalActiveUsers ||
+                               0;
 
-    const totalBonusDistributed = usersMeta?.total_bonus_distributed || 
-                                  usersMeta?.total_bonus || 
-                                  usersMeta?.TotalBonusDistributed ||
-                                  usersMeta?.TotalBonus ||
-                                  0;
+      const totalBonusDistributed = usersMeta?.total_bonus_distributed || 
+                                    usersMeta?.total_bonus || 
+                                    usersMeta?.TotalBonusDistributed ||
+                                    usersMeta?.TotalBonus ||
+                                    0;
 
-    const totalSpendingVolume = usersMeta?.total_spending_volume || 
-                                usersMeta?.total_incoming_funds || 
-                                usersMeta?.total_spend ||
-                                usersMeta?.TotalSpendingVolume ||
-                                usersMeta?.TotalIncomingFunds ||
-                                0;
-
-    return [
-      { 
-        label: 'Total Active User', 
-        value: totalActiveUsers.toString(), 
-        lastUpdate: lastUpdate 
-      },
-      { 
-        label: 'Total Bonus Distributed', 
-        value: `${totalBonusDistributed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
-        lastUpdate: lastUpdate 
-      },
-      { 
-        label: 'Total Spending Volume', 
-        value: `${totalSpendingVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
-        lastUpdate: lastUpdate 
-      },
-    ];
-    } else {
-      // For System Admin, calculate from actual user data array
-      // Calculate Total Active User: count users with status === 'active' (case-insensitive)
-      const totalActiveUsers = allUsersForStats.filter(user => {
-        const status = (user.status || '').toLowerCase();
-        return status === 'active';
-      }).length;
-
-      // Calculate Total Bonus Distributed: sum of all total_bonus values
-      const totalBonusDistributed = allUsersForStats.reduce((sum, user) => {
-        return sum + (user.total_bonus || 0);
-      }, 0);
-
-      // Calculate Total Spending Volume: sum of all total_spend values
-      const totalSpendingVolume = allUsersForStats.reduce((sum, user) => {
-        return sum + (user.total_spend || 0);
-      }, 0);
+      const totalSpendingVolume = usersMeta?.total_spending_volume || 
+                                   usersMeta?.total_incoming_funds || 
+                                   usersMeta?.total_spend ||
+                                   usersMeta?.TotalSpendingVolume ||
+                                   usersMeta?.TotalIncomingFunds ||
+                                   0;
 
       return [
         { 
@@ -266,6 +347,75 @@ export default function UserManagement() {
           lastUpdate: lastUpdate 
         },
       ];
+    } else {
+      // For System Admin, prefer summary if available, otherwise calculate from user data array
+      if (usersMeta && (usersMeta.total_active_users !== undefined || usersMeta.total_bonus_distributed !== undefined || usersMeta.total_spending_volume !== undefined)) {
+        // Use summary object if available (same structure as T3 Admin)
+        const totalActiveUsers = usersMeta.total_active_users || 
+                                 usersMeta.total_users || 
+                                 0;
+
+        const totalBonusDistributed = usersMeta.total_bonus_distributed || 
+                                      usersMeta.total_bonus || 
+                                      0;
+
+        const totalSpendingVolume = usersMeta.total_spending_volume || 
+                                    usersMeta.total_spend ||
+                                    0;
+
+        return [
+          { 
+            label: 'Total Active User', 
+            value: totalActiveUsers.toString(), 
+            lastUpdate: lastUpdate 
+          },
+          { 
+            label: 'Total Bonus Distributed', 
+            value: `${totalBonusDistributed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
+            lastUpdate: lastUpdate 
+          },
+          { 
+            label: 'Total Spending Volume', 
+            value: `${totalSpendingVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
+            lastUpdate: lastUpdate 
+          },
+        ];
+      } else {
+        // Fallback: Calculate from actual user data array (only page 1 users)
+        // Calculate Total Active User: count users with status === 'active' (case-insensitive)
+        const totalActiveUsers = allUsersForStats.filter(user => {
+          const status = (user.status || '').toLowerCase();
+          return status === 'active';
+        }).length;
+
+        // Calculate Total Bonus Distributed: sum of all total_bonus values
+        const totalBonusDistributed = allUsersForStats.reduce((sum, user) => {
+          return sum + (user.total_bonus || 0);
+        }, 0);
+
+        // Calculate Total Spending Volume: sum of all total_spend values
+        const totalSpendingVolume = allUsersForStats.reduce((sum, user) => {
+          return sum + (user.total_spend || 0);
+        }, 0);
+
+        return [
+          { 
+            label: 'Total Active User', 
+            value: totalActiveUsers.toString(), 
+            lastUpdate: lastUpdate 
+          },
+          { 
+            label: 'Total Bonus Distributed', 
+            value: `${totalBonusDistributed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
+            lastUpdate: lastUpdate 
+          },
+          { 
+            label: 'Total Spending Volume', 
+            value: `${totalSpendingVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, 
+            lastUpdate: lastUpdate 
+          },
+        ];
+      }
     }
   }, [usersMeta, allUsersForStats, isT3Admin]);
 
