@@ -14,7 +14,7 @@ const Header = ({ walletAddress }) => {
   return (
     <div className="fixed top-0 left-[274px] right-0 z-40 bg-white border-b border-neutral-200 flex items-center justify-between px-6 py-5">
       <div className="flex items-center gap-3.5">
-        <img alt="System" className="w-6 h-6" src={imgVector1} />
+        <img alt="System" className="size-8" src={imgVector1} />
         <h1 className="font-honor-sans font-semibold text-[21px]">{title}</h1>
       </div>
       
