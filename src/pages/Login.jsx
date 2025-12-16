@@ -42,7 +42,6 @@ export default function Login() {
       <div className="bg-card p-8 rounded-xl shadow-lg w-full max-w-md border">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 text-primary mb-4">
-            <Lock size={32} />
           </div>
           <h1 className="text-2xl font-bold text-primary">NBN Management System</h1>
           <p className="text-muted-foreground mt-2">Secure Login Portal</p>
