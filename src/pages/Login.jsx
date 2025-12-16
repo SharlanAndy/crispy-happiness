@@ -43,7 +43,6 @@ export default function Login() {
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center gap-2 w-auto h-16 rounded-full bg-primary/10 text-primary mb-4 px-4">
             <img src="/favicon.svg" alt="Logo" className="w-8 h-8" />
-            <Lock size={32} />
           </div>
           <h1 className="text-2xl font-bold text-primary">NBN Management System</h1>
           <p className="text-muted-foreground mt-2">Secure Login Portal</p>
