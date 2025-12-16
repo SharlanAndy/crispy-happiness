@@ -2,12 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, ArrowDownToLine } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader } from '@/components/ui';
-import { filterAndPaginate } from '@/lib/pagination';
 import { t3Service } from '@/services/t3Service';
 import { api, T3SYSTEMADMIN_BASE } from '@/lib/api';
-
-const ITEMS_PER_PAGE = 10;
-const TRANSACTION_SEARCH_KEYS = ['id', 'type', 'orderno', 'status', 'reference'];
 
 const STATS = [
   { label: 'Total Transaction', value: '1,000.00 USDT', lastUpdate: '17-11-2025' },
@@ -41,6 +37,8 @@ export default function TransactionManagement() {
   const [loading, setLoading] = useState(true);
   const [transactionsData, setTransactionsData] = useState([]);
   const [statsData, setStatsData] = useState(null);
+  const [paginationMeta, setPaginationMeta] = useState({ limit: 20, page: 1, total: null });
+  const [hasNextPage, setHasNextPage] = useState(false);
 
   // Detect if accessed from T3 Admin or System Admin
   const isT3Admin = location.pathname.startsWith('/t3-admin');
@@ -67,7 +65,14 @@ export default function TransactionManagement() {
         ]);
 
         if (transactionsResult.success) {
-          const transformed = transactionsResult.data.map(t => {
+          // Store pagination metadata from API response
+          const limit = transactionsResult.limit || 20;
+          const page = transactionsResult.page || currentPage;
+          const total = transactionsResult.total || null;
+          const dataArray = transactionsResult.data || [];
+          setPaginationMeta({ limit, page, total });
+
+          const transformed = dataArray.map(t => {
             const numericId = t.id || t.transaction_id || '';
             const formattedId = `T${String(numericId).padStart(6, '0')}`;
             return {
@@ -86,6 +91,63 @@ export default function TransactionManagement() {
             };
           });
           setTransactionsData(transformed);
+
+          // Determine if there's a next page
+          if (total !== null) {
+            // If API provides total count, calculate if there's a next page
+            setHasNextPage(page * limit < total);
+          } else if (dataArray.length < limit) {
+            // Less than limit items means this is the last page
+            setHasNextPage(false);
+          } else if (dataArray.length === limit && page === 1) {
+            // Exactly limit items on page 1 - need to check page 2
+            const checkNextPage = async () => {
+              try {
+                const nextPageParams = { page: 2 };
+                if (searchTerm && searchTerm.trim()) {
+                  nextPageParams.search = searchTerm.trim();
+                }
+                const nextPageResult = isT3Admin 
+                  ? await t3Service.getTransactions(nextPageParams)
+                  : await api.systemadmin.getTransactions(nextPageParams);
+                
+                if (nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPage(nextPageData.length > 0);
+                } else {
+                  setHasNextPage(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPage(false);
+              }
+            };
+            checkNextPage();
+          } else if (dataArray.length === limit && page > 1) {
+            // On page 2+ with exactly limit items, there might be more
+            const checkNextPage = async () => {
+              try {
+                const nextPageParams = { page: page + 1 };
+                if (searchTerm && searchTerm.trim()) {
+                  nextPageParams.search = searchTerm.trim();
+                }
+                const nextPageResult = isT3Admin 
+                  ? await t3Service.getTransactions(nextPageParams)
+                  : await api.systemadmin.getTransactions(nextPageParams);
+                
+                if (nextPageResult.success) {
+                  const nextPageData = nextPageResult.data || [];
+                  setHasNextPage(nextPageData.length > 0);
+                } else {
+                  setHasNextPage(false);
+                }
+              } catch (error) {
+                console.error('Failed to check next page:', error);
+                setHasNextPage(false);
+              }
+            };
+            checkNextPage();
+          }
         }
 
         if (overviewResult.success) {
@@ -106,15 +168,33 @@ export default function TransactionManagement() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentPage]);
 
-  // Apply search and pagination
-  const { data: transactions, totalPages } = useMemo(
-    () => filterAndPaginate(transactionsData, searchTerm, TRANSACTION_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
-    [transactionsData, searchTerm, currentPage]
-  );
+  // Calculate total pages based on API response
+  const totalPages = useMemo(() => {
+    if (paginationMeta.total !== null) {
+      // If API provides total count, calculate pages
+      return Math.ceil(paginationMeta.total / paginationMeta.limit);
+    }
+    // Otherwise, infer from current page data
+    // If current page has less than limit items, this is the last page
+    if (transactionsData.length < paginationMeta.limit) {
+      return currentPage; // Current page is the last page
+    }
+    // If current page has exactly limit items, check if we verified next page exists
+    if (transactionsData.length === paginationMeta.limit) {
+      // Only show next page if we've verified it exists
+      return hasNextPage ? currentPage + 1 : currentPage;
+    }
+    return currentPage;
+  }, [paginationMeta, transactionsData.length, currentPage, hasNextPage]);
+
+  // Use transactions directly from API (no client-side pagination or filtering)
+  // API handles both pagination and search
+  const transactions = transactionsData;
 
   const handleSearchChange = (value) => {
     setSearchTerm(value);
     setCurrentPage(1);
+    setHasNextPage(false); // Reset next page check when search changes
   };
 
   // Helper function to get last updated date from API or fallback
