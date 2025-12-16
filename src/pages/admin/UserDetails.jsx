@@ -24,6 +24,7 @@ export default function UserDetails() {
     if (!data) return null;
     return {
       id: data.ID || data.id,
+      userId: data.UserID || data.user_id || data.ID || data.id, // Extract user_id for transaction filtering
       username: data.Username || data.username,
       walletAddress: data.WalletAddress || data.wallet_address,
       status: data.Status || data.status,
@@ -37,6 +38,8 @@ export default function UserDetails() {
 
   // Fetch user details
   useEffect(() => {
+    const abortController = new AbortController();
+    
     const fetchUserDetails = async () => {
       if (!id) {
         setLoading(false);
@@ -47,51 +50,95 @@ export default function UserDetails() {
         setLoading(true);
         const result = isT3Admin
           ? await t3Service.getUserDetails(id)
-          : await api.request(`${T3SYSTEMADMIN_BASE}/users/${id}`, { method: 'GET' });
+          : await api.systemadmin.getUserDetails(id);
         
-        if (result.success && result.data) {
+        // Check if request was aborted
+        if (abortController.signal.aborted) return;
+        
+        if (result && result.success && result.data) {
           setUserData(result.data);
         }
       } catch (error) {
+        // Ignore abort errors
+        if (error.name === 'AbortError') return;
         console.error('Failed to fetch user details:', error);
       } finally {
-        setLoading(false);
+        if (!abortController.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
+    
     fetchUserDetails();
+    
+    // Cleanup: abort request if component unmounts or dependencies change
+    return () => {
+      abortController.abort();
+    };
   }, [id, isT3Admin]);
 
   // Fetch user transactions
   useEffect(() => {
+    // Don't fetch if userData is not available yet
+    if (!id || !userData) return;
+    
+    const abortController = new AbortController();
+    
     const fetchTransactions = async () => {
-      if (!id || !userData) return;
-
       try {
-        const result = isT3Admin
-          ? await t3Service.getTransactions({ page: currentPage, search: searchTerm })
-          : await api.request(`${T3SYSTEMADMIN_BASE}/transactions?page=${currentPage}&search=${encodeURIComponent(searchTerm || '')}`, { method: 'GET' });
+        // Normalize user data to get user_id
+        const normalized = normalizeUserData(userData);
+        const userId = normalized?.userId || normalized?.id || id;
         
-        if (result.success) {
-          // Normalize user data for comparison
-          const normalized = normalizeUserData(userData);
-          const userId = normalized?.id || parseInt(id.replace('U', ''));
+        if (isT3Admin) {
+          // T3 Admin: use existing service
+          const result = await t3Service.getTransactions({ page: currentPage, search: searchTerm });
           
-          // Filter transactions for this user
-          const userTransactions = result.data.filter(t => 
-            t.user_id === userId || t.user_id === parseInt(id.replace('U', ''))
-          );
-          setTransactionsData(userTransactions);
+          if (abortController.signal.aborted) return;
+          
+          if (result.success) {
+            // Filter transactions for this user
+            const userTransactions = result.data.filter(t => 
+              t.user_id === userId || t.user_id === parseInt(id.replace('U', ''))
+            );
+            setTransactionsData(userTransactions);
+          }
+        } else {
+          // System Admin: use endpoint with user_id in search and filter parameters
+          const params = new URLSearchParams({
+            page: currentPage.toString(),
+            search: userId.toString(),
+            filter: userId.toString()
+          });
+          
+          const result = await api.request(`${T3SYSTEMADMIN_BASE}/transactions?${params.toString()}`, { method: 'GET' });
+          
+          // Check if request was aborted
+          if (abortController.signal.aborted) return;
+          
+          if (result && result.success) {
+            setTransactionsData(result.data || []);
+          } else {
+            setTransactionsData([]);
+          }
         }
       } catch (error) {
+        // Ignore abort errors
+        if (error.name === 'AbortError') return;
         console.error('Failed to fetch transactions:', error);
-        setTransactionsData([]);
+        if (!abortController.signal.aborted) {
+          setTransactionsData([]);
+        }
       }
     };
     
-    if (userData) {
-      fetchTransactions();
-    }
-  }, [id, currentPage, searchTerm, userData, isT3Admin]);
+    fetchTransactions();
+    
+    // Cleanup: abort request if component unmounts or dependencies change
+    return () => {
+      abortController.abort();
+    };
+  }, [id, currentPage, searchTerm, userData, isT3Admin]); // userData needed to trigger fetch when it becomes available
 
   // Scroll to top when page changes
   useEffect(() => {

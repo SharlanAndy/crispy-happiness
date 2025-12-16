@@ -4,14 +4,13 @@ import { Eye, Settings, Trash2 } from 'lucide-react';
 import { StatCard, InfoSection, Card, DataTable, SearchBar, PageHeader, ConfirmDialog } from '../../components/ui';
 import { filterAndPaginate } from '@/lib/pagination';
 import { api } from '@/lib/api';
-import { ALL_NETWORK_DATA } from '../../constant/agentMockData';
 
 const ITEMS_PER_PAGE = 10;
 const NETWORK_SEARCH_KEYS = ['id', 'volume', 'bonus', 'sponsorL1', 'sponsorL2', 'join', 'status', 'referrer'];
 const LEVELS = ['level1', 'level2'];
 
 const COLUMNS_LEVEL1 = [
-  { key: 'id', label: 'Agent ID' },
+  { key: 'displayId', label: 'Agent ID' },
   { key: 'volume', label: 'Total Volume' },
   { key: 'bonus', label: 'Bonus Contributed', render: (val) => <span className="text-[#166534] font-medium">{val}</span> },
   { key: 'sponsorL1', label: 'Total Sponsor L1' },
@@ -21,7 +20,7 @@ const COLUMNS_LEVEL1 = [
 ];
 
 const COLUMNS_LEVEL2 = [
-  { key: 'id', label: 'Agent ID' },
+  { key: 'displayId', label: 'Agent ID' },
   { key: 'referrer', label: 'Referrer' },
   { key: 'volume', label: 'Total Volume' },
   { key: 'bonus', label: 'Bonus Contributed', render: (val) => <span className="text-[#166534] font-medium">{val}</span> },
@@ -39,16 +38,26 @@ export default function AgentDetails() {
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, item: null });
   const [agentDetails, setAgentDetails] = useState(null);
+  const [agentStats, setAgentStats] = useState(null);
+  const [networkData, setNetworkData] = useState({ level1: [], level2: [] });
   const [loading, setLoading] = useState(true);
+  const [loadingNetwork, setLoadingNetwork] = useState(false);
   const [error, setError] = useState(null);
 
   // Fetch agent details from API
   useEffect(() => {
+    if (!id) return;
+    
+    const abortController = new AbortController();
+    
     const fetchAgentDetails = async () => {
       try {
         setLoading(true);
         setError(null);
         const result = await api.systemadmin.getAgentDetails(id);
+        
+        // Check if request was aborted
+        if (abortController.signal.aborted) return;
         
         if (result && result.success && result.data) {
           setAgentDetails(result.data);
@@ -57,17 +66,125 @@ export default function AgentDetails() {
           setAgentDetails(null);
         }
       } catch (err) {
+        // Ignore abort errors
+        if (err.name === 'AbortError') return;
         console.error('Error fetching agent details:', err);
-        setError('Failed to fetch agent details. Please try again.');
-        setAgentDetails(null);
+        if (!abortController.signal.aborted) {
+          setError('Failed to fetch agent details. Please try again.');
+          setAgentDetails(null);
+        }
       } finally {
-        setLoading(false);
+        if (!abortController.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
-    if (id) {
-      fetchAgentDetails();
-    }
+    fetchAgentDetails();
+    
+    // Cleanup: abort request if component unmounts or id changes
+    return () => {
+      abortController.abort();
+    };
+  }, [id]);
+
+  // Fetch agent statistics
+  useEffect(() => {
+    if (!id) return;
+    
+    const abortController = new AbortController();
+    
+    const fetchAgentStats = async () => {
+      try {
+        const result = await api.systemadmin.getAgentStats(id);
+        
+        // Check if request was aborted
+        if (abortController.signal.aborted) return;
+        
+        if (result && result.success && result.data) {
+          setAgentStats(result.data);
+        } else {
+          setAgentStats(null);
+        }
+      } catch (err) {
+        // Ignore abort errors
+        if (err.name === 'AbortError') return;
+        console.error('Error fetching agent stats:', err);
+        if (!abortController.signal.aborted) {
+          setAgentStats(null);
+        }
+      }
+    };
+    
+    fetchAgentStats();
+    
+    // Cleanup: abort request if component unmounts or id changes
+    return () => {
+      abortController.abort();
+    };
+  }, [id]);
+
+  // Fetch agent network data
+  useEffect(() => {
+    if (!id) return;
+    
+    const abortController = new AbortController();
+    
+    const fetchNetwork = async () => {
+      try {
+        setLoadingNetwork(true);
+        const result = await api.systemadmin.getAgentNetwork(id);
+        
+        // Check if request was aborted
+        if (abortController.signal.aborted) return;
+        
+        if (result && result.success && result.data) {
+          // Transform API response to match table format
+          // Use the same ID format as agent list: use 'id' field (which matches agent list format)
+          const transformNetworkData = (agents, level) => {
+            return agents.map(agent => ({
+              id: agent.id?.toString() || agent.agent_id || 'N/A', // Use numeric id (same as agent list uses)
+              volume: `${(agent.volume || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+              bonus: `+ ${(agent.bonus_contributed || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
+              sponsorL1: (agent.sponsor_l1_count || 0).toString(),
+              sponsorL2: (agent.sponsor_l2_count || 0).toString(),
+              join: agent.join_date ? new Date(agent.join_date).toLocaleString('en-GB') : 'N/A',
+              status: agent.status ? agent.status.charAt(0).toUpperCase() + agent.status.slice(1) : 'Active',
+              referrer: level === 'level2' && agent.referrer_id ? agent.referrer_id.toString() : undefined,
+              level: level,
+              displayId: agent.agent_id || agent.id?.toString() || 'N/A', // Store agent_id for display purposes
+            }));
+          };
+          
+          const transformed = {
+            level1: transformNetworkData(result.data.level1 || [], 'level1'),
+            level2: transformNetworkData(result.data.level2 || [], 'level2'),
+          };
+          
+          setNetworkData(transformed);
+        } else {
+          setNetworkData({ level1: [], level2: [] });
+        }
+      } catch (err) {
+        // Ignore abort errors
+        if (err.name === 'AbortError') return;
+        console.error('Error fetching agent network:', err);
+        if (!abortController.signal.aborted) {
+          setNetworkData({ level1: [], level2: [] });
+        }
+      } finally {
+        if (!abortController.signal.aborted) {
+          setLoadingNetwork(false);
+        }
+      }
+    };
+    
+    fetchNetwork();
+    
+    // Cleanup: abort request if component unmounts or id changes
+    return () => {
+      abortController.abort();
+    };
   }, [id]);
 
   // Scroll to top when page changes
@@ -87,8 +204,8 @@ export default function AgentDetails() {
 
   // Filter data by level first, then apply search and pagination
   const filteredByLevel = useMemo(
-    () => ALL_NETWORK_DATA.filter(item => item.level === activeLevel),
-    [activeLevel]
+    () => networkData[activeLevel] || [],
+    [networkData, activeLevel]
   );
 
   const { data: paginatedData, totalPages } = useMemo(
@@ -114,18 +231,31 @@ export default function AgentDetails() {
 
   // Transform API data to UI format
   const stats = useMemo(() => {
-    if (!agentDetails) return [];
+    if (!agentStats) return [];
     
-    const totalReferral = (agentDetails.TotalSponsorL1 || 0) + (agentDetails.TotalSponsorL2 || 0);
-    const totalVolume = (agentDetails.TotalVolume || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const totalBonus = (agentDetails.BonusContributed || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const totalReferral = agentStats.TotalReferral || 0;
+    const totalVolume = (agentStats.TotalContributedVolume || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const totalBonus = (agentStats.TotalBonusReceived || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    
+    // Format last update date
+    let lastUpdate = 'N/A';
+    if (agentStats.LastUpdate) {
+      try {
+        const date = new Date(agentStats.LastUpdate);
+        if (!isNaN(date.getTime())) {
+          lastUpdate = date.toLocaleDateString('en-GB');
+        }
+      } catch (e) {
+        console.warn('Failed to parse LastUpdate date:', e);
+      }
+    }
     
     return [
-      { label: 'Total Referral', value: totalReferral.toString(), lastUpdate: agentDetails.CreatedAt ? new Date(agentDetails.CreatedAt).toLocaleDateString('en-GB') : 'N/A' },
-      { label: 'Total Contributed Volume', value: `${totalVolume} USDT`, lastUpdate: agentDetails.CreatedAt ? new Date(agentDetails.CreatedAt).toLocaleDateString('en-GB') : 'N/A' },
-      { label: 'Total Bonus Received', value: `${totalBonus} USDT`, lastUpdate: agentDetails.CreatedAt ? new Date(agentDetails.CreatedAt).toLocaleDateString('en-GB') : 'N/A' },
+      { label: 'Total Referral', value: totalReferral.toString(), lastUpdate },
+      { label: 'Total Contributed Volume', value: `${totalVolume} USDT`, lastUpdate },
+      { label: 'Total Bonus Received', value: `${totalBonus} USDT`, lastUpdate },
     ];
-  }, [agentDetails]);
+  }, [agentStats]);
 
   const userInfo = useMemo(() => {
     if (!agentDetails) return [];
@@ -167,20 +297,50 @@ export default function AgentDetails() {
     ];
   }, [agentDetails]);
 
-  const actions = [{
-    icon: <Eye size={16} />,
-    onClick: (row) => navigate(`/system-admin/agents/${row.id}`),
-    tooltip: 'View Details',
-  }, {
-    icon: <Settings size={16} />,
-    onClick: (row) => navigate(`/system-admin/agents/${row.id}/settings`),
-    tooltip: 'Settings',
-  }, {
-    icon: <Trash2 size={16} />,
-    onClick: (row) => setDeleteConfirm({ isOpen: true, item: row }),
-    variant: 'danger',
-    tooltip: 'Delete',
-  }];
+  // Actions for network list - Level 2 follows user management pattern (navigate to users), Level 1 navigates to agents
+  const actions = useMemo(() => {
+    if (activeLevel === 'level2') {
+      // Level 2: Follow user management pattern - navigate to USER pages
+      return [
+        {
+          icon: <Eye size={16} />,
+          onClick: (row) => navigate(`/system-admin/users/${row.id}`),
+          tooltip: 'View Details',
+        },
+        {
+          icon: <Settings size={16} />,
+          onClick: (row) => navigate(`/system-admin/users/${row.id}/settings`),
+          tooltip: 'Settings',
+        },
+        {
+          icon: <Trash2 size={16} />,
+          onClick: (row) => setDeleteConfirm({ isOpen: true, item: row }),
+          variant: 'danger',
+          tooltip: 'Delete',
+        },
+      ];
+    } else {
+      // Level 1: Navigate to agent pages
+      return [
+        {
+          icon: <Eye size={16} />,
+          onClick: (row) => navigate(`/system-admin/agents/${row.id}`),
+          tooltip: 'View Details',
+        },
+        {
+          icon: <Settings size={16} />,
+          onClick: (row) => navigate(`/system-admin/agents/${row.id}/settings`),
+          tooltip: 'Settings',
+        },
+        {
+          icon: <Trash2 size={16} />,
+          onClick: (row) => setDeleteConfirm({ isOpen: true, item: row }),
+          variant: 'danger',
+          tooltip: 'Delete',
+        },
+      ];
+    }
+  }, [activeLevel, navigate]);
 
   const handleDelete = async (item) => {
     // TODO: Implement delete functionality
@@ -256,18 +416,24 @@ export default function AgentDetails() {
             </div>
             <SearchBar placeholder="Search..." value={searchTerm} onChange={handleSearchChange} className="max-w-sm" />
             
-            <DataTable 
-              columns={columns} 
-              data={paginatedData} 
-              actions={actions}
-              emptyMessage={searchTerm ? `No network members found matching "${searchTerm}"` : 'No network members available'}
-              footer={footerData}
-              pagination={{
-                currentPage,
-                totalPages,
-                onPageChange: setCurrentPage,
-              }}
-            />
+            {loadingNetwork ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Loading network data...</p>
+              </div>
+            ) : (
+              <DataTable 
+                columns={columns} 
+                data={paginatedData} 
+                actions={actions}
+                emptyMessage={searchTerm ? `No network members found matching "${searchTerm}"` : 'No network members available'}
+                footer={footerData}
+                pagination={{
+                  currentPage,
+                  totalPages,
+                  onPageChange: setCurrentPage,
+                }}
+              />
+            )}
           </div>
         </Card>
       </div>
@@ -277,7 +443,7 @@ export default function AgentDetails() {
         onClose={() => setDeleteConfirm({ isOpen: false, item: null })}
         onConfirm={() => handleDelete(deleteConfirm.item)}
         title="Delete Agent"
-        message={`Are you sure you want to delete agent ${deleteConfirm.item?.id}? This action cannot be undone.`}
+        message={`Are you sure you want to delete agent ${deleteConfirm.item?.displayId || deleteConfirm.item?.id}? This action cannot be undone.`}
         confirmText="Delete"
         variant="danger"
       />

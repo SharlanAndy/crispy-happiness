@@ -71,7 +71,7 @@ export default function UserManagement() {
 
           if (usersResult.success) {
             const transformed = usersResult.data.map(user => ({
-              id: user.user_id || user.id || 'N/A',
+              id: user.id || 'N/A',
               walletId: user.wallet_id || 'N/A',
               amount: `${(user.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
               join: user.join_time ? new Date(user.join_time).toLocaleString('en-GB') : 'N/A',
@@ -96,7 +96,7 @@ export default function UserManagement() {
 
           if (usersResult && usersResult.success) {
             const transformed = usersResult.data.map(user => ({
-              id: user.user_id || user.id || 'N/A',
+              id: user.id || 'N/A',
               spend: `${(user.total_spend || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
               bonus: `${(user.total_bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
               join: user.join_time ? new Date(user.join_time).toLocaleString('en-GB') : 'N/A',

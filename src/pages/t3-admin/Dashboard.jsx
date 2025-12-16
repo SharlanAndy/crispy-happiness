@@ -135,7 +135,7 @@ export default function T3AdminDashboard() {
 
   // Transform API data to chart format
   const weeklyChartData = useMemo(() => {
-    // API response structure: { success: true, data: { data: { incoming: [], outgoing: [] }, date_range: "", filter: "weekly" } }
+    // API response structure: { success: true, data: { data: { incoming: [{amount, date}], outgoing: [{amount, date}] | null }, date_range: "", filter: "weekly" } }
     // weeklyFundsData is the response.data object, so we access weeklyFundsData.data for the funds data
     if (weeklyFundsData && weeklyFundsData.data) {
       const fundsData = weeklyFundsData.data;
@@ -143,75 +143,79 @@ export default function T3AdminDashboard() {
       const outgoing = fundsData?.outgoing;
       
       // Check if both are null (API returns null values)
-      if (incoming === null && outgoing === null) {
+      if ((incoming === null || incoming === undefined) && (outgoing === null || outgoing === undefined)) {
         return [];
       }
       
-      // If incoming/outgoing are arrays (daily data)
-      if (Array.isArray(incoming) && Array.isArray(outgoing)) {
-        // Match arrays by index to create daily data points
-        const maxLength = Math.max(incoming.length, outgoing.length);
-        return Array.from({ length: maxLength }, (_, i) => {
-          const incomingValue = incoming[i] || 0;
-          const outgoingValue = outgoing[i] || 0;
-          // Generate date labels (assuming week starts from selected date)
-          // selectedStartDate is already a Date object
-          const date = new Date(selectedStartDate);
-          date.setDate(date.getDate() + i);
-          const day = String(date.getDate()).padStart(2, '0');
-          const month = String(date.getMonth() + 1).padStart(2, '0');
-          return {
-            date: `${day}-${month}`,
-            dateLabel: `${day}-${month}-${date.getFullYear()}`,
-            incoming: incomingValue,
-            outgoing: outgoingValue
-          };
-        });
-      }
-      
-      // If incoming/outgoing are objects with date keys (not null, not arrays)
-      if (incoming !== null && outgoing !== null && 
-          typeof incoming === 'object' && typeof outgoing === 'object' && 
-          !Array.isArray(incoming) && !Array.isArray(outgoing)) {
-        // Safely get keys, handling null/undefined
-        const incomingKeys = incoming ? Object.keys(incoming) : [];
-        const outgoingKeys = outgoing ? Object.keys(outgoing) : [];
-        const dates = incomingKeys.length > 0 ? incomingKeys : outgoingKeys;
+      // New API structure: incoming and outgoing are arrays of objects with {amount, date}
+      if (Array.isArray(incoming) || Array.isArray(outgoing)) {
+        // Create a map to combine incoming and outgoing by date
+        const dataMap = new Map();
         
-        if (dates.length > 0) {
-          return dates.map(dateKey => {
-            const date = new Date(dateKey);
-            const day = String(date.getDate()).padStart(2, '0');
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            return {
-              date: `${day}-${month}`,
-              dateLabel: `${day}-${month}-${date.getFullYear()}`,
-              incoming: incoming?.[dateKey] || 0,
-              outgoing: outgoing?.[dateKey] || 0
-            };
+        // Process incoming data
+        if (Array.isArray(incoming)) {
+          incoming.forEach(item => {
+            if (item && item.date) {
+              const existing = dataMap.get(item.date) || { date: item.date, dateLabel: item.date, incoming: 0, outgoing: 0 };
+              existing.incoming = item.amount || 0;
+              dataMap.set(item.date, existing);
+            }
           });
         }
-      }
-      
-      // If incoming/outgoing are single values (not null, not objects, not arrays)
-      if (incoming !== null && outgoing !== null && 
-          typeof incoming !== 'object' && typeof outgoing !== 'object') {
-        // selectedStartDate is already a Date object
-        const date = new Date(selectedStartDate);
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        return [{
-          date: `${day}-${month}`,
-          dateLabel: `${day}-${month}-${date.getFullYear()}`,
-          incoming: incoming || 0,
-          outgoing: outgoing || 0
-        }];
+        
+        // Process outgoing data
+        if (Array.isArray(outgoing)) {
+          outgoing.forEach(item => {
+            if (item && item.date) {
+              const existing = dataMap.get(item.date) || { date: item.date, dateLabel: item.date, incoming: 0, outgoing: 0 };
+              existing.outgoing = item.amount || 0;
+              dataMap.set(item.date, existing);
+            }
+          });
+        }
+        
+        // Convert map to array and sort by date
+        const chartData = Array.from(dataMap.values());
+        
+        // Sort by date (parse the date string to ensure proper sorting)
+        chartData.sort((a, b) => {
+          const dateA = new Date(a.date);
+          const dateB = new Date(b.date);
+          return dateA - dateB;
+        });
+        
+        // Format date for display (extract day and month from "10 Dec 2025" format)
+        return chartData.map(item => {
+          // Parse date string like "10 Dec 2025" and format as "10-12" for chart
+          try {
+            const date = new Date(item.date);
+            if (!isNaN(date.getTime())) {
+              const day = String(date.getDate()).padStart(2, '0');
+              const month = String(date.getMonth() + 1).padStart(2, '0');
+              return {
+                date: `${day}-${month}`,
+                dateLabel: item.date, // Keep original format for tooltip
+                incoming: item.incoming || 0,
+                outgoing: item.outgoing || 0
+              };
+            }
+          } catch (e) {
+            console.warn('Failed to parse date:', item.date);
+          }
+          // Fallback: use date as-is if parsing fails
+          return {
+            date: item.date,
+            dateLabel: item.date,
+            incoming: item.incoming || 0,
+            outgoing: item.outgoing || 0
+          };
+        });
       }
     }
     
     // Fallback: return empty array if no data or data is null
     return [];
-  }, [weeklyFundsData, selectedStartDate]);
+  }, [weeklyFundsData]);
 
   // Period options for picker
   const periodOptions = [

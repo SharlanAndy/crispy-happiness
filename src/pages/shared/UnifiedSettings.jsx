@@ -97,8 +97,6 @@ export default function UnifiedSettings() {
   // Determine context: who is viewing and whose settings
   const isSystemAdmin = location.pathname.startsWith('/system-admin');
   const isT3Admin = location.pathname.startsWith('/t3-admin');
-  const isMerchant = location.pathname.startsWith('/merchant');
-  const isAgent = location.pathname.startsWith('/agent');
 
   // Determine if admin is viewing another user's settings
   const isAdminView = (isSystemAdmin || isT3Admin) && id;
@@ -108,9 +106,8 @@ export default function UnifiedSettings() {
   const [loadingProfile, setLoadingProfile] = useState(false);
   
   // State for entity data (user, agent, merchant) when admin is viewing
-  const [entityData, setEntityData] = useState(null);
   const [loadingEntity, setLoadingEntity] = useState(false);
-  const { handleApiResponse, showError, showSuccess } = useToast();
+  const { handleApiResponse, showError } = useToast();
 
   // Normalize API response to handle both PascalCase (from API) and snake_case (for backward compatibility)
   const normalizeUserData = (data) => {
@@ -162,7 +159,6 @@ export default function UnifiedSettings() {
         
         if (response && response.success && response.data) {
           const data = response.data;
-          setEntityData(data);
           
           // Normalize and populate form data for users
           if (entityType === 'user') {
@@ -213,13 +209,26 @@ export default function UnifiedSettings() {
               token_rebate: data.TokenRebate ?? data.token_rebate ?? prev.token_rebate ?? 0,
               };
             });
-          } else {
-            // For agents, use the existing location.state logic
-            setFormData(prev => ({
-              ...prev,
-              walletAddress: data.wallet_address || data.walletAddress || prev.walletAddress,
-              accountStatus: data.status || data.Status || prev.accountStatus,
-            }));
+          } else if (entityType === 'agent') {
+            // For agents, handle both PascalCase (from API) and snake_case (for backward compatibility)
+            setFormData(prev => {
+              // Normalize status to match dropdown options (capitalize first letter)
+              const rawStatus = data.Status || data.status || '';
+              let normalizedStatus = prev.accountStatus;
+              
+              if (rawStatus) {
+                // Capitalize first letter and lowercase the rest
+                const capitalized = rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1).toLowerCase();
+                // Check if the normalized status exists in ACCOUNT_STATUSES, otherwise use default
+                normalizedStatus = ACCOUNT_STATUSES.includes(capitalized) ? capitalized : prev.accountStatus;
+              }
+              
+              return {
+                ...prev,
+                walletAddress: data.WalletAddress || data.wallet_address || prev.walletAddress,
+                accountStatus: normalizedStatus,
+              };
+            });
           }
         }
       } catch (error) {
@@ -306,9 +315,6 @@ export default function UnifiedSettings() {
 
   // Role-based tab configuration
   const getTabs = () => {
-    // Get role from admin_type
-    const role = authService.getRoleFromAdminType();
-    
     // T3 Admin or System Admin viewing their own settings
     if ((isT3Admin || isSystemAdmin) && !id) {
       return [

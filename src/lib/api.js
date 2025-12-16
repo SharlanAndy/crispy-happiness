@@ -767,6 +767,22 @@ export const api = {
     getAgentDetails: (id) => request(`${T3SYSTEMADMIN_BASE}/agents/${id}`, { method: 'GET' }),
 
     /**
+     * Get agent network (level1 and level2).
+     * Headers: Authorization: Bearer <token>
+     * @param {string} id - Agent ID
+     * @returns {Promise<Object>} { success, data: { level1: [...], level2: [...] } }
+     */
+    getAgentNetwork: (id) => request(`${T3SYSTEMADMIN_BASE}/agents/${id}/network`, { method: 'GET' }),
+
+    /**
+     * Get agent statistics.
+     * Headers: Authorization: Bearer <token>
+     * @param {string} id - Agent ID
+     * @returns {Promise<Object>} { success, data: { AgentID, TotalReferral, TotalContributedVolume, TotalBonusReceived, LastUpdate } }
+     */
+    getAgentStats: (id) => request(`${T3SYSTEMADMIN_BASE}/agents/${id}/stats`, { method: 'GET' }),
+
+    /**
      * Create a new agent.
      * Headers: Authorization: Bearer <token>
      * @param {Object} data - Agent data
@@ -780,6 +796,20 @@ export const api = {
    * @returns {Promise<Object>} { success, data: [...] }
    */
   getAgentsDropdown: () => request(`${T3SYSTEMADMIN_BASE}/agents/dropdown`, { method: 'GET' }),
+
+  /**
+   * Get shareholders dropdown list for T1 agent creation.
+   * Headers: Authorization: Bearer <token>
+   * @returns {Promise<Object>} { success, data: [...] }
+   */
+  getShareholdersDropdown: () => request(`${T3SYSTEMADMIN_BASE}/agents/shareholders/dropdown`, { method: 'GET' }),
+
+  /**
+   * Get T1 agents dropdown list for T2 agent creation.
+   * Headers: Authorization: Bearer <token>
+   * @returns {Promise<Object>} { success, data: [...] }
+   */
+  getT1AgentsDropdown: () => request(`${T3SYSTEMADMIN_BASE}/agents/t1/dropdown`, { method: 'GET' }),
 
     // User Management
     /**

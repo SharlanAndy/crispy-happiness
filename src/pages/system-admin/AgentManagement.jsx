@@ -22,14 +22,19 @@ export default function AgentManagement() {
 
   // Fetch agents data
   useEffect(() => {
+    const abortController = new AbortController();
+    
     const fetchAgents = async () => {
       try {
         setLoading(true);
         const agentsResult = await api.systemadmin.getAgents({ page: 1 });
 
+        // Check if request was aborted
+        if (abortController.signal.aborted) return;
+
         if (agentsResult && agentsResult.success) {
           const transformed = agentsResult.data.map(a => ({
-            id: a.agent_id || a.id || 'N/A',
+            id: a.id || 'N/A',
             bonus: `${(a.bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
             l1: (a.level1 || 0).toString(),
             l2: (a.level2 || 0).toString(),
@@ -46,14 +51,26 @@ export default function AgentManagement() {
           setAgentsMeta(null);
         }
       } catch (error) {
+        // Ignore abort errors
+        if (error.name === 'AbortError') return;
         console.error('Failed to fetch agents:', error);
-        setAgentsData([]);
-        setAgentsMeta(null);
+        if (!abortController.signal.aborted) {
+          setAgentsData([]);
+          setAgentsMeta(null);
+        }
       } finally {
-        setLoading(false);
+        if (!abortController.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
+    
     fetchAgents();
+    
+    // Cleanup: abort request if component unmounts
+    return () => {
+      abortController.abort();
+    };
   }, []);
 
   // Scroll to top when page changes
@@ -135,13 +152,33 @@ export default function AgentManagement() {
   const handleCreateAgent = async (agentData) => {
     try {
       // Transform form data to match API expected format
-      // API requires: username, email, password, agent_type
+      // API requires: username, email, password, agent_type, first_name, last_name
+      // Optional: upline_by (required for t1/t2), phone, wallet_address
       const apiData = {
         username: agentData.username,
         email: agentData.email,
         password: agentData.password,
         agent_type: agentData.agent_type,
+        first_name: agentData.first_name,
+        last_name: agentData.last_name,
       };
+
+      // Add optional fields if provided
+      if (agentData.phone) {
+        apiData.phone = agentData.phone;
+      }
+      if (agentData.wallet_address) {
+        apiData.wallet_address = agentData.wallet_address;
+      }
+
+      // Add upline_by for t1 and t2 (required)
+      if (agentData.agent_type === 't1' || agentData.agent_type === 't2') {
+        if (!agentData.upline_by) {
+          showError('Please select an upline agent');
+          return;
+        }
+        apiData.upline_by = agentData.upline_by;
+      }
 
       const result = await api.systemadmin.createAgent(apiData);
       
@@ -157,7 +194,7 @@ export default function AgentManagement() {
 
         if (agentsResult && agentsResult.success) {
           const transformed = agentsResult.data.map(a => ({
-            id: a.agent_id || a.id || 'N/A',
+            id: a.id || 'N/A',
             bonus: `${(a.bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
             l1: (a.level1 || 0).toString(),
             l2: (a.level2 || 0).toString(),
