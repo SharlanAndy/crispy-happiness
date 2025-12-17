@@ -108,6 +108,12 @@ export default function UnifiedSettings() {
   
   // State for entity data (user, agent, merchant) when admin is viewing
   const [loadingEntity, setLoadingEntity] = useState(false);
+  // For user settings, backend password endpoint expects numeric ID even if route param has "U" prefix
+  const [resolvedUserNumericId, setResolvedUserNumericId] = useState(null);
+  // For agent settings, backend password endpoint expects numeric ID even if route param has "T" prefix
+  const [resolvedAgentNumericId, setResolvedAgentNumericId] = useState(null);
+  // For merchant settings, backend password endpoint expects numeric ID
+  const [resolvedMerchantNumericId, setResolvedMerchantNumericId] = useState(null);
   const { handleApiResponse, showError } = useToast();
 
   // Normalize API response to handle both PascalCase (from API) and snake_case (for backward compatibility)
@@ -164,6 +170,9 @@ export default function UnifiedSettings() {
           // Normalize and populate form data for users
           if (entityType === 'user') {
             const normalized = normalizeUserData(data);
+            if (normalized?.id != null) {
+              setResolvedUserNumericId(normalized.id);
+            }
             setFormData(prev => ({
               ...prev,
               username: normalized?.username || prev.username,
@@ -178,6 +187,9 @@ export default function UnifiedSettings() {
             // For merchants, populate all fields including rebates
             // Handle both PascalCase (from API) and snake_case (for backward compatibility)
             setFormData(prev => {
+              const numericId = data.id ?? data.ID ?? null;
+              if (numericId != null) setResolvedMerchantNumericId(numericId);
+
               const merchantGroup = data.UserType || data.user_type || data.merchantGroup || prev.merchantGroup;
               // Normalize UserType to match form values (t1 -> T1, t2 -> T2, t3 -> T3)
               const normalizedGroup = merchantGroup ? merchantGroup.toUpperCase() : prev.merchantGroup;
@@ -240,6 +252,10 @@ export default function UnifiedSettings() {
               };
             });
           } else if (entityType === 'agent') {
+            // Agent details endpoint returns lowercase keys and numeric `id`
+            const numericId = data.id ?? data.ID ?? null;
+            if (numericId != null) setResolvedAgentNumericId(numericId);
+
             // For agents, handle both PascalCase (from API) and snake_case (for backward compatibility)
             setFormData(prev => {
               // Normalize status to match dropdown options (capitalize first letter)
@@ -402,17 +418,103 @@ export default function UnifiedSettings() {
     navigate(-1); // Go back to previous page
   };
 
-  // Handle save for merchant updates
+  // Handle save for admin updates (merchant/user/agent)
   const handleSave = async (sectionKey) => {
-    // Merchant settings save is for admin views (System Admin or T3 Admin) only
-    if (!id || entityType !== 'merchant' || (!isSystemAdmin && !isT3Admin)) {
-      console.warn('Save only available for system admin / t3 admin editing merchants');
+    // Settings save is for admin views (System Admin or T3 Admin) only
+    if (!id || !entityType || (!isSystemAdmin && !isT3Admin)) {
+      console.warn('Save only available for system admin / t3 admin editing entities');
       return;
     }
 
     try {
       let updateData = {};
       const adminApi = isSystemAdmin ? api.systemadmin : api.t3admin;
+
+      // USER: update password via dedicated endpoint
+      if (entityType === 'user') {
+        if (sectionKey !== 'profile') {
+          console.warn('User save only supported for profile section currently');
+          return;
+        }
+
+        // Resolve numeric ID from GET /users/:id (e.g. param "U900017" -> response data.ID: 900017)
+        const passwordUserId = resolvedUserNumericId ?? id;
+
+        // Backend expects this payload (current_password can be empty per your sample)
+        updateData = {
+          current_password: '',
+          new_password: formData.password || '',
+          confirm_password: formData.password || '',
+        };
+
+        const result = await adminApi.updateUserPassword(passwordUserId, updateData);
+        handleApiResponse(result, {
+          successMessage: result?.message || 'Password updated successfully!',
+          errorMessage: result?.message || 'Failed to update password. Please try again.',
+        });
+
+        if (result && result.success) {
+          // Clear password field after successful change
+          setFormData(prev => ({ ...prev, password: '' }));
+        }
+        return;
+      }
+
+      // AGENT: (no save endpoints wired yet)
+      if (entityType === 'agent') {
+        if (sectionKey !== 'profile') {
+          console.warn('Agent save only supported for profile section currently');
+          return;
+        }
+
+        const passwordAgentId = resolvedAgentNumericId ?? id;
+        updateData = {
+          current_password: '',
+          new_password: formData.password || '',
+          confirm_password: formData.password || '',
+        };
+
+        const result = await adminApi.updateAgentPassword(passwordAgentId, updateData);
+        handleApiResponse(result, {
+          successMessage: result?.message || 'Password updated successfully!',
+          errorMessage: result?.message || 'Failed to update password. Please try again.',
+        });
+
+        if (result && result.success) {
+          setFormData(prev => ({ ...prev, password: '' }));
+        }
+        return;
+      }
+
+      // MERCHANT: password update via dedicated endpoint (Profile tab)
+      if (entityType === 'merchant' && sectionKey === 'profile' && formData.password) {
+        const passwordMerchantId = resolvedMerchantNumericId ?? id;
+        updateData = {
+          current_password: '',
+          new_password: formData.password || '',
+          confirm_password: formData.password || '',
+        };
+
+        const pwdResult = await adminApi.updateMerchantPassword(passwordMerchantId, updateData);
+        handleApiResponse(pwdResult, {
+          successMessage: pwdResult?.message || 'Password updated successfully!',
+          errorMessage: pwdResult?.message || 'Failed to update password. Please try again.',
+        });
+
+        if (pwdResult && pwdResult.success) {
+          setFormData(prev => ({ ...prev, password: '' }));
+        }
+
+        // If email is also present, update it via standard merchant update endpoint
+        if (formData.email) {
+          const emailResult = await adminApi.updateMerchant(id, { email: formData.email });
+          handleApiResponse(emailResult, {
+            successMessage: emailResult?.message || 'Email updated successfully!',
+            errorMessage: emailResult?.message || 'Failed to update email. Please try again.',
+          });
+        }
+        return;
+      }
 
       // Build update data based on section
       if (sectionKey === 'rebates') {

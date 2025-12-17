@@ -493,6 +493,19 @@ export const api = {
      */
     getUserDetails: (id) => request(`${T3SYSTEMADMIN_BASE}/users/${id}`, { method: 'GET' }),
 
+    /**
+     * Update user password.
+     * Headers: Authorization: Bearer <token>
+     * @param {string|number} id - User ID
+     * @param {Object} data - { current_password, new_password, confirm_password }
+     * @returns {Promise<Object>} { success: true, message: "Password updated successfully" }
+     */
+    updateUserPassword: (id, data) =>
+      request(`${T3SYSTEMADMIN_BASE}/users/${id}/password`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
     // Account Management (Finance Accounts)
     /**
      * Get list of T3 admin accounts.
@@ -728,6 +741,19 @@ export const api = {
     getMerchantDetails: (id) => request(`${T3SYSTEMADMIN_BASE}/merchants/${id}`, { method: 'GET' }),
 
     /**
+     * Update merchant password.
+     * Headers: Authorization: Bearer <token>
+     * @param {string|number} id - Merchant ID
+     * @param {Object} data - { current_password, new_password, confirm_password }
+     * @returns {Promise<Object>} { success: true, message: "Password updated successfully" }
+     */
+    updateMerchantPassword: (id, data) =>
+      request(`${T3SYSTEMADMIN_BASE}/merchants/${id}/password`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    /**
      * Update merchant (rebates, wallet, password).
      * Headers: Authorization: Bearer <token>
      * @param {string} id - Merchant ID
@@ -769,6 +795,19 @@ export const api = {
      * @returns {Promise<Object>} Agent details
      */
     getAgentDetails: (id) => request(`${T3SYSTEMADMIN_BASE}/agents/${id}`, { method: 'GET' }),
+
+    /**
+     * Update agent password.
+     * Headers: Authorization: Bearer <token>
+     * @param {string|number} id - Agent ID
+     * @param {Object} data - { current_password, new_password, confirm_password }
+     * @returns {Promise<Object>} { success: true, message: "Password updated successfully" }
+     */
+    updateAgentPassword: (id, data) =>
+      request(`${T3SYSTEMADMIN_BASE}/agents/${id}/password`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
 
     /**
      * Get agent network (level1 and level2).
@@ -834,6 +873,19 @@ export const api = {
      * @returns {Promise<Object>} User details
      */
     getUserDetails: (id) => request(`${T3SYSTEMADMIN_BASE}/users/${id}`, { method: 'GET' }),
+
+    /**
+     * Update user password.
+     * Headers: Authorization: Bearer <token>
+     * @param {string|number} id - User ID
+     * @param {Object} data - { current_password, new_password, confirm_password }
+     * @returns {Promise<Object>} { success: true, message: "Password updated successfully" }
+     */
+    updateUserPassword: (id, data) =>
+      request(`${T3SYSTEMADMIN_BASE}/users/${id}/password`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
 
     // Currencies Management
     /**
