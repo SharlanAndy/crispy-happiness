@@ -287,15 +287,6 @@ export default function AgentDetails() {
     ];
   }, [agentDetails]);
 
-  const bonusInfo = useMemo(() => {
-    if (!agentDetails) return [];
-    const bonusContributed = (agentDetails.BonusContributed || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    return [
-      { label: 'Total Bonus Contributed', value: `${bonusContributed} U` },
-      { label: 'Total Sponsor L1', value: (agentDetails.TotalSponsorL1 || 0).toString() },
-      { label: 'Total Sponsor L2', value: (agentDetails.TotalSponsorL2 || 0).toString() },
-    ];
-  }, [agentDetails]);
 
   // Actions for network list - Level 2 follows user management pattern (navigate to users), Level 1 navigates to agents
   const actions = useMemo(() => {
@@ -395,7 +386,6 @@ export default function AgentDetails() {
           <div className="grid grid-rows-1 gap-6">
             <InfoSection title="Wallet Address" items={walletAddressInfo} columns={1} />
             <InfoSection title="Sponsor Information" items={sponsorInfo} columns={1} />
-            <InfoSection title="Bonus" items={bonusInfo} columns={1} />
           </div>
         </div>
 

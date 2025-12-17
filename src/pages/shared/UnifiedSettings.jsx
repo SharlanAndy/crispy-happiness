@@ -61,8 +61,9 @@ export default function UnifiedSettings() {
         walletAddress: userData.walletAddress || userData.wallet || prev.walletAddress,
         sponsorBy: userData.sponsorBy || userData.sponsor || prev.sponsorBy,
         fees: userData.fees || prev.fees,
-        markupFees: userData.markupFees || prev.markupFees,
-        processingFees: userData.processingFees || prev.processingFees,
+        // Preserve valid 0 values (use nullish coalescing)
+        markupFees: userData.markupFees ?? prev.markupFees,
+        processingFees: userData.processingFees ?? prev.processingFees,
         currencies: userData.currency || userData.currencies || prev.currencies,
         accountStatus: userData.status || userData.accountStatus || prev.accountStatus,
         email: userData.email || prev.email,
@@ -199,6 +200,35 @@ export default function UnifiedSettings() {
               walletAddress: data.WalletAddress || data.wallet_address || data.walletAddress || prev.walletAddress,
               accountStatus: data.Status || data.status || prev.accountStatus,
               email: data.Email || data.email || prev.email,
+              // Currency - endpoint returns an object { currency_code, currency_name, id, rate }
+              // We store the selected option as a string to match `SelectInput` + `CURRENCIES` format.
+              currencies:
+                data.currency?.currency_name ??
+                data.Currency?.currency_name ??
+                data.currency_name ??
+                data.currency?.currency_code ??
+                data.Currency?.currency_code ??
+                data.currency_code ??
+                prev.currencies ??
+                '',
+              // Fees - include defaults from endpoint (preserve 0 values)
+              // Supports a few possible API shapes: flat snake_case, PascalCase, or nested fees object.
+              markupFees:
+                data.markup_fees ??
+                data.MarkupFees ??
+                data.markupFees ??
+                data.fees?.markup ??
+                data.Fees?.markup ??
+                prev.markupFees ??
+                0,
+              processingFees:
+                data.processing_fees ??
+                data.ProcessingFees ??
+                data.processingFees ??
+                data.fees?.processing ??
+                data.Fees?.processing ??
+                prev.processingFees ??
+                0,
               // Rebates - handle both PascalCase and snake_case
               DirectRebate: data.DirectRebate ?? data.direct_rebate ?? prev.DirectRebate ?? 0,
               L1_rebate: data.L1Rebate ?? data.L1_rebate ?? data.l1_rebate ?? prev.L1_rebate ?? 0,
@@ -332,7 +362,6 @@ export default function UnifiedSettings() {
           { id: 'profile', label: 'Profile Information', icon: User },
           { id: 'wallet', label: 'Wallet Address', icon: Wallet },
           { id: 'referral', label: 'Referral Information', icon: Cog },
-          { id: 'bonus', label: 'Initial Bonus', icon: Gift },
           { id: 'status', label: 'Account Status', icon: Lock },
         ];
       } else if (entityType === 'user') {
@@ -375,13 +404,15 @@ export default function UnifiedSettings() {
 
   // Handle save for merchant updates
   const handleSave = async (sectionKey) => {
-    if (!id || entityType !== 'merchant' || !isSystemAdmin) {
-      console.warn('Save only available for system admin editing merchants');
+    // Merchant settings save is for admin views (System Admin or T3 Admin) only
+    if (!id || entityType !== 'merchant' || (!isSystemAdmin && !isT3Admin)) {
+      console.warn('Save only available for system admin / t3 admin editing merchants');
       return;
     }
 
     try {
       let updateData = {};
+      const adminApi = isSystemAdmin ? api.systemadmin : api.t3admin;
 
       // Build update data based on section
       if (sectionKey === 'rebates') {
@@ -393,6 +424,29 @@ export default function UnifiedSettings() {
           T1_rebate: parseFloat(formData.T1_rebate) || 0,
           T2_rebate: parseFloat(formData.T2_rebate) || 0,
           token_rebate: parseFloat(formData.token_rebate) || 0,
+        };
+      } else if (sectionKey === 'fees') {
+        const processing = parseFloat(formData.processingFees);
+        updateData = {
+          // Keep the same snake_case keys used by create merchant
+          processing_fees: Number.isFinite(processing) ? processing : 0,
+        };
+      } else if (sectionKey === 'info') {
+        updateData = {
+          company_name: formData.companyName,
+          ssm_number: formData.ssmNumber,
+          merchant_type: formData.merchantType,
+          // Merchant group: backend GET returns `user_type` (e.g. "t1")
+          user_type: (formData.merchantGroup || 'T1').toLowerCase(),
+        };
+      } else if (sectionKey === 'business') {
+        updateData = {
+          address_line1: formData.addressLine1,
+          address_line2: formData.addressLine2,
+          city: formData.city,
+          postcode: formData.postcode,
+          state: formData.state,
+          country: formData.country,
         };
       } else if (sectionKey === 'wallet') {
         updateData = {
@@ -411,7 +465,7 @@ export default function UnifiedSettings() {
         updateData = {
           company_name: formData.companyName,
           ssm_number: formData.ssmNumber,
-          type: formData.merchantType,
+          merchant_type: formData.merchantType,
           wallet_address: formData.walletAddress,
         };
         if (formData.password) {
@@ -422,7 +476,7 @@ export default function UnifiedSettings() {
         }
       }
 
-      const result = await api.systemadmin.updateMerchant(id, updateData);
+      const result = await adminApi.updateMerchant(id, updateData);
       
       handleApiResponse(result, {
         successMessage: 'Merchant updated successfully!',
@@ -431,7 +485,7 @@ export default function UnifiedSettings() {
 
       if (result && result.success) {
         // Refresh entity data
-        const refreshResponse = await api.systemadmin.getMerchantDetails(id);
+        const refreshResponse = await adminApi.getMerchantDetails(id);
         if (refreshResponse && refreshResponse.success && refreshResponse.data) {
           const data = refreshResponse.data;
           setFormData(prev => ({
@@ -450,6 +504,33 @@ export default function UnifiedSettings() {
             walletAddress: data.WalletAddress || data.wallet_address || prev.walletAddress,
             accountStatus: data.Status || data.status || prev.accountStatus,
             email: data.Email || data.email || prev.email,
+            // Currency - keep selected string in sync with endpoint
+            currencies:
+              data.currency?.currency_name ??
+              data.Currency?.currency_name ??
+              data.currency_name ??
+              data.currency?.currency_code ??
+              data.Currency?.currency_code ??
+              data.currency_code ??
+              prev.currencies ??
+              '',
+            // Fees - refresh from endpoint (preserve 0 values)
+            markupFees:
+              data.markup_fees ??
+              data.MarkupFees ??
+              data.markupFees ??
+              data.fees?.markup ??
+              data.Fees?.markup ??
+              prev.markupFees ??
+              0,
+            processingFees:
+              data.processing_fees ??
+              data.ProcessingFees ??
+              data.processingFees ??
+              data.fees?.processing ??
+              data.Fees?.processing ??
+              prev.processingFees ??
+              0,
             // Rebates - handle both PascalCase and snake_case
             DirectRebate: data.DirectRebate ?? data.direct_rebate ?? prev.DirectRebate ?? 0,
             L1_rebate: data.L1Rebate ?? data.L1_rebate ?? data.l1_rebate ?? prev.L1_rebate ?? 0,
@@ -640,13 +721,16 @@ export default function UnifiedSettings() {
     fees: {
       title: 'Fees Settings',
       fields: [
-        createField('text-suffix', 'Markup Fees (%)', 'markupFees', { placeholder: 'eg: 1.2', suffix: '%' }),
         createField('text-suffix', 'Processing Fees (%)', 'processingFees', { placeholder: 'eg: 1.2', suffix: '%' })
       ]
     },
     currency: {
       title: 'Currency Settings',
-      fields: [createField('select', 'Currencies', 'currencies', { placeholder: 'Select Currencies', options: 'CURRENCIES' })]
+      fields: [createField('select', 'Currencies', 'currencies', { 
+        placeholder: 'Select Currencies', 
+        // Allow currencies from API that aren't in the mock list (e.g., "Vietnam - VND")
+        options: Array.from(new Set([...(CURRENCIES || []), ...(formData.currencies ? [formData.currencies] : [])]))
+      })]
     },
     bonus: {
       title: 'Initial Bonus Settings',
@@ -733,7 +817,6 @@ export default function UnifiedSettings() {
           {activeTab === 'referral' && renderSection('referral')}
           {activeTab === 'fees' && renderSection('fees')}
           {activeTab === 'currency' && renderSection('currency')}
-          {activeTab === 'bonus' && renderSection('bonus')}
           {activeTab === 'profile' && renderSection('profile')}
 
           {activeTab === 'permissions' && (
