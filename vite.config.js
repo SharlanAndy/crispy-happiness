@@ -10,9 +10,25 @@ export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current working directory.
   // eslint-disable-next-line no-undef
   const env = loadEnv(mode, process.cwd(), '')
+  const buildTimestamp = Date.now().toString()
   
   return {
-    plugins: [react()],
+    plugins: [
+      react(),
+      // Cache-busting: append ?v=<timestamp> to built HTML asset URLs (JS/CSS)
+      {
+        name: 'html-cache-bust',
+        apply: 'build',
+        transformIndexHtml(html) {
+          // Only touch local Vite-built asset URLs; keep external URLs unchanged.
+          return html
+            // <script type="module" crossorigin src="/assets/xxx.js"></script>
+            .replace(/(<script\b[^>]*\bsrc=")(\/assets\/[^"]+)(")/g, `$1$2?v=${buildTimestamp}$3`)
+            // <link rel="stylesheet" crossorigin href="/assets/xxx.css">
+            .replace(/(<link\b[^>]*\bhref=")(\/assets\/[^"]+)(")/g, `$1$2?v=${buildTimestamp}$3`)
+        },
+      },
+    ],
     base: '/',
     resolve: {
       alias: {

@@ -16,7 +16,6 @@ const STATS = [
 const COLUMNS = [
   { key: 'id', label: 'Admin ID' },
   { key: 'username', label: 'Username' },
-  { key: 'character', label: 'Character' },
   { key: 'lastLogin', label: 'Last Login' },
   { key: 'created', label: 'Create On' },
   { key: 'status', label: 'Status' },
@@ -177,7 +176,6 @@ export default function AccountManagement() {
       return (
         acc.id?.toLowerCase().includes(searchLower) ||
         acc.username?.toLowerCase().includes(searchLower) ||
-        acc.character?.toLowerCase().includes(searchLower) ||
         acc.status?.toLowerCase().includes(searchLower)
       );
     });
@@ -265,24 +263,33 @@ export default function AccountManagement() {
     setDeleteConfirm({ isOpen: false, item: null });
   };
 
-  const actions = useMemo(() => [
-    {
-      icon: <Eye size={16} />,
-      onClick: (row) => navigate(`${basePath}/accounts/${row.id}`),
-      tooltip: 'View Details',
-    },
-    { 
-      icon: <Settings size={16} />, 
-      onClick: (row) => handleOpenEdit(row), 
-      tooltip: 'Edit Account' 
-    },
-    {
-      icon: <Trash2 size={16} />,
-      onClick: (row) => setDeleteConfirm({ isOpen: true, item: row }),
-      variant: 'danger',
-      tooltip: 'Delete Account',
-    },
-  ], [navigate, basePath]);
+  const actions = useMemo(() => {
+    const baseActions = [
+      {
+        icon: <Eye size={16} />,
+        onClick: (row) => navigate(`${basePath}/accounts/${row.id}`),
+        tooltip: 'View Details',
+      },
+      { 
+        icon: <Settings size={16} />, 
+        onClick: (row) => handleOpenEdit(row), 
+        tooltip: 'Edit Account' 
+      },
+    ];
+
+    // T3 admin should NOT see delete button on admin list
+    if (isT3Admin) return baseActions;
+
+    return [
+      ...baseActions,
+      {
+        icon: <Trash2 size={16} />,
+        onClick: (row) => setDeleteConfirm({ isOpen: true, item: row }),
+        variant: 'danger',
+        tooltip: 'Delete Account',
+      },
+    ];
+  }, [navigate, basePath, isT3Admin]);
 
   return (
     <>
@@ -366,6 +373,7 @@ export default function AccountManagement() {
               value={formData.username}
               onChange={(e) => setFormData({ ...formData, username: e.target.value })}
               placeholder="Insert username"
+              readOnly={modalState.mode === 'edit'}
             />
           </FormField>
 
@@ -377,22 +385,27 @@ export default function AccountManagement() {
             />
           </FormField>
 
-          <FormField label="Email">
-            <TextInput
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              placeholder="Insert email"
-            />
-          </FormField>
+          {/* Edit Finance: keep only password field (hide email + wallet address) */}
+          {modalState.mode !== 'edit' && (
+            <>
+              <FormField label="Email">
+                <TextInput
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="Insert email"
+                />
+              </FormField>
 
-          <FormField label="Wallet Address">
-            <TextInput
-              value={formData.walletAddress}
-              onChange={(e) => setFormData({ ...formData, walletAddress: e.target.value })}
-              placeholder="Insert wallet address"
-            />
-          </FormField>
+              <FormField label="Wallet Address">
+                <TextInput
+                  value={formData.walletAddress}
+                  onChange={(e) => setFormData({ ...formData, walletAddress: e.target.value })}
+                  placeholder="Insert wallet address"
+                />
+              </FormField>
+            </>
+          )}
         </div>
       </Modal>
 
