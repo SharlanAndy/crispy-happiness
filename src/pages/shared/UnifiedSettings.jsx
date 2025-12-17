@@ -436,8 +436,6 @@ export default function UnifiedSettings() {
           company_name: formData.companyName,
           ssm_number: formData.ssmNumber,
           merchant_type: formData.merchantType,
-          // Merchant group: backend GET returns `user_type` (e.g. "t1")
-          user_type: (formData.merchantGroup || 'T1').toLowerCase(),
         };
       } else if (sectionKey === 'business') {
         updateData = {
@@ -561,13 +559,19 @@ export default function UnifiedSettings() {
         <FormLabel key={field.name} label={field.label}>
           <div className="flex gap-16 items-center">
             {field.options.map((option) => (
-              <label key={option} className="flex gap-2 items-center cursor-pointer">
+              <label
+                key={option}
+                className={`flex gap-2 items-center ${field.disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+              >
                 <input
                   type="radio"
                   name={field.name}
                   value={option}
                   checked={field.value === option}
-                  onChange={() => field.onChange(option)}
+                  disabled={field.disabled}
+                  onChange={() => {
+                    if (!field.disabled) field.onChange(option);
+                  }}
                   className="peer sr-only"
                 />
                 <span className={`size-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
@@ -668,7 +672,11 @@ export default function UnifiedSettings() {
     info: {
       title: 'Business Information',
       fields: [
-        createField('radio-group', "Merchant's Group", 'merchantGroup', { options: ['T1', 'T2', 'T3'] }),
+        createField('radio-group', "Merchant's Group", 'merchantGroup', {
+          options: ['T1', 'T2', 'T3'],
+          // Merchant group should not be editable in settings
+          disabled: entityType === 'merchant' && isAdminView
+        }),
         createField('text', 'Company Name', 'companyName', { placeholder: 'Insert company name here' }),
         createField('text', 'SSM Number', 'ssmNumber', { placeholder: 'Insert SSM number here' }),
         createField('select', "Merchant's Type", 'merchantType', { placeholder: 'Select type of business', options: 'MERCHANT_TYPES' }),
