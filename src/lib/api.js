@@ -763,6 +763,32 @@ export const api = {
     updateMerchant: (id, data) => request(`${T3SYSTEMADMIN_BASE}/merchants/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 
     /**
+     * Update merchant status.
+     * Headers: Authorization: Bearer <token>
+     * @param {string|number} id - Merchant ID
+     * @param {Object} data - { status: "active" | "inactive" }
+     * @returns {Promise<Object>} { success, message, data: { merchant_id, status, user_id } }
+     */
+    updateMerchantStatus: (id, data) =>
+      request(`${T3SYSTEMADMIN_BASE}/merchants/${id}/status`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    /**
+     * Update agent status.
+     * Headers: Authorization: Bearer <token>
+     * @param {string|number} id - Agent ID
+     * @param {Object} data - { status: "active" | "inactive" }
+     * @returns {Promise<Object>} { success, message, data: { agent_id, status, user_id? } }
+     */
+    updateAgentStatus: (id, data) =>
+      request(`${T3SYSTEMADMIN_BASE}/agents/${id}/status`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    /**
      * Get merchant profit chart data.
      * Headers: Authorization: Bearer <token>
      * @param {string} id - Merchant ID
@@ -883,6 +909,19 @@ export const api = {
      */
     updateUserPassword: (id, data) =>
       request(`${T3SYSTEMADMIN_BASE}/users/${id}/password`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    /**
+     * Update user status (System Admin only).
+     * Headers: Authorization: Bearer <token>
+     * @param {string|number} id - User numeric ID (from GET /users/Uxxxxxx -> data.ID)
+     * @param {Object} data - { status: "active" | "inactive" }
+     * @returns {Promise<Object>} { success, message, data: {...} }
+     */
+    updateUserStatus: (id, data) =>
+      request(`${T3SYSTEMADMIN_BASE}/users/${id}/status`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),

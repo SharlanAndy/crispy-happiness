@@ -453,17 +453,6 @@ export default function UserManagement() {
           onClick: (row) => setTransferModal({ isOpen: true, user: row }),
           tooltip: 'Transfer',
         },
-        {
-          icon: <Settings size={16} />,
-          onClick: (row) => navigate(`${basePath}/users/${row.id}/settings`),
-          tooltip: 'Edit',
-        },
-        {
-          icon: <Trash2 size={16} />,
-          onClick: (row) => setDeleteConfirm({ isOpen: true, item: row }),
-          variant: 'danger',
-          tooltip: 'Delete',
-        },
       ];
     }
     

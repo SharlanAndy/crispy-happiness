@@ -173,11 +173,13 @@ export default function UnifiedSettings() {
             if (normalized?.id != null) {
               setResolvedUserNumericId(normalized.id);
             }
+            const rawUserStatus = (normalized?.status || '').toString().toLowerCase();
+            const normalizedUserStatus = rawUserStatus === 'inactive' ? 'Inactive' : 'Active';
             setFormData(prev => ({
               ...prev,
               username: normalized?.username || prev.username,
               walletAddress: normalized?.walletAddress || prev.walletAddress,
-              accountStatus: normalized?.status || prev.accountStatus,
+              accountStatus: normalized?.status ? normalizedUserStatus : prev.accountStatus,
               // Referred By - who referred this user (upline)
               // This field will be added to the API response later
               // Assumes field names: ReferredBy, referred_by, referredBy, sponsor_by, sponsorBy
@@ -193,6 +195,8 @@ export default function UnifiedSettings() {
               const merchantGroup = data.UserType || data.user_type || data.merchantGroup || prev.merchantGroup;
               // Normalize UserType to match form values (t1 -> T1, t2 -> T2, t3 -> T3)
               const normalizedGroup = merchantGroup ? merchantGroup.toUpperCase() : prev.merchantGroup;
+              const rawMerchantStatus = (data.Status || data.status || prev.accountStatus || '').toString().toLowerCase();
+              const normalizedMerchantStatus = rawMerchantStatus === 'inactive' ? 'Inactive' : 'Active';
               
               return {
               ...prev,
@@ -210,7 +214,7 @@ export default function UnifiedSettings() {
               postcode: data.Postcode || data.postcode || prev.postcode,
               // Wallet and Profile
               walletAddress: data.WalletAddress || data.wallet_address || data.walletAddress || prev.walletAddress,
-              accountStatus: data.Status || data.status || prev.accountStatus,
+              accountStatus: normalizedMerchantStatus,
               email: data.Email || data.email || prev.email,
               // Currency - endpoint returns an object { currency_code, currency_name, id, rate }
               // We store the selected option as a string to match `SelectInput` + `CURRENCIES` format.
@@ -256,18 +260,10 @@ export default function UnifiedSettings() {
             const numericId = data.id ?? data.ID ?? null;
             if (numericId != null) setResolvedAgentNumericId(numericId);
 
-            // For agents, handle both PascalCase (from API) and snake_case (for backward compatibility)
+            // For agents, normalize status from API ("active"/"inactive") into dropdown ("Active"/"Inactive")
             setFormData(prev => {
-              // Normalize status to match dropdown options (capitalize first letter)
-              const rawStatus = data.Status || data.status || '';
-              let normalizedStatus = prev.accountStatus;
-              
-              if (rawStatus) {
-                // Capitalize first letter and lowercase the rest
-                const capitalized = rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1).toLowerCase();
-                // Check if the normalized status exists in ACCOUNT_STATUSES, otherwise use default
-                normalizedStatus = ACCOUNT_STATUSES.includes(capitalized) ? capitalized : prev.accountStatus;
-              }
+              const rawStatus = (data.Status || data.status || '').toString().toLowerCase();
+              const normalizedStatus = rawStatus === 'inactive' ? 'Inactive' : 'Active';
               
               return {
                 ...prev,
@@ -416,6 +412,50 @@ export default function UnifiedSettings() {
 
   const handleCancel = () => {
     navigate(-1); // Go back to previous page
+  };
+
+  const handleStatusUpdate = async () => {
+    if (!id || !entityType || (!isSystemAdmin && !isT3Admin)) return;
+    if (entityType !== 'merchant' && entityType !== 'agent' && entityType !== 'user') return;
+
+    const adminApi = isSystemAdmin ? api.systemadmin : api.t3admin;
+
+    // UI values are "Active"/"Inactive"; endpoint expects "active"/"inactive"
+    const raw = (formData.accountStatus || '').toString().trim().toLowerCase();
+    const status = raw.startsWith('inactive') ? 'inactive' : 'active';
+
+    const targetId =
+      entityType === 'agent' ? (resolvedAgentNumericId ?? id) :
+      entityType === 'user' ? (resolvedUserNumericId ?? id) :
+      id;
+
+    // USER status updates are system-admin only via /users/:id/status
+    if (entityType === 'user') {
+      if (!isSystemAdmin) return;
+      const result = await api.systemadmin.updateUserStatus(targetId, { status });
+      handleApiResponse(result, {
+        successMessage: result?.message || 'User status updated successfully',
+        errorMessage: result?.message || 'Failed to update user status. Please try again.',
+      });
+      if (result && result.success) {
+        setFormData(prev => ({ ...prev, accountStatus: status === 'inactive' ? 'Inactive' : 'Active' }));
+      }
+      return;
+    }
+
+    const result =
+      entityType === 'agent'
+        ? await adminApi.updateAgentStatus(targetId, { status })
+        : await adminApi.updateMerchantStatus(targetId, { status });
+
+    handleApiResponse(result, {
+      successMessage: result?.message || `${entityType === 'agent' ? 'Agent' : 'Merchant'} status updated successfully`,
+      errorMessage: result?.message || `Failed to update ${entityType} status. Please try again.`,
+    });
+
+    if (result && result.success) {
+      setFormData(prev => ({ ...prev, accountStatus: status === 'inactive' ? 'Inactive' : 'Active' }));
+    }
   };
 
   // Handle save for admin updates (merchant/user/agent)
@@ -588,6 +628,8 @@ export default function UnifiedSettings() {
         const refreshResponse = await adminApi.getMerchantDetails(id);
         if (refreshResponse && refreshResponse.success && refreshResponse.data) {
           const data = refreshResponse.data;
+          const rawMerchantStatus = (data.Status || data.status || '').toString().toLowerCase();
+          const normalizedMerchantStatus = rawMerchantStatus === 'inactive' ? 'Inactive' : 'Active';
           setFormData(prev => ({
             ...prev,
             // Update all merchant fields with PascalCase support
@@ -602,7 +644,7 @@ export default function UnifiedSettings() {
             country: data.Country || data.country || prev.country,
             postcode: data.Postcode || data.postcode || prev.postcode,
             walletAddress: data.WalletAddress || data.wallet_address || prev.walletAddress,
-            accountStatus: data.Status || data.status || prev.accountStatus,
+            accountStatus: normalizedMerchantStatus,
             email: data.Email || data.email || prev.email,
             // Currency - keep selected string in sync with endpoint
             currencies:
@@ -970,7 +1012,7 @@ export default function UnifiedSettings() {
                   value={formData.accountStatus}
                   onChange={(e) => handleInputChange('accountStatus', e.target.value)}
                 >
-                  {ACCOUNT_STATUSES.map(status => (
+                  {((entityType === 'merchant' || entityType === 'agent' || entityType === 'user') ? ['Active', 'Inactive'] : ACCOUNT_STATUSES).map(status => (
                     <option key={status} value={status}>
                       {status}
                     </option>
@@ -986,7 +1028,7 @@ export default function UnifiedSettings() {
               </FormField>
               <div className="flex justify-end gap-3">
                 <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
-                <Button variant="danger">Update Status</Button>
+                <Button variant="danger" onClick={handleStatusUpdate}>Update Status</Button>
               </div>
             </div>
           )}
