@@ -114,6 +114,8 @@ export default function UnifiedSettings() {
   const [resolvedAgentNumericId, setResolvedAgentNumericId] = useState(null);
   // For merchant settings, backend password endpoint expects numeric ID
   const [resolvedMerchantNumericId, setResolvedMerchantNumericId] = useState(null);
+  // State for currency options (fetched from API)
+  const [currencyOptions, setCurrencyOptions] = useState([]);
   const { handleApiResponse, showError } = useToast();
 
   // Normalize API response to handle both PascalCase (from API) and snake_case (for backward compatibility)
@@ -192,8 +194,9 @@ export default function UnifiedSettings() {
               const numericId = data.id ?? data.ID ?? null;
               if (numericId != null) setResolvedMerchantNumericId(numericId);
 
-              const merchantGroup = data.UserType || data.user_type || data.merchantGroup || prev.merchantGroup;
-              // Normalize UserType to match form values (t1 -> T1, t2 -> T2, t3 -> T3)
+              // Use category from API response first, then fallback to other fields
+              const merchantGroup = data.category || data.Category || data.UserType || data.user_type || data.merchantGroup || prev.merchantGroup;
+              // Normalize to match form values (t1 -> T1, t2 -> T2, t3 -> T3)
               const normalizedGroup = merchantGroup ? merchantGroup.toUpperCase() : prev.merchantGroup;
               const rawMerchantStatus = (data.Status || data.status || prev.accountStatus || '').toString().toLowerCase();
               const normalizedMerchantStatus = rawMerchantStatus === 'inactive' ? 'Inactive' : 'Active';
@@ -217,14 +220,14 @@ export default function UnifiedSettings() {
               accountStatus: normalizedMerchantStatus,
               email: data.Email || data.email || prev.email,
               // Currency - endpoint returns an object { currency_code, currency_name, id, rate }
-              // We store the selected option as a string to match `SelectInput` + `CURRENCIES` format.
+              // We store currency_code as the value to match dropdown options format
               currencies:
-                data.currency?.currency_name ??
-                data.Currency?.currency_name ??
-                data.currency_name ??
                 data.currency?.currency_code ??
                 data.Currency?.currency_code ??
                 data.currency_code ??
+                data.currency?.currency_name ??
+                data.Currency?.currency_name ??
+                data.currency_name ??
                 prev.currencies ??
                 '',
               // Fees - include defaults from endpoint (preserve 0 values)
@@ -238,13 +241,27 @@ export default function UnifiedSettings() {
                 prev.markupFees ??
                 0,
               processingFees:
+                data.processing_fee ??
                 data.processing_fees ??
+                data.ProcessingFee ??
                 data.ProcessingFees ??
                 data.processingFees ??
                 data.fees?.processing ??
                 data.Fees?.processing ??
                 prev.processingFees ??
                 0,
+              // Referral Information
+              // Handle referral_by as object (from API) or string (legacy)
+              referralBy: (() => {
+                const referral = data.referral_by ?? data.ReferralBy ?? data.referred_by ?? data.ReferredBy ?? data.referredBy ?? data.sponsor_by ?? data.sponsorBy;
+                if (!referral) return prev.referralBy ?? '';
+                // If it's an object, extract email; otherwise use as string
+                if (typeof referral === 'object' && referral !== null) {
+                  return referral.email ?? referral.Email ?? referral.referral_id ?? referral.referralId ?? '';
+                }
+                return referral;
+              })(),
+              referralRemarks: data.remarks ?? data.Remarks ?? data.referral_remarks ?? data.ReferralRemarks ?? prev.referralRemarks ?? '',
               // Rebates - handle both PascalCase and snake_case
               DirectRebate: data.DirectRebate ?? data.direct_rebate ?? prev.DirectRebate ?? 0,
               L1_rebate: data.L1Rebate ?? data.L1_rebate ?? data.l1_rebate ?? prev.L1_rebate ?? 0,
@@ -262,13 +279,15 @@ export default function UnifiedSettings() {
 
             // For agents, normalize status from API ("active"/"inactive") into dropdown ("Active"/"Inactive")
             setFormData(prev => {
-              const rawStatus = (data.Status || data.status || '').toString().toLowerCase();
+              const rawStatus = (data.status || data.Status || '').toString().toLowerCase();
               const normalizedStatus = rawStatus === 'inactive' ? 'Inactive' : 'Active';
               
               return {
                 ...prev,
-                walletAddress: data.WalletAddress || data.wallet_address || prev.walletAddress,
+                walletAddress: data.wallet_address || data.WalletAddress || prev.walletAddress,
                 accountStatus: normalizedStatus,
+                // Map referral information if available
+                referralBy: data.referral_id || data.ReferralID || data.referralId || prev.referralBy || '',
               };
             });
           }
@@ -282,6 +301,49 @@ export default function UnifiedSettings() {
     
     fetchEntityData();
   }, [isAdminView, id, entityType, isT3Admin, isSystemAdmin]);
+
+  // Fetch currencies for dropdown (System Admin viewing merchant)
+  useEffect(() => {
+    const fetchCurrencies = async () => {
+      if (!isSystemAdmin || entityType !== 'merchant' || !isAdminView) {
+        setCurrencyOptions([]);
+        return;
+      }
+
+      try {
+        const result = await api.systemadmin.getCurrencies({ page: 1 });
+        if (result && result.success && Array.isArray(result.data)) {
+          const opts = result.data.map((c) => {
+            const code = c.currency_code || '';
+            const name = c.currency_name || (c.country_name && code ? `${c.country_name} - ${code}` : code);
+            return {
+              value: code || (c.id != null ? String(c.id) : ''),
+              label: name || code,
+            };
+          });
+          setCurrencyOptions(opts);
+          
+          // Normalize stored currency value: if it's a currency_name, convert to currency_code
+          if (formData.currencies && opts.length > 0) {
+            const storedValue = formData.currencies;
+            // Check if stored value is a currency_name (label) instead of currency_code (value)
+            const matchedOption = opts.find(opt => opt.label === storedValue);
+            if (matchedOption && matchedOption.value !== storedValue) {
+              // Update formData to use currency_code
+              setFormData(prev => ({ ...prev, currencies: matchedOption.value }));
+            }
+          }
+        } else {
+          setCurrencyOptions([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch currencies:', error);
+        setCurrencyOptions([]);
+      }
+    };
+
+    fetchCurrencies();
+  }, [isSystemAdmin, entityType, isAdminView]);
 
   // Fetch admin profile if viewing own settings (both T3 and System Admin)
   useEffect(() => {
@@ -377,13 +439,20 @@ export default function UnifiedSettings() {
           { id: 'status', label: 'Account Status', icon: Lock },
         ];
       } else if (entityType === 'user') {
-        // User settings - temporarily hide Permissions & Access tab
-        return [
+        // User settings - hide Account Status and Wallet Address tabs for system admin
+        const tabs = [
           { id: 'profile', label: 'Profile Information', icon: User },
-          { id: 'wallet', label: 'Wallet Address', icon: Wallet },
-          { id: 'referral', label: 'Referral Information', icon: Cog },
-          { id: 'status', label: 'Account Status', icon: Lock },
         ];
+        // Only show Wallet Address tab for T3 Admin, not System Admin
+        if (!isSystemAdmin) {
+          tabs.push({ id: 'wallet', label: 'Wallet Address', icon: Wallet });
+        }
+        tabs.push({ id: 'referral', label: 'Referral Information', icon: Cog });
+        // Only show Account Status tab for T3 Admin, not System Admin
+        if (!isSystemAdmin) {
+          tabs.push({ id: 'status', label: 'Account Status', icon: Lock });
+        }
+        return tabs;
       } else {
         // Merchant settings - temporarily hide Permissions & Access tab
         return [
@@ -409,6 +478,13 @@ export default function UnifiedSettings() {
   };
 
   const tabs = getTabs();
+
+  // If status or wallet tab is active but not available (e.g., system admin viewing user), switch to first tab
+  useEffect(() => {
+    if ((activeTab === 'status' || activeTab === 'wallet') && !tabs.find(tab => tab.id === activeTab)) {
+      setActiveTab(tabs[0]?.id || 'profile');
+    }
+  }, [tabs, activeTab]);
 
   const handleCancel = () => {
     navigate(-1); // Go back to previous page
@@ -573,9 +649,18 @@ export default function UnifiedSettings() {
           // Keep the same snake_case keys used by create merchant
           processing_fees: Number.isFinite(processing) ? processing : 0,
         };
+      } else if (sectionKey === 'referral') {
+        updateData = {
+          // Don't send referral_by if it's disabled (temporarily disabled for merchants)
+          // remarks: formData.referralRemarks || null,
+        };
+        // Only send remarks for now since referral_by is disabled
+        if (formData.referralRemarks !== undefined && formData.referralRemarks !== null && formData.referralRemarks !== '') {
+          updateData.remarks = formData.referralRemarks;
+        }
       } else if (sectionKey === 'info') {
         updateData = {
-          company_name: formData.companyName,
+          business_name: formData.companyName,
           ssm_number: formData.ssmNumber,
           merchant_type: formData.merchantType,
         };
@@ -592,6 +677,11 @@ export default function UnifiedSettings() {
         updateData = {
           wallet_address: formData.walletAddress,
         };
+      } else if (sectionKey === 'currency') {
+        // Send currency_code when saving currency
+        updateData = {
+          currency_code: formData.currencies || null,
+        };
       } else if (sectionKey === 'profile') {
         updateData = {};
         if (formData.password) {
@@ -603,7 +693,7 @@ export default function UnifiedSettings() {
       } else {
         // For other sections, include all relevant fields
         updateData = {
-          company_name: formData.companyName,
+          business_name: formData.companyName,
           ssm_number: formData.ssmNumber,
           merchant_type: formData.merchantType,
           wallet_address: formData.walletAddress,
@@ -633,7 +723,10 @@ export default function UnifiedSettings() {
           setFormData(prev => ({
             ...prev,
             // Update all merchant fields with PascalCase support
-            merchantGroup: data.UserType ? data.UserType.toUpperCase() : prev.merchantGroup,
+            // Use category from API response first, then fallback to other fields
+            merchantGroup: (data.category || data.Category || data.UserType || data.user_type) 
+              ? (data.category || data.Category || data.UserType || data.user_type).toUpperCase() 
+              : prev.merchantGroup,
             companyName: data.BusinessName || data.business_name || prev.companyName,
             ssmNumber: data.SSMNumber || data.ssm_number || prev.ssmNumber,
             merchantType: data.MerchantType || data.merchant_type || prev.merchantType,
@@ -646,14 +739,14 @@ export default function UnifiedSettings() {
             walletAddress: data.WalletAddress || data.wallet_address || prev.walletAddress,
             accountStatus: normalizedMerchantStatus,
             email: data.Email || data.email || prev.email,
-            // Currency - keep selected string in sync with endpoint
+            // Currency - keep selected currency_code in sync with endpoint
             currencies:
-              data.currency?.currency_name ??
-              data.Currency?.currency_name ??
-              data.currency_name ??
               data.currency?.currency_code ??
               data.Currency?.currency_code ??
               data.currency_code ??
+              data.currency?.currency_name ??
+              data.Currency?.currency_name ??
+              data.currency_name ??
               prev.currencies ??
               '',
             // Fees - refresh from endpoint (preserve 0 values)
@@ -666,13 +759,27 @@ export default function UnifiedSettings() {
               prev.markupFees ??
               0,
             processingFees:
+              data.processing_fee ??
               data.processing_fees ??
+              data.ProcessingFee ??
               data.ProcessingFees ??
               data.processingFees ??
               data.fees?.processing ??
               data.Fees?.processing ??
               prev.processingFees ??
               0,
+            // Referral Information
+            // Handle referral_by as object (from API) or string (legacy)
+            referralBy: (() => {
+              const referral = data.referral_by ?? data.ReferralBy ?? data.referred_by ?? data.ReferredBy ?? data.referredBy ?? data.sponsor_by ?? data.sponsorBy;
+              if (!referral) return prev.referralBy ?? '';
+              // If it's an object, extract email; otherwise use as string
+              if (typeof referral === 'object' && referral !== null) {
+                return referral.email ?? referral.Email ?? referral.referral_id ?? referral.referralId ?? '';
+              }
+              return referral;
+            })(),
+            referralRemarks: data.remarks ?? data.Remarks ?? data.referral_remarks ?? data.ReferralRemarks ?? prev.referralRemarks ?? '',
             // Rebates - handle both PascalCase and snake_case
             DirectRebate: data.DirectRebate ?? data.direct_rebate ?? prev.DirectRebate ?? 0,
             L1_rebate: data.L1Rebate ?? data.L1_rebate ?? data.l1_rebate ?? prev.L1_rebate ?? 0,
@@ -788,6 +895,22 @@ export default function UnifiedSettings() {
     }
 
     // Default: text input
+    // Handle read-only/disabled fields with special styling
+    if (field.readOnly || field.disabled) {
+      return (
+        <FormLabel key={field.name} label={field.label}>
+          <input
+            type={field.type === 'email' ? 'email' : field.type === 'number' ? 'number' : 'text'}
+            value={field.value || ''}
+            readOnly
+            disabled={field.disabled}
+            placeholder={field.placeholder}
+            className="w-full px-3 py-2 rounded-md bg-secondary/50 border-none cursor-not-allowed"
+          />
+        </FormLabel>
+      );
+    }
+    
     return (
       <FormLabel key={field.name} label={field.label}>
         <TextInput
@@ -861,8 +984,11 @@ export default function UnifiedSettings() {
       title: 'Referral Settings',
       fields: entityType === 'merchant' 
         ? [
-          createField('text', 'Referral By', 'referralBy', { placeholder: 'Insert referral ID here' }),
-          createField('text', 'Referral Fees', 'referralFees', { placeholder: 'eg:1.2' }),
+          createField('text', 'Referral By', 'referralBy', { 
+            placeholder: 'Insert referral ID here',
+            disabled: true, // Temporarily disabled
+            readOnly: true
+          }),
           createField('text', 'Remarks', 'referralRemarks', { placeholder: 'Additional remarks' })
         ]
         : [
@@ -880,8 +1006,10 @@ export default function UnifiedSettings() {
       title: 'Currency Settings',
       fields: [createField('select', 'Currencies', 'currencies', { 
         placeholder: 'Select Currencies', 
-        // Allow currencies from API that aren't in the mock list (e.g., "Vietnam - VND")
-        options: Array.from(new Set([...(CURRENCIES || []), ...(formData.currencies ? [formData.currencies] : [])]))
+        // Use fetched currency options for system admin, fallback to CURRENCIES constant
+        options: currencyOptions.length > 0 
+          ? currencyOptions 
+          : Array.from(new Set([...(CURRENCIES || []), ...(formData.currencies ? [formData.currencies] : [])]))
       })]
     },
     bonus: {

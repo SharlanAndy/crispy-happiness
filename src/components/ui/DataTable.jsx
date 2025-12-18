@@ -71,18 +71,25 @@ export default function DataTable({
                   {actions && actions.length > 0 && (
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
-                        {actions.map((action, actionIdx) => (
-                          <ActionButton
-                            key={actionIdx}
-                            icon={action.icon}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              action.onClick(row);
-                            }}
-                            variant={action.variant}
-                            tooltip={action.tooltip}
-                          />
-                        ))}
+                        {actions.map((action, actionIdx) => {
+                          // Support functions for dynamic icon, variant, and tooltip based on row
+                          const icon = typeof action.icon === 'function' ? action.icon(row) : action.icon;
+                          const variant = typeof action.variant === 'function' ? action.variant(row) : action.variant;
+                          const tooltip = typeof action.tooltip === 'function' ? action.tooltip(row) : action.tooltip;
+                          
+                          return (
+                            <ActionButton
+                              key={actionIdx}
+                              icon={icon}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                action.onClick(row);
+                              }}
+                              variant={variant}
+                              tooltip={tooltip}
+                            />
+                          );
+                        })}
                       </div>
                     </td>
                   )}

@@ -233,15 +233,17 @@ export default function AgentDetails() {
   const stats = useMemo(() => {
     if (!agentStats) return [];
     
-    const totalReferral = agentStats.TotalReferral || 0;
-    const totalVolume = (agentStats.TotalContributedVolume || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const totalBonus = (agentStats.TotalBonusReceived || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const totalReferral = agentStats.TotalReferral || agentStats.total_referral || 0;
+    const totalVolume = (agentStats.TotalContributedVolume || agentStats.total_contributed_volume || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const totalBonus = (agentStats.TotalBonusReceived || agentStats.total_bonus_received || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     
     // Format last update date
     let lastUpdate = 'N/A';
-    if (agentStats.LastUpdate) {
+    const lastUpdateValue = agentStats.LastUpdate || agentStats.last_update || agentStats.lastUpdate;
+    if (lastUpdateValue) {
       try {
-        const date = new Date(agentStats.LastUpdate);
+        // Handle format "2025-12-18 10:52:28"
+        const date = new Date(lastUpdateValue.replace(' ', 'T'));
         if (!isNaN(date.getTime())) {
           lastUpdate = date.toLocaleDateString('en-GB');
         }
@@ -260,30 +262,34 @@ export default function AgentDetails() {
   const userInfo = useMemo(() => {
     if (!agentDetails) return [];
     
-    const fullName = [agentDetails.FirstName, agentDetails.LastName].filter(Boolean).join(' ') || 'N/A';
-    const joinDate = agentDetails.CreatedAt ? new Date(agentDetails.CreatedAt).toLocaleString('en-GB') : 'N/A';
-    const status = agentDetails.Status || 'N/A';
+    // Use AgentID from stats if available, otherwise use referral_id from details
+    const agentId = agentStats?.AgentID || agentStats?.agentID || agentDetails.referral_id || agentDetails.ReferralID || agentDetails.referralId || agentDetails.id?.toString() || 'N/A';
+    const firstName = agentDetails.first_name || agentDetails.FirstName || '';
+    const lastName = agentDetails.last_name || agentDetails.LastName || '';
+    const fullName = [firstName, lastName].filter(Boolean).join(' ') || 'N/A';
+    const joinDate = agentDetails.created_at || agentDetails.CreatedAt ? new Date(agentDetails.created_at || agentDetails.CreatedAt).toLocaleString('en-GB') : 'N/A';
+    const status = agentDetails.status || agentDetails.Status || 'N/A';
     
     return [
-      { label: "Agent ID", value: agentDetails.ReferralID || agentDetails.ID?.toString() || 'N/A' },
-      { label: 'Username', value: agentDetails.Username || 'N/A' },
+      { label: "Agent ID", value: agentId },
+      { label: 'Username', value: agentDetails.username || agentDetails.Username || 'N/A' },
       { label: 'Full Name', value: fullName },
       { label: 'Join Date', value: joinDate },
       { label: 'Status', value: status.charAt(0).toUpperCase() + status.slice(1), badge: true },
     ];
-  }, [agentDetails]);
+  }, [agentDetails, agentStats]);
 
   const walletAddressInfo = useMemo(() => {
     if (!agentDetails) return [];
     return [
-      { label: 'Wallet Address', value: agentDetails.WalletAddress || 'N/A' },
+      { label: 'Wallet Address', value: agentDetails.wallet_address || agentDetails.WalletAddress || 'N/A' },
     ];
   }, [agentDetails]);
 
   const sponsorInfo = useMemo(() => {
     if (!agentDetails) return [];
     return [
-      { label: 'Referral ID', value: agentDetails.ReferralID || 'N/A' },
+      { label: 'Referral ID', value: agentDetails.referral_id || agentDetails.ReferralID || agentDetails.referralId || 'N/A' },
     ];
   }, [agentDetails]);
 

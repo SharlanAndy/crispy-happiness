@@ -534,6 +534,32 @@ export const api = {
      */
     getAccountDetails: (id) => request(`${T3SYSTEMADMIN_BASE}/accounts/${id}`, { method: 'GET' }),
 
+    /**
+     * Update account status.
+     * Headers: Authorization: Bearer <token>
+     * @param {string|number} id - Account ID
+     * @param {Object} data - { status: "active" | "inactive" }
+     * @returns {Promise<Object>} { success: true, message: "Account status updated successfully" }
+     */
+    updateAccountStatus: (id, data) =>
+      request(`${T3SYSTEMADMIN_BASE}/accounts/${id}/status`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    /**
+     * Update account password.
+     * Headers: Authorization: Bearer <token>
+     * @param {string|number} id - Account ID
+     * @param {Object} data - { password: string }
+     * @returns {Promise<Object>} { success: true, message: "Account password reset successfully" }
+     */
+    updateAccountPassword: (id, data) =>
+      request(`${T3SYSTEMADMIN_BASE}/accounts/${id}/password`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
     // Currencies Management
     /**
      * Get currencies list.
@@ -1005,6 +1031,15 @@ export const api = {
       // TODO: update path when backend endpoint is confirmed
       return request(`${T3SYSTEMADMIN_BASE}/merchants/t3-admins?${query}`, { method: 'GET' });
     },
+
+    /**
+     * Get T3 admins by supermain_id.
+     * Headers: Authorization: Bearer <token>
+     * @param {string|number} supermainId - Supermain ID
+     * @returns {Promise<Object>} { success: true, data: [...] }
+     */
+    getT3AdminsBySupermain: (supermainId) =>
+      request(`${T3SYSTEMADMIN_BASE}/t3admins/${supermainId}/sub`, { method: 'GET' }),
 
     /**
      * Get transaction details.

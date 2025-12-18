@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Eye, Settings, Trash2, Plus } from 'lucide-react';
+import { Eye, Settings, Trash2, Plus, CheckCircle2, XCircle } from 'lucide-react';
 import { StatCard, DataTable, SearchBar, PageHeader, Modal, Button, FormField, ConfirmDialog } from '../../components/ui';
 import { TextInput, PasswordInput } from '../../components/form';
 import { t3Service } from '@/services/t3Service';
@@ -196,8 +196,8 @@ export default function AccountManagement() {
     setFormData({
       username: account.username,
       password: '',
-      email: account.email || '',
-      walletAddress: account.walletAddress || ''
+      email: '',
+      walletAddress: ''
     });
     setModalState({ isOpen: true, mode: 'edit', editingId: account.id });
   };
@@ -252,8 +252,29 @@ export default function AccountManagement() {
         return;
       }
     } else {
-      console.log('Updating finance account:', modalState.editingId, formData);
-      // TODO: Implement update API when available
+      // Edit mode: Update password only
+      if (!formData.password || !formData.password.trim()) {
+        showError('Password is required');
+        return;
+      }
+
+      try {
+        const result = await api.t3admin.updateAccountPassword(modalState.editingId, {
+          password: formData.password.trim()
+        });
+        
+        handleApiResponse(result, {
+          successMessage: result?.message || 'Account password reset successfully',
+          errorMessage: result?.message || 'Failed to update password. Please try again.',
+          onSuccess: () => {
+            handleCloseModal();
+          }
+        });
+      } catch (error) {
+        console.error('Failed to update password:', error);
+        showError('Failed to update password. Please try again.');
+      }
+      return;
     }
     handleCloseModal();
   };
@@ -262,6 +283,61 @@ export default function AccountManagement() {
     console.log('Deleting account:', account.id);
     setDeleteConfirm({ isOpen: false, item: null });
   };
+
+  const handleToggleStatus = useCallback(async (account) => {
+    if (!isT3Admin) return;
+    
+    const currentStatus = account.status?.toLowerCase() || 'active';
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    
+    try {
+      const result = await api.t3admin.updateAccountStatus(account.id, { status: newStatus });
+      
+      if (result && result.success) {
+        // Optimistically update the local state immediately
+        setAccountsData(prevData => 
+          prevData.map(acc => 
+            acc.id === account.id 
+              ? { ...acc, status: newStatus.charAt(0).toUpperCase() + newStatus.slice(1) }
+              : acc
+          )
+        );
+        
+        handleApiResponse(result, {
+          successMessage: result?.message || 'Account status updated successfully',
+          errorMessage: result?.message || 'Failed to update account status. Please try again.',
+          onSuccess: async () => {
+            // Refresh accounts list from server to ensure consistency
+            const fetchResult = await t3Service.getAccounts({ page: currentPage, search: searchTerm });
+            if (fetchResult.success) {
+              const dataArray = fetchResult.data || [];
+              const limit = fetchResult.limit || 20;
+              const page = fetchResult.page || currentPage;
+              const total = fetchResult.total || null;
+              
+              setPaginationMeta({ limit, page, total });
+              
+              const transformed = dataArray.map(acc => ({
+                id: acc.id.toString(),
+                username: acc.username,
+                character: acc.character || 'Finance',
+                lastLogin: acc.last_login ? new Date(acc.last_login).toLocaleString('en-GB') : 'Never',
+                created: acc.created_at ? new Date(acc.created_at).toLocaleString('en-GB') : '',
+                status: acc.status || 'Active'
+              }));
+              setAccountsData(transformed);
+              setTotalAccounts(total || transformed.length);
+            }
+          }
+        });
+      } else {
+        showError(result?.message || 'Failed to update account status. Please try again.');
+      }
+    } catch (error) {
+      console.error('Failed to update account status:', error);
+      showError('Failed to update account status. Please try again.');
+    }
+  }, [isT3Admin, currentPage, searchTerm, handleApiResponse, showError]);
 
   const actions = useMemo(() => {
     const baseActions = [
@@ -277,8 +353,31 @@ export default function AccountManagement() {
       },
     ];
 
-    // T3 admin should NOT see delete button on admin list
-    if (isT3Admin) return baseActions;
+    // T3 admin: replace delete with active/inactive toggle
+    if (isT3Admin) {
+      return [
+        ...baseActions,
+        {
+          icon: (row) => {
+            const isActive = row.status?.toLowerCase() === 'active';
+            return isActive ? (
+              <CheckCircle2 size={16} className="text-green-600" />
+            ) : (
+              <XCircle size={16} className="text-red-600" />
+            );
+          },
+          onClick: (row) => handleToggleStatus(row),
+          tooltip: (row) => {
+            const isActive = row.status?.toLowerCase() === 'active';
+            return isActive ? 'Deactivate Account' : 'Activate Account';
+          },
+          variant: (row) => {
+            const isActive = row.status?.toLowerCase() === 'active';
+            return isActive ? 'success' : 'danger';
+          },
+        },
+      ];
+    }
 
     return [
       ...baseActions,
@@ -289,7 +388,7 @@ export default function AccountManagement() {
         tooltip: 'Delete Account',
       },
     ];
-  }, [navigate, basePath, isT3Admin]);
+  }, [navigate, basePath, isT3Admin, handleToggleStatus]);
 
   return (
     <>
@@ -381,12 +480,12 @@ export default function AccountManagement() {
             <PasswordInput
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              placeholder={modalState.mode === 'edit' ? 'Leave blank to keep current password' : 'Insert password'}
+              placeholder={modalState.mode === 'edit' ? 'Enter new password' : 'Insert password'}
             />
           </FormField>
 
-          {/* Edit Finance: keep only password field (hide email + wallet address) */}
-          {modalState.mode !== 'edit' && (
+          {/* Create Finance: show email + wallet address */}
+          {modalState.mode === 'create' && (
             <>
               <FormField label="Email">
                 <TextInput

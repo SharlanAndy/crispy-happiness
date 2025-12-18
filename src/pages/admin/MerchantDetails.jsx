@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Eye } from 'lucide-react';
+import { Eye, CheckCircle2, XCircle } from 'lucide-react';
 import { StatCard, InfoSection, Card, DataTable, SearchBar, PageHeader, ProfitChart, TabButtons, Modal, Button, FormField } from '@/components/ui';
 import { PasswordInput, TextInput } from '@/components/form';
 
@@ -16,7 +16,7 @@ export default function MerchantDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { showError } = useToast();
+  const { showError, handleApiResponse } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('Today');
   const [currentPage, setCurrentPage] = useState(1);
@@ -27,6 +27,8 @@ export default function MerchantDetails() {
   const [loadingChart, setLoadingChart] = useState(false);
   const [t3Admins, setT3Admins] = useState([]);
   const [loadingT3Admins, setLoadingT3Admins] = useState(false);
+  const [regularTransactions, setRegularTransactions] = useState([]);
+  const [paymentTransactions, setPaymentTransactions] = useState([]);
   
   // Modal and form states for T3 Admin
   const [showWalletModal, setShowWalletModal] = useState(false);
@@ -59,6 +61,18 @@ export default function MerchantDetails() {
           setMerchantData(result.data);
           // Handle both PascalCase (from API) and snake_case (for backward compatibility)
           setWalletAddress(result.data.WalletAddress || result.data.wallet_address || '');
+          
+          // Extract transactions and payment_transactions from merchant data (for system admin only)
+          if (!isT3Admin) {
+            // Regular transactions from transactions array
+            const regularTrans = result.data.transactions || result.data.Transactions || [];
+            setRegularTransactions(Array.isArray(regularTrans) ? regularTrans : []);
+            
+            // Payment transactions from payment_transactions.data
+            const paymentTransData = result.data.payment_transactions || result.data.PaymentTransactions || {};
+            const paymentTrans = paymentTransData.data || paymentTransData.Data || [];
+            setPaymentTransactions(Array.isArray(paymentTrans) ? paymentTrans : []);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch merchant details:', error);
@@ -144,86 +158,76 @@ export default function MerchantDetails() {
     { label: 'Total Fees Contributed', value: `${(merchantData.TotalFeesContributed || merchantData.total_fees_contributed || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`, lastUpdate: new Date().toLocaleDateString('en-GB') }
   ] : [];
 
-  // Fetch profit chart data
+  // Extract profit chart data from merchant data (profit_breakdown)
   useEffect(() => {
-    const fetchProfitChart = async () => {
-      // Only fetch if we have a valid ID and it's system admin view
-      if (!id || id === 'undefined' || String(id) === 'undefined' || isT3Admin) {
-        setChartData([]);
-        return;
-      }
+    if (!merchantData || isT3Admin) {
+      setChartData([]);
+      setLoadingChart(false);
+      return;
+    }
 
-      try {
-        setLoadingChart(true);
-        // Map tab to period parameter - API uses: today, week, month, year
-        const periodMap = {
-          'Today': 'today',
-          'This Week': 'week',
-          'This Month': 'month',
-          'This Year': 'year',
-        };
-        const period = periodMap[activeTab] || 'month';
-        
-        // Ensure ID is a valid string/number
-        const merchantId = String(id).trim();
-        if (!merchantId || merchantId === 'undefined' || merchantId === 'null') {
-          console.warn('Invalid merchant ID for profit chart:', id);
-          setChartData([]);
-          return;
-        }
-        
-        const result = await api.systemadmin.getMerchantProfitChart(merchantId, period);
-        
-        if (result && result.success && result.data) {
-          // Transform API data to chart format
-          // API response: { data: { chart_data: [...], period: "year" }, success: true }
-          let transformedData = [];
-          
-          // Handle null chart_data
-          if (result.data.chart_data === null || result.data.chart_data === undefined) {
-            transformedData = [];
-          } else if (Array.isArray(result.data.chart_data)) {
-            // If chart_data is an array, transform it
-            transformedData = result.data.chart_data.map(item => ({
-              time: item.time || item.date || item.label || '',
-              profit: item.profit || item.value || 0
-            }));
-          } else if (Array.isArray(result.data)) {
-            // If data is directly an array (fallback)
-            transformedData = result.data.map(item => ({
-              time: item.time || item.date || item.label || '',
-              profit: item.profit || item.value || 0
-            }));
-          } else if (result.data.data && Array.isArray(result.data.data)) {
-            // If data is nested in a data property (fallback)
-            transformedData = result.data.data.map(item => ({
-              time: item.time || item.date || item.label || '',
-              profit: item.profit || item.value || 0
-            }));
-          }
-          
-          setChartData(transformedData);
-        } else {
-          setChartData([]);
-        }
-      } catch (error) {
-        console.error('Failed to fetch profit chart:', error);
-        setChartData([]);
-      } finally {
-        setLoadingChart(false);
-      }
-    };
+    try {
+      setLoadingChart(true);
+      
+      // Map tab to profit_breakdown field
+      const periodMap = {
+        'Today': 'daily',
+        'This Week': 'weekly',
+        'This Month': 'monthly',
+        'This Year': 'yearly',
+      };
+      const periodKey = periodMap[activeTab] || 'monthly';
+      
+      // Extract profit_breakdown from merchant data
+      const profitBreakdown = merchantData.profit_breakdown || merchantData.ProfitBreakdown || {};
+      const profitValue = profitBreakdown[periodKey] ?? profitBreakdown[periodKey.charAt(0).toUpperCase() + periodKey.slice(1)] ?? 0;
+      
+      // Transform to chart format (single data point for the selected period)
+      // Chart expects array of { time, profit } objects
+      // Always show data even if value is 0
+      const transformedData = [{
+        time: activeTab,
+        profit: Number(profitValue) || 0
+      }];
+      
+      setChartData(transformedData);
+    } catch (error) {
+      console.error('Failed to extract profit chart data:', error);
+      setChartData([]);
+    } finally {
+      setLoadingChart(false);
+    }
+  }, [merchantData, activeTab, isT3Admin]);
 
-    fetchProfitChart();
-  }, [id, activeTab, isT3Admin]);
-
-  // Fetch T3 admin list for this merchant (placeholder - actual endpoint to be confirmed)
+  // Fetch T3 admin list for this merchant (only if category is T3)
   useEffect(() => {
     const fetchT3Admins = async () => {
-      if (!id) return;
+      if (!id || !merchantData) return;
+      
+      // Check if merchant category is T3
+      const category = merchantData.category || merchantData.Category || merchantData.user_type || merchantData.UserType || '';
+      const isT3Merchant = category.toString().toLowerCase() === 't3';
+      
+      // Only fetch if category is T3
+      if (!isT3Merchant) {
+        setT3Admins([]);
+        setLoadingT3Admins(false);
+        return;
+      }
+      
+      // Get supermain_id from merchant data
+      const supermainId = merchantData.supermain_id || merchantData.supermainId || merchantData.SupermainId;
+      
+      if (!supermainId) {
+        console.warn('[MerchantDetails] No supermain_id found for T3 merchant');
+        setT3Admins([]);
+        setLoadingT3Admins(false);
+        return;
+      }
+      
       try {
         setLoadingT3Admins(true);
-        const result = await api.systemadmin.getMerchantT3Admins({ merchant_id: id, page: 1 });
+        const result = await api.systemadmin.getT3AdminsBySupermain(supermainId);
         console.log('[MerchantDetails] T3 admin list response:', result);
         if (result && result.success && Array.isArray(result.data)) {
           setT3Admins(result.data);
@@ -242,7 +246,46 @@ export default function MerchantDetails() {
     if (!isT3Admin) {
       fetchT3Admins();
     }
-  }, [id, isT3Admin]);
+  }, [id, isT3Admin, merchantData]);
+
+  // Handle T3 admin status toggle
+  const handleToggleT3AdminStatus = useCallback(async (admin) => {
+    const currentStatus = admin.status?.toLowerCase() || 'active';
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    
+    try {
+      // Optimistic update
+      setT3Admins(prev => prev.map(acc => acc.id === admin.id ? { ...acc, status: newStatus } : acc));
+
+      const result = await api.t3admin.updateAccountStatus(admin.id, { status: newStatus });
+      handleApiResponse(result, {
+        successMessage: result?.message || 'T3 admin status updated successfully',
+        errorMessage: result?.message || 'Failed to update T3 admin status. Please try again.',
+        onSuccess: async () => {
+          // Refresh T3 admins list from server to ensure consistency
+          const category = merchantData?.category || merchantData?.Category || merchantData?.user_type || merchantData?.UserType || '';
+          const isT3Merchant = category.toString().toLowerCase() === 't3';
+          const supermainId = merchantData?.supermain_id || merchantData?.supermainId || merchantData?.SupermainId;
+          
+          if (isT3Merchant && supermainId) {
+            try {
+              const fetchResult = await api.systemadmin.getT3AdminsBySupermain(supermainId);
+              if (fetchResult && fetchResult.success && Array.isArray(fetchResult.data)) {
+                setT3Admins(fetchResult.data);
+              }
+            } catch (error) {
+              console.error('Failed to refresh T3 admins:', error);
+            }
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Failed to update T3 admin status:', error);
+      showError('Failed to update T3 admin status. Please try again.');
+      // Revert optimistic update on error
+      setT3Admins(prev => prev.map(acc => acc.id === admin.id ? { ...acc, status: currentStatus } : acc));
+    }
+  }, [merchantData, handleApiResponse, showError]);
 
   // Transform transactions for display
   const transformedTransactions = transactionsData.map(t => ({
@@ -421,10 +464,100 @@ export default function MerchantDetails() {
           </div>
         )}
 
-        {/* T3 Admin List Section (placeholder table; data wiring once endpoint is finalized) */}
+        {/* Transaction List Section - System Admin Only */}
         {!isT3Admin && (
           <div className="bg-white rounded-[20px] border border-[#E5E5E5] p-5">
-            <h3 className="text-2xl font-semibold text-black mb-4">T3 Admin List</h3>
+            <h3 className="text-2xl font-semibold text-black mb-4">Transaction List</h3>
+            {regularTransactions.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No transactions available
+              </div>
+            ) : (
+              <DataTable
+                columns={[
+                  { key: 'id', label: 'ID' },
+                  { key: 'amount', label: 'Amount' },
+                  { key: 'description', label: 'Description' },
+                  { key: 'type', label: 'Type' },
+                  { key: 'created_at', label: 'Created At' },
+                ]}
+                data={regularTransactions.map(t => ({
+                  id: t.id || 'N/A',
+                  amount: `${(t.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                  description: t.description || 'N/A',
+                  type: t.type || 'N/A',
+                  created_at: t.created_at ? new Date(t.created_at).toLocaleString('en-GB') : 'N/A',
+                }))}
+                actions={[]}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Payment Transaction List Section - System Admin Only */}
+        {!isT3Admin && (
+          <div className="bg-white rounded-[20px] border border-[#E5E5E5] p-5">
+            <h3 className="text-2xl font-semibold text-black mb-4">Payment Transaction List</h3>
+            {paymentTransactions.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No payment transactions available
+              </div>
+            ) : (
+              <DataTable
+                columns={[
+                  { key: 'id', label: 'ID' },
+                  { key: 'amount', label: 'Amount' },
+                  { key: 'converted_amount', label: 'Converted Amount' },
+                  { key: 'currency', label: 'Currency' },
+                  { key: 'currency_rate', label: 'Currency Rate' },
+                  { key: 'original_amount', label: 'Original Amount' },
+                  { key: 'original_currency', label: 'Original Currency' },
+                  { key: 'markup_fees', label: 'Markup Fees' },
+                  { key: 'platform_fees', label: 'Platform Fees' },
+                  { key: 'processing_fees', label: 'Processing Fees' },
+                  { key: 'total_payable', label: 'Total Payable' },
+                  { key: 'status', label: 'Status' },
+                  { key: 'user_id', label: 'User ID' },
+                  { key: 'username', label: 'Username' },
+                  { key: 'wallet_address', label: 'Wallet Address' },
+                  { key: 'created_at', label: 'Created At' },
+                ]}
+                data={paymentTransactions.map(t => ({
+                  id: t.id || 'N/A',
+                  amount: t.amount != null ? `${Number(t.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A',
+                  converted_amount: t.converted_amount != null ? `${Number(t.converted_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A',
+                  currency: t.currency || 'N/A',
+                  currency_rate: t.currency_rate != null ? Number(t.currency_rate).toLocaleString('en-US') : 'N/A',
+                  original_amount: t.original_amount != null ? `${Number(t.original_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A',
+                  original_currency: t.original_currency || 'N/A',
+                  markup_fees: t.markup_fees != null ? `${Number(t.markup_fees).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A',
+                  platform_fees: t.platform_fees != null ? `${Number(t.platform_fees).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A',
+                  processing_fees: t.processing_fees != null ? `${Number(t.processing_fees).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A',
+                  total_payable: t.total_payable != null ? `${Number(t.total_payable).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A',
+                  status: t.status || 'N/A',
+                  user_id: t.user_id || 'N/A',
+                  username: t.username || 'N/A',
+                  wallet_address: t.wallet_address || 'N/A',
+                  created_at: t.created_at ? new Date(t.created_at).toLocaleString('en-GB') : 'N/A',
+                }))}
+                actions={[]}
+              />
+            )}
+          </div>
+        )}
+
+        {/* T3 Admin List Section - Only show for T3 merchants */}
+        {!isT3Admin && (() => {
+          // Check if merchant category is T3
+          const category = merchantData?.category || merchantData?.Category || merchantData?.user_type || merchantData?.UserType || '';
+          const isT3Merchant = category.toString().toLowerCase() === 't3';
+          
+          // Only render if category is T3
+          if (!isT3Merchant) return null;
+          
+          return (
+            <div className="bg-white rounded-[20px] border border-[#E5E5E5] p-5">
+              <h3 className="text-2xl font-semibold text-black mb-4">T3 Admin List</h3>
             {loadingT3Admins ? (
               <div className="text-center py-8 text-muted-foreground">
                 Loading T3 admins...
@@ -434,55 +567,40 @@ export default function MerchantDetails() {
                 No T3 admins available
               </div>
             ) : (
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="py-2 px-3">Username</th>
-                    <th className="py-2 px-3">Email</th>
-                    <th className="py-2 px-3">Created Date</th>
-                    <th className="py-2 px-3 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {t3Admins.map((admin, idx) => (
-                    <tr key={idx} className="border-b last:border-0">
-                      <td className="py-2 px-3">{admin.username || 'N/A'}</td>
-                      <td className="py-2 px-3">{admin.email || 'N/A'}</td>
-                      <td className="py-2 px-3">
-                        {admin.created_at
-                          ? new Date(admin.created_at).toLocaleString('en-GB')
-                          : 'N/A'}
-                      </td>
-                      <td className="py-2 px-3">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            type="button"
-                            className="p-1.5 rounded-md border border-gray-300 hover:bg-gray-100"
-                            onClick={() =>
-                              console.log('[MerchantDetails] View T3 admin details clicked:', admin)
-                            }
-                          >
-                            <Eye size={16} />
-                          </button>
-                          <button
-                            type="button"
-                            className="p-1.5 rounded-md border border-gray-300 hover:bg-gray-100"
-                            onClick={() =>
-                              console.log('[MerchantDetails] Settings for T3 admin clicked:', admin)
-                            }
-                          >
-                            {/* Reuse Eye icon as placeholder for settings until we wire a modal & icon */}
-                            <Eye size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+                columns={[
+                  { key: 'username', label: 'Username' },
+                  { key: 'email', label: 'Email' },
+                  { key: 'first_name', label: 'First Name' },
+                  { key: 'last_name', label: 'Last Name' },
+                  { key: 'status', label: 'Status' },
+                  { key: 'last_login', label: 'Last Login' },
+                  { key: 'created_at', label: 'Created Date' },
+                ]}
+                data={t3Admins.map(admin => ({
+                  username: admin.username || 'N/A',
+                  email: admin.email || 'N/A',
+                  first_name: admin.first_name || 'N/A',
+                  last_name: admin.last_name || 'N/A',
+                  status: admin.status ? admin.status.charAt(0).toUpperCase() + admin.status.slice(1) : 'N/A',
+                  last_login: admin.last_login ? new Date(admin.last_login).toLocaleString('en-GB') : 'Never',
+                  created_at: admin.created_at ? new Date(admin.created_at).toLocaleString('en-GB') : 'N/A',
+                  rawStatus: admin.status || '',
+                  id: admin.id,
+                }))}
+                actions={[
+                  {
+                    icon: (row) => row.rawStatus?.toLowerCase() === 'active' ? <CheckCircle2 size={16} /> : <XCircle size={16} />,
+                    onClick: (row) => handleToggleT3AdminStatus(row),
+                    tooltip: (row) => row.rawStatus?.toLowerCase() === 'active' ? 'Deactivate T3 Admin' : 'Activate T3 Admin',
+                    variant: (row) => row.rawStatus?.toLowerCase() === 'active' ? 'success' : 'danger',
+                  },
+                ]}
+              />
             )}
-          </div>
-        )}
+            </div>
+          );
+        })()}
 
           </>
         )}

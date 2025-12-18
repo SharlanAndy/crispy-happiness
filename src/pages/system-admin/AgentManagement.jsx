@@ -39,7 +39,8 @@ export default function AgentManagement() {
           setPaginationMeta({ limit, page, total });
           
           const transformed = dataArray.map(a => ({
-            id: a.id || 'N/A',
+            id: a.id || 'N/A', // Keep id for navigation
+            agentId: a.agent_id || a.agentId || a.id || 'N/A', // Use agent_id for display
             bonus: `${(a.bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
             l1: (a.level1 || 0).toString(),
             l2: (a.level2 || 0).toString(),
@@ -148,6 +149,7 @@ export default function AgentManagement() {
     const searchLower = searchTerm.toLowerCase().trim();
     return agentsData.filter(a => {
       return (
+        a.agentId?.toLowerCase().includes(searchLower) ||
         a.id?.toLowerCase().includes(searchLower) ||
         a.status?.toLowerCase().includes(searchLower) ||
         a.bonus?.toLowerCase().includes(searchLower) ||
@@ -210,7 +212,7 @@ export default function AgentManagement() {
   }, [agentsMeta]);
 
   const columns = [
-    { key: 'id', label: 'Agent ID' },
+    { key: 'agentId', label: 'Agent ID' },
     { key: 'bonus', label: 'Bonus' },
     { key: 'l1', label: 'Level 1' },
     { key: 'l2', label: 'Level 2' },
@@ -268,7 +270,8 @@ export default function AgentManagement() {
 
         if (agentsResult && agentsResult.success) {
           const transformed = agentsResult.data.map(a => ({
-            id: a.id || 'N/A',
+            id: a.id || 'N/A', // Keep id for navigation
+            agentId: a.agent_id || a.agentId || a.id || 'N/A', // Use agent_id for display
             bonus: `${(a.bonus || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} U`,
             l1: (a.level1 || 0).toString(),
             l2: (a.level2 || 0).toString(),
