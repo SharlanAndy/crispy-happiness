@@ -21,7 +21,6 @@ export default function MerchantManagement() {
   const [activeTier, setActiveTier] = useState('T1');
   const [loading, setLoading] = useState(true);
   const [merchantsData, setMerchantsData] = useState([]);
-  const [dashboardData, setDashboardData] = useState(null);
   const [totalPages, setTotalPages] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [paginationMeta, setPaginationMeta] = useState({ limit: 20, page: 1, total: null });
@@ -116,10 +115,7 @@ export default function MerchantManagement() {
       try {
         setLoading(true);
         const type = getTypeFromTier(activeTier);
-        const [merchantsResult, dashboardResult] = await Promise.all([
-          api.systemadmin.getMerchants({ page: currentPage, type }),
-          api.systemadmin.getDashboard()
-        ]);
+        const merchantsResult = await api.systemadmin.getMerchants({ page: currentPage, type });
 
         if (merchantsResult && merchantsResult.success) {
           const dataArray = merchantsResult.data || [];
@@ -133,7 +129,7 @@ export default function MerchantManagement() {
             id: m.id, // Keep numeric id for navigation/actions
             merchant_id: m.merchant_id || 'N/A', // Use merchant_id directly from API for display
             name: m.company_name || 'N/A',
-            type: m.type ? m.type.toUpperCase() : 'N/A', // Uppercase the type (e.g., t1 -> T1)
+            type: m.category || m.Category || m.type ? (m.category || m.Category || m.type).toUpperCase() : 'N/A', // Use category from API, fallback to type
             state: m.state || m.location?.state || '',
             join: m.join_date ? new Date(m.join_date).toLocaleString('en-GB') : 'N/A',
             status: m.status || 'Active',
@@ -196,10 +192,6 @@ export default function MerchantManagement() {
           setMerchantsData([]);
           setTotalPages(1);
           setHasNextPage(false);
-        }
-
-        if (dashboardResult && dashboardResult.success) {
-          setDashboardData(dashboardResult.data);
         }
       } catch (error) {
         console.error('Failed to fetch merchants:', error);
@@ -291,17 +283,14 @@ export default function MerchantManagement() {
       if (result && result.success) {
         // Refresh merchant list for current tier
         const type = getTypeFromTier(activeTier);
-        const [merchantsResult, dashboardResult] = await Promise.all([
-          api.systemadmin.getMerchants({ page: currentPage, type }),
-          api.systemadmin.getDashboard()
-        ]);
+        const merchantsResult = await api.systemadmin.getMerchants({ page: currentPage, type });
 
         if (merchantsResult && merchantsResult.success) {
           const transformed = merchantsResult.data.map(m => ({
             id: m.id, // Keep numeric id for navigation/actions
             merchant_id: m.merchant_id || 'N/A', // Use merchant_id directly from API for display
             name: m.company_name || 'N/A',
-            type: m.type ? m.type.toUpperCase() : 'N/A', // Uppercase the type (e.g., t1 -> T1)
+            type: m.category || m.Category || m.type ? (m.category || m.Category || m.type).toUpperCase() : 'N/A', // Use category from API, fallback to type
             state: m.state || m.location?.state || '',
             join: m.join_date ? new Date(m.join_date).toLocaleString('en-GB') : 'N/A',
             status: m.status || 'Active',
@@ -313,10 +302,6 @@ export default function MerchantManagement() {
           } else if (merchantsResult.meta?.totalPages) {
             setTotalPages(merchantsResult.meta.totalPages);
           }
-        }
-
-        if (dashboardResult && dashboardResult.success) {
-          setDashboardData(dashboardResult.data);
         }
 
         // Refresh summary stats
