@@ -254,6 +254,7 @@ export default function MerchantManagement() {
         ssm_number: merchantData.ssmNumber || '',
         merchant_type: merchantData.merchantType || '',
         merchant_group: merchantData.merchantGroup || 'T1',
+        category: merchantData.merchantGroup || 'T1', // category should match merchant_group
         address_line1: merchantData.addressLine1 || '',
         address_line2: merchantData.addressLine2 || '',
         city: merchantData.city || '',
@@ -270,7 +271,48 @@ export default function MerchantManagement() {
         T2_rebate: merchantData.T2Rebate ? parseFloat(merchantData.T2Rebate) : 0,
         Merchant_rebate: merchantData.MerchantRebate ? parseFloat(merchantData.MerchantRebate) : 0,
         DirectRebate: merchantData.DirectRebate ? parseFloat(merchantData.DirectRebate) : 0,
+        Shareholder_bonus: merchantData.ShareholderBonus ? parseFloat(merchantData.ShareholderBonus) : 0,
       };
+
+      // Add T3 admin fields if merchant group is T3
+      if (merchantData.merchantGroup === 'T3') {
+        // Only include T3 admin fields if they are provided (empty strings will trigger auto-generation)
+        if (merchantData.t3AdminUsername !== undefined) {
+          apiData.t3_admin_username = merchantData.t3AdminUsername || '';
+        }
+        if (merchantData.t3AdminEmail !== undefined) {
+          apiData.t3_admin_email = merchantData.t3AdminEmail || '';
+        }
+        if (merchantData.t3AdminPassword !== undefined) {
+          apiData.t3_admin_password = merchantData.t3AdminPassword || '';
+        }
+        if (merchantData.t3AdminFirstName !== undefined) {
+          apiData.t3_admin_first_name = merchantData.t3AdminFirstName || '';
+        }
+        if (merchantData.t3AdminLastName !== undefined) {
+          apiData.t3_admin_last_name = merchantData.t3AdminLastName || '';
+        }
+        if (merchantData.t3AdminPhone !== undefined) {
+          apiData.t3_admin_phone = merchantData.t3AdminPhone || '';
+        }
+      }
+
+      // Handle currency_id - extract from currencies field
+      // Currency value should now be the ID (string or number)
+      if (merchantData.currencies) {
+        const currencyId = typeof merchantData.currencies === 'string' 
+          ? parseInt(merchantData.currencies, 10) 
+          : Number(merchantData.currencies);
+        if (!isNaN(currencyId) && currencyId > 0) {
+          apiData.currency_id = currencyId;
+        } else {
+          // Fallback: default to 1 if currency ID cannot be parsed
+          apiData.currency_id = 1;
+        }
+      } else {
+        // Default currency_id if not provided
+        apiData.currency_id = 1;
+      }
 
       const result = await api.systemadmin.createMerchant(apiData);
       

@@ -1,34 +1,28 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Eye, CheckCircle2, XCircle } from 'lucide-react';
-import { StatCard, InfoSection, Card, DataTable, SearchBar, PageHeader, ProfitChart, TabButtons, Modal, Button, FormField } from '@/components/ui';
+import { useParams, useLocation } from 'react-router-dom';
+import { CheckCircle2, XCircle } from 'lucide-react';
+import { StatCard, InfoSection, DataTable, PageHeader, ProfitChart, TabButtons, Modal, Button, FormField } from '@/components/ui';
 import { PasswordInput, TextInput } from '@/components/form';
 
-import { filterAndPaginate } from '@/lib/pagination';
 import { t3Service } from '@/services/t3Service';
 import { api, T3SYSTEMADMIN_BASE } from '@/lib/api';
 import { useToast } from '@/contexts/ToastContext';
 
-const ITEMS_PER_PAGE = 10;
-const TRANSACTION_SEARCH_KEYS = ['id', 'type', 'status'];
 
 export default function MerchantDetails() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const location = useLocation();
   const { showError, handleApiResponse } = useToast();
-  const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('Today');
-  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [merchantData, setMerchantData] = useState(null);
-  const [transactionsData, setTransactionsData] = useState([]);
   const [chartData, setChartData] = useState([]);
   const [loadingChart, setLoadingChart] = useState(false);
   const [t3Admins, setT3Admins] = useState([]);
-  const [loadingT3Admins, setLoadingT3Admins] = useState(false);
   const [regularTransactions, setRegularTransactions] = useState([]);
   const [paymentTransactions, setPaymentTransactions] = useState([]);
+  const [regularTransactionsPage, setRegularTransactionsPage] = useState(1);
+  const [paymentTransactionsPage, setPaymentTransactionsPage] = useState(1);
   
   // Modal and form states for T3 Admin
   const [showWalletModal, setShowWalletModal] = useState(false);
@@ -72,6 +66,14 @@ export default function MerchantDetails() {
             const paymentTransData = result.data.payment_transactions || result.data.PaymentTransactions || {};
             const paymentTrans = paymentTransData.data || paymentTransData.Data || [];
             setPaymentTransactions(Array.isArray(paymentTrans) ? paymentTrans : []);
+            
+            // Extract T3 admins from merchant data (t3_admins field)
+            const t3AdminsData = result.data.t3_admins || result.data.t3Admins || [];
+            if (Array.isArray(t3AdminsData)) {
+              setT3Admins(t3AdminsData);
+            } else {
+              setT3Admins([]);
+            }
           }
         }
       } catch (error) {
@@ -83,39 +85,11 @@ export default function MerchantDetails() {
     fetchMerchantDetails();
   }, [id, isT3Admin]);
 
-  // Fetch merchant transactions
-  useEffect(() => {
-    const fetchTransactions = async () => {
-      if (!id) return;
 
-      try {
-        // Fetch transactions for this merchant
-        const result = isT3Admin
-          ? await t3Service.getTransactions({ page: currentPage, search: searchTerm })
-          : await api.request(`${T3SYSTEMADMIN_BASE}/transactions?page=${currentPage}&search=${encodeURIComponent(searchTerm || '')}`, { method: 'GET' });
-        
-        if (result.success) {
-          // Filter transactions for this merchant/user
-          const merchantTransactions = result.data.filter(t => 
-            t.user_id === merchantData?.user_id || t.merchant_id === parseInt(id)
-          );
-          setTransactionsData(merchantTransactions);
-        }
-      } catch (error) {
-        console.error('Failed to fetch transactions:', error);
-        setTransactionsData([]);
-      }
-    };
-    
-    if (merchantData) {
-      fetchTransactions();
-    }
-  }, [id, currentPage, searchTerm, merchantData, isT3Admin]);
-
-  // Scroll to top when page changes
+  // Scroll to top when transaction pages change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [currentPage]);
+  }, [regularTransactionsPage, paymentTransactionsPage]);
 
   // Format merchant info from API data
   // Handle both PascalCase (from API) and snake_case (for backward compatibility)
@@ -199,54 +173,33 @@ export default function MerchantDetails() {
     }
   }, [merchantData, activeTab, isT3Admin]);
 
-  // Fetch T3 admin list for this merchant (only if category is T3)
-  useEffect(() => {
-    const fetchT3Admins = async () => {
-      if (!id || !merchantData) return;
-      
-      // Check if merchant category is T3
-      const category = merchantData.category || merchantData.Category || merchantData.user_type || merchantData.UserType || '';
-      const isT3Merchant = category.toString().toLowerCase() === 't3';
-      
-      // Only fetch if category is T3
-      if (!isT3Merchant) {
-        setT3Admins([]);
-        setLoadingT3Admins(false);
-        return;
-      }
-      
-      // Get supermain_id from merchant data
-      const supermainId = merchantData.supermain_id || merchantData.supermainId || merchantData.SupermainId;
-      
-      if (!supermainId) {
-        console.warn('[MerchantDetails] No supermain_id found for T3 merchant');
-        setT3Admins([]);
-        setLoadingT3Admins(false);
-        return;
-      }
-      
-      try {
-        setLoadingT3Admins(true);
-        const result = await api.systemadmin.getT3AdminsBySupermain(supermainId);
-        console.log('[MerchantDetails] T3 admin list response:', result);
-        if (result && result.success && Array.isArray(result.data)) {
-          setT3Admins(result.data);
-        } else {
-          setT3Admins([]);
-        }
-      } catch (error) {
-        console.error('[MerchantDetails] Failed to fetch T3 admins:', error);
-        setT3Admins([]);
-      } finally {
-        setLoadingT3Admins(false);
-      }
-    };
-
-    // Only for system admin view
-    if (!isT3Admin) {
-      fetchT3Admins();
-    }
-  }, [id, isT3Admin, merchantData]);
+  // T3 admins are now extracted from merchant details response (t3_admins field)
+  // No separate API call needed - data comes from api/t3systemadmin/merchants/{id}
+  
+  // Paginate transaction lists
+  const TRANSACTIONS_PER_PAGE = 10;
+  
+  // Paginate regular transactions
+  const paginatedRegularTransactions = useMemo(() => {
+    const startIndex = (regularTransactionsPage - 1) * TRANSACTIONS_PER_PAGE;
+    const endIndex = startIndex + TRANSACTIONS_PER_PAGE;
+    return regularTransactions.slice(startIndex, endIndex);
+  }, [regularTransactions, regularTransactionsPage]);
+  
+  const regularTransactionsTotalPages = useMemo(() => {
+    return Math.ceil(regularTransactions.length / TRANSACTIONS_PER_PAGE);
+  }, [regularTransactions.length]);
+  
+  // Paginate payment transactions
+  const paginatedPaymentTransactions = useMemo(() => {
+    const startIndex = (paymentTransactionsPage - 1) * TRANSACTIONS_PER_PAGE;
+    const endIndex = startIndex + TRANSACTIONS_PER_PAGE;
+    return paymentTransactions.slice(startIndex, endIndex);
+  }, [paymentTransactions, paymentTransactionsPage]);
+  
+  const paymentTransactionsTotalPages = useMemo(() => {
+    return Math.ceil(paymentTransactions.length / TRANSACTIONS_PER_PAGE);
+  }, [paymentTransactions.length]);
 
   // Handle T3 admin status toggle
   const handleToggleT3AdminStatus = useCallback(async (admin) => {
@@ -257,21 +210,20 @@ export default function MerchantDetails() {
       // Optimistic update
       setT3Admins(prev => prev.map(acc => acc.id === admin.id ? { ...acc, status: newStatus } : acc));
 
-      const result = await api.t3admin.updateAccountStatus(admin.id, { status: newStatus });
+      const result = await api.systemadmin.updateT3AdminStatus(admin.id, { status: newStatus });
       handleApiResponse(result, {
         successMessage: result?.message || 'T3 admin status updated successfully',
         errorMessage: result?.message || 'Failed to update T3 admin status. Please try again.',
         onSuccess: async () => {
-          // Refresh T3 admins list from server to ensure consistency
-          const category = merchantData?.category || merchantData?.Category || merchantData?.user_type || merchantData?.UserType || '';
-          const isT3Merchant = category.toString().toLowerCase() === 't3';
-          const supermainId = merchantData?.supermain_id || merchantData?.supermainId || merchantData?.SupermainId;
-          
-          if (isT3Merchant && supermainId) {
+          // Refresh merchant details to get updated T3 admins list
+          if (id) {
             try {
-              const fetchResult = await api.systemadmin.getT3AdminsBySupermain(supermainId);
-              if (fetchResult && fetchResult.success && Array.isArray(fetchResult.data)) {
-                setT3Admins(fetchResult.data);
+              const fetchResult = await api.systemadmin.getMerchantDetails(id);
+              if (fetchResult && fetchResult.success && fetchResult.data) {
+                const t3AdminsData = fetchResult.data.t3_admins || fetchResult.data.t3Admins || [];
+                if (Array.isArray(t3AdminsData)) {
+                  setT3Admins(t3AdminsData);
+                }
               }
             } catch (error) {
               console.error('Failed to refresh T3 admins:', error);
@@ -285,39 +237,8 @@ export default function MerchantDetails() {
       // Revert optimistic update on error
       setT3Admins(prev => prev.map(acc => acc.id === admin.id ? { ...acc, status: currentStatus } : acc));
     }
-  }, [merchantData, handleApiResponse, showError]);
+  }, [id, handleApiResponse, showError]);
 
-  // Transform transactions for display
-  const transformedTransactions = transactionsData.map(t => ({
-    id: `T${String(t.id || '').padStart(6, '0')}`,
-    type: t.type || 'Payment',
-    status: t.status === 'completed' ? 'Success' : t.status === 'pending' ? 'Pending' : t.status === 'failed' ? 'Failed' : t.status || 'Success',
-    rawData: t
-  }));
-
-  // Filter and paginate transactions
-  const { data: transactions, totalPages } = useMemo(
-    () => filterAndPaginate(transformedTransactions, searchTerm, TRANSACTION_SEARCH_KEYS, currentPage, ITEMS_PER_PAGE),
-    [transformedTransactions, searchTerm, currentPage]
-  );
-
-  // Handle search - reset to page 1
-  const handleSearchChange = (value) => {
-    setSearchTerm(value);
-    setCurrentPage(1);
-  };
-
-  // Transaction table actions
-  const transactionActions = useMemo(() => [
-    {
-      icon: <Eye size={16} />,
-      onClick: (row) => {
-        const basePath = isT3Admin ? '/t3-admin' : '/system-admin';
-        navigate(`${basePath}/transactions/${row.id}`);
-      },
-      tooltip: 'View',
-    },
-  ], [navigate, isT3Admin]);
 
   // Handle wallet address update
   const handleWalletUpdate = () => {
@@ -481,7 +402,7 @@ export default function MerchantDetails() {
                   { key: 'type', label: 'Type' },
                   { key: 'created_at', label: 'Created At' },
                 ]}
-                data={regularTransactions.map(t => ({
+                data={paginatedRegularTransactions.map(t => ({
                   id: t.id || 'N/A',
                   amount: `${(t.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
                   description: t.description || 'N/A',
@@ -489,6 +410,16 @@ export default function MerchantDetails() {
                   created_at: t.created_at ? new Date(t.created_at).toLocaleString('en-GB') : 'N/A',
                 }))}
                 actions={[]}
+                pagination={
+                  regularTransactionsTotalPages > 1 ? {
+                    currentPage: regularTransactionsPage,
+                    totalPages: regularTransactionsTotalPages,
+                    onPageChange: (page) => {
+                      setRegularTransactionsPage(page);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    },
+                  } : undefined
+                }
               />
             )}
           </div>
@@ -522,7 +453,7 @@ export default function MerchantDetails() {
                   { key: 'wallet_address', label: 'Wallet Address' },
                   { key: 'created_at', label: 'Created At' },
                 ]}
-                data={paymentTransactions.map(t => ({
+                data={paginatedPaymentTransactions.map(t => ({
                   id: t.id || 'N/A',
                   amount: t.amount != null ? `${Number(t.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A',
                   converted_amount: t.converted_amount != null ? `${Number(t.converted_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A',
@@ -541,6 +472,16 @@ export default function MerchantDetails() {
                   created_at: t.created_at ? new Date(t.created_at).toLocaleString('en-GB') : 'N/A',
                 }))}
                 actions={[]}
+                pagination={
+                  paymentTransactionsTotalPages > 1 ? {
+                    currentPage: paymentTransactionsPage,
+                    totalPages: paymentTransactionsTotalPages,
+                    onPageChange: (page) => {
+                      setPaymentTransactionsPage(page);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    },
+                  } : undefined
+                }
               />
             )}
           </div>
@@ -558,7 +499,7 @@ export default function MerchantDetails() {
           return (
             <div className="bg-white rounded-[20px] border border-[#E5E5E5] p-5">
               <h3 className="text-2xl font-semibold text-black mb-4">T3 Admin List</h3>
-            {loadingT3Admins ? (
+            {loading ? (
               <div className="text-center py-8 text-muted-foreground">
                 Loading T3 admins...
               </div>

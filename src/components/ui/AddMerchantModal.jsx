@@ -12,7 +12,11 @@ const INITIAL_FORM_DATA = {
   password: '',
   // Additional fields for T3 merchants
   t3AdminUsername: '',
+  t3AdminEmail: '',
   t3AdminPassword: '',
+  t3AdminFirstName: '',
+  t3AdminLastName: '',
+  t3AdminPhone: '',
   firstName: '',
   lastName: '',
   phone: '',
@@ -126,39 +130,10 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
           const opts = result.data.map((c) => {
             const code = c.currency_code || '';
             const name = c.currency_name || (c.country_name && code ? `${c.country_name} - ${code}` : code);
+            // Store ID as value (preferred) for currency_id mapping, fallback to code
+            const value = (c.id != null ? String(c.id) : '') || code || '';
             return {
-              value: code || (c.id != null ? String(c.id) : ''),
-              label: name || code,
-            };
-          });
-          setCurrencyOptions(opts);
-        } else {
-          setCurrencyOptions([]);
-        }
-      } catch (error) {
-        console.error('[AddMerchantModal] Failed to fetch currencies:', error);
-        setCurrencyOptions([]);
-      }
-    };
-
-    if (isOpen) {
-      fetchCurrencies();
-    }
-  }, [isOpen]);
-
-  // Fetch currencies for currency select (step 6)
-  useEffect(() => {
-    const fetchCurrencies = async () => {
-      try {
-        const result = await api.systemadmin.getCurrencies({ page: 1 });
-        console.log('[AddMerchantModal] currencies result:', result);
-
-        if (result && result.success && Array.isArray(result.data)) {
-          const opts = result.data.map((c) => {
-            const code = c.currency_code || '';
-            const name = c.currency_name || (c.country_name && code ? `${c.country_name} - ${code}` : code);
-            return {
-              value: code || (c.id != null ? String(c.id) : ''),
+              value: value,
               label: name || code,
             };
           });
@@ -208,13 +183,19 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
         if (!validateRequired(formData.merchantGroup)) {
           stepErrors.merchantGroup = 'Merchant group is required';
         }
-        // If T3 group selected, require T3 admin credentials
+        // If T3 group selected, validate T3 admin credentials (optional - can be auto-generated)
         if (formData.merchantGroup === 'T3') {
-          if (!validateRequired(formData.t3AdminUsername)) {
-            stepErrors.t3AdminUsername = 'T3 admin username is required';
+          // T3 Admin Email validation (optional, but if provided must be valid)
+          if (formData.t3AdminEmail && !validateEmail(formData.t3AdminEmail)) {
+            stepErrors.t3AdminEmail = 'Please enter a valid email address';
           }
-          if (!validatePassword(formData.t3AdminPassword)) {
+          // T3 Admin Password validation (optional, but if provided must be at least 6 characters)
+          if (formData.t3AdminPassword && !validatePassword(formData.t3AdminPassword)) {
             stepErrors.t3AdminPassword = 'T3 admin password must be at least 6 characters';
+          }
+          // T3 Admin Phone validation (optional, but if provided must be valid)
+          if (formData.t3AdminPhone && !validatePhone(formData.t3AdminPhone)) {
+            stepErrors.t3AdminPhone = 'Please enter a valid phone number';
           }
         }
         break;
@@ -309,15 +290,23 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
 
     switch (step) {
       case 1:
-        return validateRequired(formData.username) &&
+        const baseValid = validateRequired(formData.username) &&
                validateRequired(formData.email) && validateEmail(formData.email) &&
                validatePassword(formData.password) &&
                validateRequired(formData.firstName) &&
                validateRequired(formData.lastName) &&
                validateRequired(formData.phone) && validatePhone(formData.phone) &&
-               validateRequired(formData.merchantGroup) &&
-               (formData.merchantGroup !== 'T3' ||
-                 (validateRequired(formData.t3AdminUsername) && validatePassword(formData.t3AdminPassword)));
+               validateRequired(formData.merchantGroup);
+        
+        // T3 admin fields are optional, but if provided must be valid
+        if (formData.merchantGroup === 'T3') {
+          const t3Valid = (!formData.t3AdminEmail || validateEmail(formData.t3AdminEmail)) &&
+                         (!formData.t3AdminPassword || validatePassword(formData.t3AdminPassword)) &&
+                         (!formData.t3AdminPhone || validatePhone(formData.t3AdminPhone));
+          return baseValid && t3Valid;
+        }
+        
+        return baseValid;
       case 2:
         return validateRequired(formData.companyName) &&
                validateRequired(formData.ssmNumber) &&
@@ -397,7 +386,11 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
     // If merchant group is not T3, drop T3-specific fields
     if (payload.merchantGroup !== 'T3') {
       delete payload.t3AdminUsername;
+      delete payload.t3AdminEmail;
       delete payload.t3AdminPassword;
+      delete payload.t3AdminFirstName;
+      delete payload.t3AdminLastName;
+      delete payload.t3AdminPhone;
     }
     onSubmit(payload);
     handleClose();
@@ -573,6 +566,27 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
           delete fieldErrors.currencies;
         }
         break;
+      case 't3AdminEmail':
+        if (value && !validateEmail(value)) {
+          fieldErrors.t3AdminEmail = 'Please enter a valid email address';
+        } else {
+          delete fieldErrors.t3AdminEmail;
+        }
+        break;
+      case 't3AdminPassword':
+        if (value && !validatePassword(value)) {
+          fieldErrors.t3AdminPassword = 'T3 admin password must be at least 6 characters';
+        } else {
+          delete fieldErrors.t3AdminPassword;
+        }
+        break;
+      case 't3AdminPhone':
+        if (value && !validatePhone(value)) {
+          fieldErrors.t3AdminPhone = 'Please enter a valid phone number';
+        } else {
+          delete fieldErrors.t3AdminPhone;
+        }
+        break;
       default:
         break;
     }
@@ -667,6 +681,14 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
           { label: 'First Name', value: formData.firstName || 'N/A' },
           { label: 'Last Name', value: formData.lastName || 'N/A' },
           { label: 'Phone', value: formData.phone || 'N/A' },
+          ...(formData.merchantGroup === 'T3' ? [
+            { label: 'T3 Admin Username', value: formData.t3AdminUsername || 'Auto-generate' },
+            { label: 'T3 Admin Email', value: formData.t3AdminEmail || 'Auto-generate' },
+            { label: 'T3 Admin Password', value: formData.t3AdminPassword ? '••••••••' : 'Use merchant password' },
+            { label: 'T3 Admin First Name', value: formData.t3AdminFirstName || 'Use merchant first name' },
+            { label: 'T3 Admin Last Name', value: formData.t3AdminLastName || 'Use merchant last name' },
+            { label: 'T3 Admin Phone', value: formData.t3AdminPhone || 'Use merchant phone' },
+          ] : []),
         ]
       },
       {
@@ -786,8 +808,26 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
             {/* Additional T3 Admin credentials when Merchant Group is T3 */}
             {formData.merchantGroup === 'T3' && (
               <>
-                {renderField(TextInput, 'T3 Admin Username', 't3AdminUsername', { placeholder: 'Insert T3 admin username here' })}
-                {renderField(PasswordInput, 'T3 Admin Password', 't3AdminPassword', { placeholder: 'Insert T3 admin password here' })}
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-yellow-700">
+                        <strong>T3 Admin Creation:</strong> When creating a T3 merchant, a T3 admin account will be automatically created as the supermain admin. Provide the credentials below, or leave empty to auto-generate.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                {renderField(TextInput, 'T3 Admin Username', 't3AdminUsername', { placeholder: 'Leave empty to auto-generate (e.g., t3m{userID})' })}
+                {renderField(TextInput, 'T3 Admin Email', 't3AdminEmail', { placeholder: 'Leave empty to auto-generate', type: 'email' })}
+                {renderField(PasswordInput, 'T3 Admin Password', 't3AdminPassword', { placeholder: 'Leave empty to use merchant password' })}
+                {renderField(TextInput, 'T3 Admin First Name', 't3AdminFirstName', { placeholder: 'Leave empty to use merchant first name' })}
+                {renderField(TextInput, 'T3 Admin Last Name', 't3AdminLastName', { placeholder: 'Leave empty to use merchant last name' })}
+                {renderField(TextInput, 'T3 Admin Phone', 't3AdminPhone', { placeholder: 'Leave empty to use merchant phone', type: 'tel' })}
               </>
             )}
             {renderField(TextInput, 'First Name', 'firstName', { placeholder: 'Insert first name here' })}

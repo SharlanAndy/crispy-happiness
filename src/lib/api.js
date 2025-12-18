@@ -1042,6 +1042,19 @@ export const api = {
       request(`${T3SYSTEMADMIN_BASE}/t3admins/${supermainId}/sub`, { method: 'GET' }),
 
     /**
+     * Update T3 admin status.
+     * Headers: Authorization: Bearer <token>
+     * @param {string|number} id - T3 Admin ID
+     * @param {Object} data - { status: "active" | "inactive" }
+     * @returns {Promise<Object>} { success: true, message: "T3 admin status updated successfully" }
+     */
+    updateT3AdminStatus: (id, data) =>
+      request(`${T3SYSTEMADMIN_BASE}/t3admins/${id}/status`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    /**
      * Get transaction details.
      * Headers: Authorization: Bearer <token>
      * @param {string} id - Transaction ID
