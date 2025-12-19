@@ -289,12 +289,15 @@ export default function UnifiedSettings() {
               const rawStatus = (data.status || data.Status || '').toString().toLowerCase();
               const normalizedStatus = rawStatus === 'inactive' ? 'Inactive' : 'Active';
               
+              // Extract referral email from referred_by object
+              const referralEmail = data.referred_by?.email || data.referredBy?.email || data.ReferredBy?.email || '';
+              
               return {
                 ...prev,
                 walletAddress: data.wallet_address || data.WalletAddress || prev.walletAddress,
                 accountStatus: normalizedStatus,
-                // Map referral information if available
-                referralBy: data.referral_id || data.ReferralID || data.referralId || prev.referralBy || '',
+                // Use referred_by.email from API response
+                referralBy: referralEmail || prev.referralBy || '',
               };
             });
           }
@@ -998,6 +1001,16 @@ export default function UnifiedSettings() {
           }),
           createField('text', 'Remarks', 'referralRemarks', { placeholder: 'Additional remarks' })
         ]
+        : entityType === 'agent'
+        ? [
+          // For agents: Show Referral By (read-only from referred_by.email), Remarks field commented out
+          createField('text', 'Referral By', 'referralBy', { 
+            placeholder: 'Insert referral ID here',
+            disabled: true, // Disabled for agents - read-only from API
+            readOnly: true
+          }),
+          // createField('text', 'Remarks', 'referralRemarks', { placeholder: 'Additional remarks' })
+        ]
         : [
           // For users: Only show Referral By (read-only), no Remarks field, no save button
           createField('text', 'Referral By', 'referralBy', { 
@@ -1088,8 +1101,8 @@ export default function UnifiedSettings() {
           }
           return renderField(field);
         })}
-        {/* Hide Save Changes button for users in referral section - no updates allowed */}
-        {!(entityType === 'user' && sectionKey === 'referral') && (
+        {/* Hide Save Changes button for users and agents in referral section - no updates allowed */}
+        {!(entityType === 'user' && sectionKey === 'referral') && !(entityType === 'agent' && sectionKey === 'referral') && (
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
             <Button onClick={() => handleSave(sectionKey)}>Save Changes</Button>
