@@ -2,8 +2,32 @@
 import { toastManager } from './toastManager.js';
 
 // Configuration for API connection
+// In production, VITE_API_URL should be set to the full API URL (e.g., https://nbn.iotareward.com/api)
+// In development, it can be '/api' to use Vite proxy
+const getBaseURL = () => {
+  const envURL = import.meta.env.VITE_API_URL;
+  
+  // Log for debugging (always log in production to help diagnose issues)
+  if (import.meta.env.PROD) {
+    console.log('[API Config] Production build - VITE_API_URL:', envURL || 'NOT SET - WILL USE RELATIVE PATH');
+    console.log('[API Config] Using baseURL:', envURL || '/api');
+  } else if (import.meta.env.DEV) {
+    console.log('[API Config] Development - VITE_API_URL:', envURL || 'NOT SET - USING PROXY');
+    console.log('[API Config] Using baseURL:', envURL || '/api');
+  }
+  
+  // If VITE_API_URL is set, use it (should be full URL in production)
+  if (envURL) {
+    return envURL;
+  }
+  
+  // Fallback to relative path (will use Netlify domain if env var not set in production)
+  // WARNING: This will cause API calls to go to Netlify domain instead of backend!
+  return '/api';
+};
+
 const API_CONFIG = {
-  baseURL: import.meta.env.VITE_API_URL || '/api', // Use relative path to leverage Vite proxy
+  baseURL: getBaseURL(),
   useMock: false, // Set to false to test real API endpoints
   timeout: 10000,
   fallbackToMock: false, // Disable fallback to see real API errors
