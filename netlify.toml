@@ -4,18 +4,29 @@
 
 # IMPORTANT: Set VITE_API_URL in Netlify Dashboard
 # Go to: Site settings > Environment variables
-# Add: VITE_API_URL = https://nbn.iotareward.com/api
+# Add: VITE_API_URL = /api (use relative path to leverage Netlify proxy below)
 # 
 # CRITICAL STEPS:
 # 1. Set the variable in Netlify Dashboard (Site settings > Environment variables)
 # 2. Variable name MUST be exactly: VITE_API_URL
-# 3. Variable value MUST be exactly: https://nbn.iotareward.com/api
+# 3. Variable value MUST be exactly: /api (relative path - Netlify will proxy it)
 # 4. After setting, you MUST trigger a NEW deployment (the variable is embedded at BUILD time, not runtime!)
 # 5. Check the build logs to verify the variable is available during build
 #
 # The .env file is gitignored, so Netlify needs this set in the dashboard
 
+# CORS Bypass: Proxy API requests through Netlify to avoid CORS issues
+# This makes API calls appear to come from the same origin (nbnadmin.netlify.app)
+# The backend will see requests from Netlify, not the browser directly
+[[redirects]]
+  from = "/api/*"
+  to = "https://nbn.iotareward.com/api/:splat"
+  status = 200
+  force = true
+  headers = { X-From = "Netlify" }
+
 # SPA fallback - redirect all routes to index.html for client-side routing
+# This must be LAST to catch all other routes
 [[redirects]]
   from = "/*"
   to = "/index.html"
