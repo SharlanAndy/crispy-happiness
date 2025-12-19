@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { InfoSection, Button, PageHeader } from '../../components/ui';
 import { t3Service } from '@/services/t3Service';
+import { authService } from '@/services/authService';
 
 export default function AccountDetails() {
   const { id } = useParams();
@@ -13,6 +14,9 @@ export default function AccountDetails() {
   const [accountData, setAccountData] = useState(null);
 
   const isT3Admin = location.pathname.startsWith('/t3-admin');
+  // Check actual admin_type from auth service
+  const adminType = authService.getAdminType();
+  const isT3AdminType = adminType?.toLowerCase() === 't3';
 
   // Fetch account details
   useEffect(() => {
@@ -43,24 +47,27 @@ export default function AccountDetails() {
   }, [currentPage]);
 
   // Format account info
+  // For T3 Admin (admin_type=t3), exclude wallet address
+  const shouldHideWalletAddress = isT3AdminType || isT3Admin;
   const accountInfo = accountData ? [
     { label: 'Admin ID', value: accountData.id?.toString() || id || '001' },
-    { label: 'Username', value: accountData.username || 'N/A' },
     { label: 'Character', value: accountData.character || 'Finance' },
-    { label: 'Email', value: accountData.email || 'N/A' },
-    { label: 'Wallet Address', value: accountData.wallet_address || 'N/A' },
-    { label: 'Last Login', value: accountData.last_login ? new Date(accountData.last_login).toLocaleString('en-GB') : 'Never' },
+    ...(shouldHideWalletAddress ? [] : [{ label: 'Wallet Address', value: accountData.wallet_address || 'N/A' }]),
     { label: 'Created On', value: accountData.created_at ? new Date(accountData.created_at).toLocaleString('en-GB') : 'N/A' },
+    { label: 'Username', value: accountData.username || 'N/A' },
+    { label: 'Email', value: accountData.email || 'N/A' },
+    { label: 'Last Login', value: accountData.last_login ? new Date(accountData.last_login).toLocaleString('en-GB') : 'Never' },
     { label: 'Status', value: accountData.status || 'Active', badge: true },
-  ] : [
+  ].filter(Boolean) : [
     { label: 'Admin ID', value: id || '001' },
-    { label: 'Username', value: 'finance1' },
     { label: 'Character', value: 'Finance' },
+    ...(shouldHideWalletAddress ? [] : [{ label: 'Wallet Address', value: '0x1234...5678' }]),
+    { label: 'Created On', value: '01-11-2025 13:00' },
+    { label: 'Username', value: 'finance1' },
     { label: 'Email', value: 'finance1@nbn.com' },
     { label: 'Last Login', value: '2 hours ago' },
-    { label: 'Created On', value: '01-11-2025 13:00' },
     { label: 'Status', value: 'Active', badge: true },
-  ];
+  ].filter(Boolean);
 
   if (loading) {
     return (

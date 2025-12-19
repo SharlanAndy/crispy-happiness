@@ -42,14 +42,24 @@ export function ToastProvider({ children }) {
       successMessage,
       errorMessage,
       duration = 5000,
+      onSuccess,
+      onError,
     } = options;
 
     if (response?.success) {
       const message = successMessage || response?.message || 'Operation completed successfully';
       showSuccess(message, duration);
+      // Call onSuccess callback if provided
+      if (onSuccess && typeof onSuccess === 'function') {
+        onSuccess(response);
+      }
     } else {
       const message = errorMessage || response?.message || response?.error || 'Operation failed. Please try again.';
       showError(message, duration);
+      // Call onError callback if provided
+      if (onError && typeof onError === 'function') {
+        onError(response);
+      }
     }
   }, [showSuccess, showError]);
 

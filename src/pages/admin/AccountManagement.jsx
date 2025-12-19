@@ -6,6 +6,7 @@ import { TextInput, PasswordInput } from '../../components/form';
 import { t3Service } from '@/services/t3Service';
 import { api } from '@/lib/api';
 import { useToast } from '@/contexts/ToastContext';
+import { authService } from '@/services/authService';
 
 // Removed ALL_ACCOUNTS mock data - using real API data only
 
@@ -43,110 +44,118 @@ export default function AccountManagement() {
 
   const basePath = location.pathname.startsWith('/t3-admin') ? '/t3-admin' : '/system-admin';
   const isT3Admin = location.pathname.startsWith('/t3-admin');
+  // Check actual admin_type from auth service
+  const adminType = authService.getAdminType();
+  const isT3AdminType = adminType?.toLowerCase() === 't3';
 
-  // Fetch accounts data
-  useEffect(() => {
-    const fetchAccounts = async () => {
-      if (!isT3Admin) {
-        // System admin - no mock data, use empty array
-        setAccountsData([]);
-        setTotalAccounts(0);
-        setLoading(false);
-        return;
+  // Reusable function to fetch accounts
+  const fetchAccounts = useCallback(async (pageOverride, searchOverride) => {
+    if (!isT3Admin) {
+      // System admin - no mock data, use empty array
+      setAccountsData([]);
+      setTotalAccounts(0);
+      setLoading(false);
+      return;
+    }
+
+    const pageToUse = pageOverride !== undefined ? pageOverride : currentPage;
+    const searchToUse = searchOverride !== undefined ? searchOverride : searchTerm;
+
+    try {
+      setLoading(true);
+      const params = { page: pageToUse };
+      if (searchToUse && searchToUse.trim()) {
+        params.search = searchToUse.trim();
       }
-
-      try {
-        setLoading(true);
-        const params = { page: currentPage };
-        if (searchTerm && searchTerm.trim()) {
-          params.search = searchTerm.trim();
-        }
+      
+      const result = await t3Service.getAccounts(params);
+      if (result.success) {
+        const dataArray = result.data || [];
+        const limit = result.limit || 20;
+        const resultPage = result.page || pageToUse;
+        const total = result.total || null;
         
-        const result = await t3Service.getAccounts(params);
-        if (result.success) {
-          const dataArray = result.data || [];
-          const limit = result.limit || 20;
-          const page = result.page || currentPage;
-          const total = result.total || null;
-          
-          setPaginationMeta({ limit, page, total });
-          
-          // Transform API data to match table format
-          const transformed = dataArray.map(acc => ({
-            id: acc.id.toString(),
-            username: acc.username,
-            character: acc.character || 'Finance',
-            lastLogin: acc.last_login ? new Date(acc.last_login).toLocaleString('en-GB') : 'Never',
-            created: acc.created_at ? new Date(acc.created_at).toLocaleString('en-GB') : '',
-            status: acc.status || 'Active'
-          }));
-          setAccountsData(transformed);
-          setTotalAccounts(total || transformed.length);
+        setPaginationMeta({ limit, page: resultPage, total });
+        
+        // Transform API data to match table format
+        const transformed = dataArray.map(acc => ({
+          id: acc.id.toString(),
+          username: acc.username,
+          character: acc.character || 'Finance',
+          lastLogin: acc.last_login ? new Date(acc.last_login).toLocaleString('en-GB') : 'Never',
+          created: acc.created_at ? new Date(acc.created_at).toLocaleString('en-GB') : '',
+          status: acc.status || 'Active'
+        }));
+        setAccountsData(transformed);
+        setTotalAccounts(total || transformed.length);
 
-          // Determine if there's a next page
-          if (total !== null) {
-            setHasNextPage(page * limit < total);
-          } else if (dataArray.length < limit) {
-            setHasNextPage(false);
-          } else if (dataArray.length === limit && page === 1) {
-            // Check page 2
-            const checkNextPage = async () => {
-              try {
-                const nextPageParams = { page: 2 };
-                if (searchTerm && searchTerm.trim()) {
-                  nextPageParams.search = searchTerm.trim();
-                }
-                const nextPageResult = await t3Service.getAccounts(nextPageParams);
-                if (nextPageResult.success) {
-                  const nextPageData = nextPageResult.data || [];
-                  setHasNextPage(nextPageData.length > 0);
-                } else {
-                  setHasNextPage(false);
-                }
-              } catch (error) {
-                console.error('Failed to check next page:', error);
-                setHasNextPage(false);
-              }
-            };
-            checkNextPage();
-          } else if (dataArray.length === limit && page > 1) {
-            // Check next page
-            const checkNextPage = async () => {
-              try {
-                const nextPageParams = { page: page + 1 };
-                if (searchTerm && searchTerm.trim()) {
-                  nextPageParams.search = searchTerm.trim();
-                }
-                const nextPageResult = await t3Service.getAccounts(nextPageParams);
-                if (nextPageResult.success) {
-                  const nextPageData = nextPageResult.data || [];
-                  setHasNextPage(nextPageData.length > 0);
-                } else {
-                  setHasNextPage(false);
-                }
-              } catch (error) {
-                console.error('Failed to check next page:', error);
-                setHasNextPage(false);
-              }
-            };
-            checkNextPage();
-          }
-        } else {
-          setAccountsData([]);
-          setTotalAccounts(0);
+        // Determine if there's a next page
+        if (total !== null) {
+          setHasNextPage(resultPage * limit < total);
+        } else if (dataArray.length < limit) {
           setHasNextPage(false);
+        } else if (dataArray.length === limit && resultPage === 1) {
+          // Check page 2
+          const checkNextPage = async () => {
+            try {
+              const nextPageParams = { page: 2 };
+              if (searchToUse && searchToUse.trim()) {
+                nextPageParams.search = searchToUse.trim();
+              }
+              const nextPageResult = await t3Service.getAccounts(nextPageParams);
+              if (nextPageResult.success) {
+                const nextPageData = nextPageResult.data || [];
+                setHasNextPage(nextPageData.length > 0);
+              } else {
+                setHasNextPage(false);
+              }
+            } catch (error) {
+              console.error('Failed to check next page:', error);
+              setHasNextPage(false);
+            }
+          };
+          checkNextPage();
+        } else if (dataArray.length === limit && resultPage > 1) {
+          // Check next page
+          const checkNextPage = async () => {
+            try {
+              const nextPageParams = { page: resultPage + 1 };
+              if (searchToUse && searchToUse.trim()) {
+                nextPageParams.search = searchToUse.trim();
+              }
+              const nextPageResult = await t3Service.getAccounts(nextPageParams);
+              if (nextPageResult.success) {
+                const nextPageData = nextPageResult.data || [];
+                setHasNextPage(nextPageData.length > 0);
+              } else {
+                setHasNextPage(false);
+              }
+            } catch (error) {
+              console.error('Failed to check next page:', error);
+              setHasNextPage(false);
+            }
+          };
+          checkNextPage();
         }
-      } catch (error) {
-        console.error('Failed to fetch accounts:', error);
+      } else {
         setAccountsData([]);
         setTotalAccounts(0);
         setHasNextPage(false);
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (error) {
+      console.error('Failed to fetch accounts:', error);
+      setAccountsData([]);
+      setTotalAccounts(0);
+      setHasNextPage(false);
+    } finally {
+      setLoading(false);
+    }
+  }, [isT3Admin, currentPage, searchTerm]);
+
+  // Fetch accounts data
+  useEffect(() => {
     fetchAccounts();
-  }, [currentPage, searchTerm, isT3Admin]);
+  }, [fetchAccounts]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -211,41 +220,33 @@ export default function AccountManagement() {
     if (modalState.mode === 'create') {
         try {
         // Use the correct API endpoint with the required payload structure
+        // For T3 Admin (admin_type=t3), wallet_address is not required
         const payload = {
             username: formData.username,
             email: formData.email,
-            password: formData.password,
-            wallet_address: formData.walletAddress
+            password: formData.password
         };
+        
+        // Only include wallet_address if provided and not T3 admin type
+        if (!isT3AdminType && formData.walletAddress && formData.walletAddress.trim()) {
+          payload.wallet_address = formData.walletAddress.trim();
+        }
         
         console.log('Creating account with payload:', payload);
         const result = await api.t3admin.createAccount(payload);
         
         handleApiResponse(result, {
-          successMessage: 'Account created successfully!',
+          successMessage: result?.message || 'Account created successfully!',
           errorMessage: result?.message || 'Failed to create account. Please try again.',
           onSuccess: async () => {
-            // Refresh accounts list
-            if (isT3Admin) {
-            const fetchResult = await t3Service.getAccounts({ page: currentPage, search: searchTerm });
-            if (fetchResult.success) {
-              const transformed = fetchResult.data.map(acc => ({
-                id: acc.id.toString(),
-                username: acc.username,
-                character: acc.character || 'Finance',
-                lastLogin: acc.last_login ? new Date(acc.last_login).toLocaleString('en-GB') : 'Never',
-                created: acc.created_at ? new Date(acc.created_at).toLocaleString('en-GB') : '',
-                status: acc.status || 'Active'
-              }));
-              setAccountsData(transformed);
-            }
-          }
+            // Close modal first
+            handleCloseModal();
+            // Refresh accounts list - go to first page to see the new account
+            setCurrentPage(1);
+            // Fetch accounts with explicit page 1 to avoid dependency on state
+            await fetchAccounts(1, searchTerm);
           }
         });
-        
-        if (!result || !result.success) {
-          return;
-        }
       } catch (error) {
         console.error('Failed to create account:', error);
         showError('Failed to create account. Please try again.');
@@ -268,6 +269,8 @@ export default function AccountManagement() {
           errorMessage: result?.message || 'Failed to update password. Please try again.',
           onSuccess: () => {
             handleCloseModal();
+            // Refresh accounts list to ensure data is up to date
+            fetchAccounts(currentPage, searchTerm);
           }
         });
       } catch (error) {
@@ -276,7 +279,6 @@ export default function AccountManagement() {
       }
       return;
     }
-    handleCloseModal();
   };
 
   const handleDelete = (account) => {
@@ -308,26 +310,7 @@ export default function AccountManagement() {
           errorMessage: result?.message || 'Failed to update account status. Please try again.',
           onSuccess: async () => {
             // Refresh accounts list from server to ensure consistency
-            const fetchResult = await t3Service.getAccounts({ page: currentPage, search: searchTerm });
-            if (fetchResult.success) {
-              const dataArray = fetchResult.data || [];
-              const limit = fetchResult.limit || 20;
-              const page = fetchResult.page || currentPage;
-              const total = fetchResult.total || null;
-              
-              setPaginationMeta({ limit, page, total });
-              
-              const transformed = dataArray.map(acc => ({
-                id: acc.id.toString(),
-                username: acc.username,
-                character: acc.character || 'Finance',
-                lastLogin: acc.last_login ? new Date(acc.last_login).toLocaleString('en-GB') : 'Never',
-                created: acc.created_at ? new Date(acc.created_at).toLocaleString('en-GB') : '',
-                status: acc.status || 'Active'
-              }));
-              setAccountsData(transformed);
-              setTotalAccounts(total || transformed.length);
-            }
+            await fetchAccounts(currentPage, searchTerm);
           }
         });
       } else {
@@ -484,7 +467,7 @@ export default function AccountManagement() {
             />
           </FormField>
 
-          {/* Create Finance: show email + wallet address */}
+          {/* Create Finance: show email + wallet address (only if not T3 admin type) */}
           {modalState.mode === 'create' && (
             <>
               <FormField label="Email">
@@ -496,13 +479,16 @@ export default function AccountManagement() {
                 />
               </FormField>
 
-              <FormField label="Wallet Address">
-                <TextInput
-                  value={formData.walletAddress}
-                  onChange={(e) => setFormData({ ...formData, walletAddress: e.target.value })}
-                  placeholder="Insert wallet address"
-                />
-              </FormField>
+              {/* Hide wallet address field for T3 Admin (admin_type=t3) */}
+              {!isT3AdminType && (
+                <FormField label="Wallet Address">
+                  <TextInput
+                    value={formData.walletAddress}
+                    onChange={(e) => setFormData({ ...formData, walletAddress: e.target.value })}
+                    placeholder="Insert wallet address"
+                  />
+                </FormField>
+              )}
             </>
           )}
         </div>

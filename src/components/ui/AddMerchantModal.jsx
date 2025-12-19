@@ -47,7 +47,8 @@ const INITIAL_FORM_DATA = {
 // Legacy fallback; real options now come from the currencies API.
 const CURRENCY_OPTIONS = ['🇲🇾 Malaysia - RM', '🇸🇬 Singapore - SGD', '🇺🇸 USA - USD'];
 
-const STEPS = [
+// Base steps without T3 Admin step
+const BASE_STEPS = [
   { id: 1, label: 'Basic Info' },
   { id: 2, label: 'Business Info' },
   { id: 3, label: 'Address' },
@@ -55,6 +56,23 @@ const STEPS = [
   { id: 5, label: 'Fees & Rebates' },
   { id: 6, label: 'Currency & Preview' },
 ];
+
+// Get dynamic steps based on merchant group
+const getSteps = (merchantGroup) => {
+  if (merchantGroup === 'T3') {
+    // Insert T3 Admin step after Basic Info
+    return [
+      { id: 1, label: 'Basic Info' },
+      { id: 2, label: 'T3 Admin Info' },
+      { id: 3, label: 'Business Info' },
+      { id: 4, label: 'Address' },
+      { id: 5, label: 'Wallet & Referral' },
+      { id: 6, label: 'Fees & Rebates' },
+      { id: 7, label: 'Currency & Preview' },
+    ];
+  }
+  return BASE_STEPS;
+};
 
 export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
@@ -101,7 +119,7 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
         console.log('[AddMerchantModal] agents dropdown result:', result);
         if (result && result.success && Array.isArray(result.data)) {
           const opts = result.data.map((agent) => ({
-            value: agent.referral_id || agent.id?.toString() || agent.username || '',
+            value: agent.id?.toString() || '',
             label: agent.display_name || agent.username || agent.referral_id || '',
           }));
           setAgentOptions(opts);
@@ -152,12 +170,54 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
     }
   }, [isOpen]);
 
+  // Adjust step when merchant group changes
+  useEffect(() => {
+    const steps = getSteps(formData.merchantGroup);
+    const maxStep = steps.length;
+    // If current step exceeds max, reset to max step
+    if (currentStep > maxStep) {
+      setCurrentStep(maxStep);
+    }
+  }, [formData.merchantGroup, currentStep]);
+
+  // Get current steps based on merchant group
+  const steps = getSteps(formData.merchantGroup);
+
+  // Get logical step content based on actual step and merchant group
+  const getStepContent = (step) => {
+    if (formData.merchantGroup === 'T3') {
+      // T3 flow: 1=Basic, 2=T3Admin, 3=Business, 4=Address, 5=Wallet, 6=Fees, 7=Currency
+      switch (step) {
+        case 1: return 'basic';
+        case 2: return 't3admin';
+        case 3: return 'business';
+        case 4: return 'address';
+        case 5: return 'wallet';
+        case 6: return 'fees';
+        case 7: return 'currency';
+        default: return 'basic';
+      }
+    } else {
+      // Non-T3 flow: 1=Basic, 2=Business, 3=Address, 4=Wallet, 5=Fees, 6=Currency
+      switch (step) {
+        case 1: return 'basic';
+        case 2: return 'business';
+        case 3: return 'address';
+        case 4: return 'wallet';
+        case 5: return 'fees';
+        case 6: return 'currency';
+        default: return 'basic';
+      }
+    }
+  };
+
   // Validate current step
   const validateStep = (step) => {
     const stepErrors = {};
+    const stepContent = getStepContent(step);
 
-    switch (step) {
-      case 1: // Basic Info
+    switch (stepContent) {
+      case 'basic': // Basic Info
         if (!validateRequired(formData.username)) {
           stepErrors.username = 'Username is required';
         }
@@ -183,24 +243,22 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
         if (!validateRequired(formData.merchantGroup)) {
           stepErrors.merchantGroup = 'Merchant group is required';
         }
-        // If T3 group selected, validate T3 admin credentials (optional - can be auto-generated)
-        if (formData.merchantGroup === 'T3') {
-          // T3 Admin Email validation (optional, but if provided must be valid)
-          if (formData.t3AdminEmail && !validateEmail(formData.t3AdminEmail)) {
-            stepErrors.t3AdminEmail = 'Please enter a valid email address';
-          }
-          // T3 Admin Password validation (optional, but if provided must be at least 6 characters)
-          if (formData.t3AdminPassword && !validatePassword(formData.t3AdminPassword)) {
-            stepErrors.t3AdminPassword = 'T3 admin password must be at least 6 characters';
-          }
-          // T3 Admin Phone validation (optional, but if provided must be valid)
-          if (formData.t3AdminPhone && !validatePhone(formData.t3AdminPhone)) {
-            stepErrors.t3AdminPhone = 'Please enter a valid phone number';
-          }
+        break;
+
+      case 't3admin': // T3 Admin Info
+        // T3 Admin fields are optional, but if provided must be valid
+        if (formData.t3AdminEmail && !validateEmail(formData.t3AdminEmail)) {
+          stepErrors.t3AdminEmail = 'Please enter a valid email address';
+        }
+        if (formData.t3AdminPassword && !validatePassword(formData.t3AdminPassword)) {
+          stepErrors.t3AdminPassword = 'T3 admin password must be at least 6 characters';
+        }
+        if (formData.t3AdminPhone && !validatePhone(formData.t3AdminPhone)) {
+          stepErrors.t3AdminPhone = 'Please enter a valid phone number';
         }
         break;
 
-      case 2: // Business Info
+      case 'business': // Business Info
         if (!validateRequired(formData.companyName)) {
           stepErrors.companyName = 'Company name is required';
         }
@@ -215,7 +273,7 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
         }
         break;
 
-      case 3: // Address
+      case 'address': // Address
         if (!validateRequired(formData.addressLine1)) {
           stepErrors.addressLine1 = 'Address line 1 is required';
         }
@@ -233,7 +291,7 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
         }
         break;
 
-      case 4: // Wallet & Referral
+      case 'wallet': // Wallet & Referral
         if (!validateRequired(formData.walletAddress)) {
           stepErrors.walletAddress = 'Wallet address is required';
         }
@@ -243,7 +301,7 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
         }
         break;
 
-      case 5: // Fees & Rebates
+      case 'fees': // Fees & Rebates
         if (formData.markupFees && !validateNumber(formData.markupFees)) {
           stepErrors.markupFees = 'Please enter a valid number';
         }
@@ -270,7 +328,7 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
         }
         break;
 
-      case 6: // Currency & Preview
+      case 'currency': // Currency & Preview
         if (!validateRequired(formData.currencies)) {
           stepErrors.currencies = 'Currency selection is required';
         }
@@ -286,42 +344,37 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
 
   // Check if step is valid without setting errors (for button state)
   const isStepValid = () => {
-    const step = currentStep;
+    const stepContent = getStepContent(currentStep);
 
-    switch (step) {
-      case 1:
-        const baseValid = validateRequired(formData.username) &&
+    switch (stepContent) {
+      case 'basic':
+        return validateRequired(formData.username) &&
                validateRequired(formData.email) && validateEmail(formData.email) &&
                validatePassword(formData.password) &&
                validateRequired(formData.firstName) &&
                validateRequired(formData.lastName) &&
                validateRequired(formData.phone) && validatePhone(formData.phone) &&
                validateRequired(formData.merchantGroup);
-        
+      case 't3admin':
         // T3 admin fields are optional, but if provided must be valid
-        if (formData.merchantGroup === 'T3') {
-          const t3Valid = (!formData.t3AdminEmail || validateEmail(formData.t3AdminEmail)) &&
-                         (!formData.t3AdminPassword || validatePassword(formData.t3AdminPassword)) &&
-                         (!formData.t3AdminPhone || validatePhone(formData.t3AdminPhone));
-          return baseValid && t3Valid;
-        }
-        
-        return baseValid;
-      case 2:
+        return (!formData.t3AdminEmail || validateEmail(formData.t3AdminEmail)) &&
+               (!formData.t3AdminPassword || validatePassword(formData.t3AdminPassword)) &&
+               (!formData.t3AdminPhone || validatePhone(formData.t3AdminPhone));
+      case 'business':
         return validateRequired(formData.companyName) &&
                validateRequired(formData.ssmNumber) &&
                validateRequired(formData.merchantType) &&
                (formData.merchantType !== 'Others' || validateRequired(formData.merchantTypeOther));
-      case 3:
+      case 'address':
         return validateRequired(formData.addressLine1) &&
                validateRequired(formData.city) &&
                validateRequired(formData.postcode) &&
                validateRequired(formData.state) &&
                validateRequired(formData.country);
-      case 4:
+      case 'wallet':
         return validateRequired(formData.walletAddress) &&
                (!formData.referralFees || validateNumber(formData.referralFees));
-      case 5:
+      case 'fees':
         return (!formData.markupFees || validateNumber(formData.markupFees)) &&
                (!formData.processingFees || validateNumber(formData.processingFees)) &&
                (!formData.L1Rebate || validateNumber(formData.L1Rebate)) &&
@@ -330,7 +383,7 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
                (!formData.T2Rebate || validateNumber(formData.T2Rebate)) &&
                (!formData.MerchantRebate || validateNumber(formData.MerchantRebate)) &&
                (!formData.DirectRebate || validateNumber(formData.DirectRebate));
-      case 6:
+      case 'currency':
         return validateRequired(formData.currencies);
       default:
         return true;
@@ -363,7 +416,7 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
-      if (currentStep < STEPS.length) {
+      if (currentStep < steps.length) {
         setCurrentStep(currentStep + 1);
         // Clear errors when moving to next step
         setErrors({});
@@ -668,6 +721,59 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
     );
   };
 
+  // Render T3 Admin Information section
+  const renderT3AdminInfo = () => {
+    if (formData.merchantGroup !== 'T3') {
+      return null;
+    }
+
+    // Determine actual values (use provided values or fallback to merchant values or auto-generate)
+    const t3AdminEmail = formData.t3AdminEmail || 'Auto-generate';
+    const t3AdminFirstName = formData.t3AdminFirstName || formData.firstName || 'Auto-generate';
+    const t3AdminPhone = formData.t3AdminPhone || formData.phone || 'Auto-generate';
+    const t3AdminUsername = formData.t3AdminUsername || 'Auto-generate';
+    const t3AdminPassword = formData.t3AdminPassword ? '••••••••' : 'Use merchant password';
+    const t3AdminLastName = formData.t3AdminLastName || formData.lastName || 'Auto-generate';
+
+    return (
+      <FormSection title="T3 Admin Information">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Left Column */}
+          <div className="space-y-4">
+            <div className="flex flex-col gap-1">
+              <span className="text-sm text-gray-500">T3 Admin Email</span>
+              <span className="text-base text-black font-medium">{t3AdminEmail}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-sm text-gray-500">T3 Admin First Name</span>
+              <span className="text-base text-black font-medium">{t3AdminFirstName}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-sm text-gray-500">T3 Admin Phone</span>
+              <span className="text-base text-black font-medium">{t3AdminPhone}</span>
+            </div>
+          </div>
+          
+          {/* Right Column */}
+          <div className="space-y-4">
+            <div className="flex flex-col gap-1">
+              <span className="text-sm text-gray-500">T3 Admin Username</span>
+              <span className="text-base text-black font-medium">{t3AdminUsername}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-sm text-gray-500">T3 Admin Password</span>
+              <span className="text-base text-black font-medium">{t3AdminPassword}</span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-sm text-gray-500">T3 Admin Last Name</span>
+              <span className="text-base text-black font-medium">{t3AdminLastName}</span>
+            </div>
+          </div>
+        </div>
+      </FormSection>
+    );
+  };
+
   // Render preview of all form data
   const renderPreview = () => {
     const previewSections = [
@@ -681,14 +787,6 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
           { label: 'First Name', value: formData.firstName || 'N/A' },
           { label: 'Last Name', value: formData.lastName || 'N/A' },
           { label: 'Phone', value: formData.phone || 'N/A' },
-          ...(formData.merchantGroup === 'T3' ? [
-            { label: 'T3 Admin Username', value: formData.t3AdminUsername || 'Auto-generate' },
-            { label: 'T3 Admin Email', value: formData.t3AdminEmail || 'Auto-generate' },
-            { label: 'T3 Admin Password', value: formData.t3AdminPassword ? '••••••••' : 'Use merchant password' },
-            { label: 'T3 Admin First Name', value: formData.t3AdminFirstName || 'Use merchant first name' },
-            { label: 'T3 Admin Last Name', value: formData.t3AdminLastName || 'Use merchant last name' },
-            { label: 'T3 Admin Phone', value: formData.t3AdminPhone || 'Use merchant phone' },
-          ] : []),
         ]
       },
       {
@@ -765,8 +863,10 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
 
   // Render step content
   const renderStepContent = () => {
-    switch (currentStep) {
-      case 1: // Basic Info
+    const stepContent = getStepContent(currentStep);
+
+    switch (stepContent) {
+      case 'basic': // Basic Info
         return (
           <FormSection title="Basic Information">
             <div>
@@ -805,38 +905,39 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
             {renderField(TextInput, 'Username', 'username', { placeholder: 'Insert username here' })}
             {renderField(TextInput, 'Email', 'email', { placeholder: 'Insert email here', type: 'email' })}
             {renderField(PasswordInput, 'Password', 'password', { placeholder: 'Insert password here' })}
-            {/* Additional T3 Admin credentials when Merchant Group is T3 */}
-            {formData.merchantGroup === 'T3' && (
-              <>
-                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0">
-                      <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm text-yellow-700">
-                        <strong>T3 Admin Creation:</strong> When creating a T3 merchant, a T3 admin account will be automatically created as the supermain admin. Provide the credentials below, or leave empty to auto-generate.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                {renderField(TextInput, 'T3 Admin Username', 't3AdminUsername', { placeholder: 'Leave empty to auto-generate (e.g., t3m{userID})' })}
-                {renderField(TextInput, 'T3 Admin Email', 't3AdminEmail', { placeholder: 'Leave empty to auto-generate', type: 'email' })}
-                {renderField(PasswordInput, 'T3 Admin Password', 't3AdminPassword', { placeholder: 'Leave empty to use merchant password' })}
-                {renderField(TextInput, 'T3 Admin First Name', 't3AdminFirstName', { placeholder: 'Leave empty to use merchant first name' })}
-                {renderField(TextInput, 'T3 Admin Last Name', 't3AdminLastName', { placeholder: 'Leave empty to use merchant last name' })}
-                {renderField(TextInput, 'T3 Admin Phone', 't3AdminPhone', { placeholder: 'Leave empty to use merchant phone', type: 'tel' })}
-              </>
-            )}
             {renderField(TextInput, 'First Name', 'firstName', { placeholder: 'Insert first name here' })}
             {renderField(TextInput, 'Last Name', 'lastName', { placeholder: 'Insert last name here' })}
             {renderField(TextInput, 'Phone', 'phone', { placeholder: 'Insert phone number here', type: 'tel' })}
           </FormSection>
         );
 
-      case 2: // Business Info
+      case 't3admin': // T3 Admin Info
+        return (
+          <FormSection title="T3 Admin Information">
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-yellow-700">
+                    <strong>T3 Admin Creation:</strong> When creating a T3 merchant, a T3 admin account will be automatically created as the supermain admin. Provide the credentials below, or leave empty to auto-generate.
+                  </p>
+                </div>
+              </div>
+            </div>
+            {renderField(TextInput, 'T3 Admin Username', 't3AdminUsername', { placeholder: 'Leave empty to auto-generate (e.g., t3m{userID})' })}
+            {renderField(TextInput, 'T3 Admin Email', 't3AdminEmail', { placeholder: 'Leave empty to auto-generate', type: 'email' })}
+            {renderField(PasswordInput, 'T3 Admin Password', 't3AdminPassword', { placeholder: 'Leave empty to use merchant password' })}
+            {renderField(TextInput, 'T3 Admin First Name', 't3AdminFirstName', { placeholder: 'Leave empty to use merchant first name' })}
+            {renderField(TextInput, 'T3 Admin Last Name', 't3AdminLastName', { placeholder: 'Leave empty to use merchant last name' })}
+            {renderField(TextInput, 'T3 Admin Phone', 't3AdminPhone', { placeholder: 'Leave empty to use merchant phone', type: 'tel' })}
+          </FormSection>
+        );
+
+      case 'business': // Business Info
         return (
           <FormSection title="Business Information">
             {renderField(TextInput, 'Company Name', 'companyName', { placeholder: 'Insert company name here' })}
@@ -877,7 +978,7 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
           </FormSection>
         );
 
-      case 3: // Address
+      case 'address': // Address
         return (
           <FormSection title="Business Address">
             {renderField(TextInput, 'Address Line 1', 'addressLine1', { placeholder: 'Insert address line 1 here' })}
@@ -933,7 +1034,7 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
           </FormSection>
         );
 
-      case 4: // Wallet & Referral
+      case 'wallet': // Wallet & Referral
         return (
           <>
             <FormSection title="Wallet Setup">
@@ -958,7 +1059,7 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
           </>
         );
 
-      case 5: // Fees & Rebates
+      case 'fees': // Fees & Rebates
         return (
           <>
             <FormSection title="Fees Setup">
@@ -976,7 +1077,7 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
           </>
         );
 
-      case 6: // Currency & Preview
+      case 'currency': // Currency & Preview
         return (
           <>
             <FormSection title="Currencies Select">
@@ -1004,6 +1105,7 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
                 )}
               </div>
             </FormSection>
+            {formData.merchantGroup === 'T3' && renderT3AdminInfo()}
             {renderPreview()}
           </>
         );
@@ -1030,7 +1132,7 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
         <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
           {/* Circles and connecting lines row */}
           <div className="flex items-center w-full mb-1.5 sm:mb-2">
-            {STEPS.map((step, index) => {
+            {steps.map((step, index) => {
               const isActive = currentStep === step.id;
               const isCompleted = currentStep > step.id;
               
@@ -1050,7 +1152,7 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
                   </div>
                   
                   {/* Connecting line - between circles */}
-                  {index < STEPS.length - 1 && (
+                  {index < steps.length - 1 && (
                     <div className="flex-1 flex-shrink-0 mx-1 sm:mx-2" style={{ minWidth: '8px' }}>
                       <div 
                         className={`w-full h-0.5 transition-colors ${
@@ -1066,7 +1168,7 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
           
           {/* Labels row - positioned below circles */}
           <div className="flex items-start w-full">
-            {STEPS.map((step, index) => {
+            {steps.map((step, index) => {
               const isActive = currentStep === step.id;
               const isCompleted = currentStep > step.id;
               
@@ -1080,7 +1182,7 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
                       <span className="sm:hidden">{step.label.split(' ')[0]}</span>
                     </span>
                   </div>
-                  {index < STEPS.length - 1 && (
+                  {index < steps.length - 1 && (
                     <div className="flex-1 flex-shrink-0 mx-1 sm:mx-2" style={{ minWidth: '8px' }} />
                   )}
                 </Fragment>
@@ -1116,7 +1218,7 @@ export default function AddMerchantModal({ isOpen, onClose, onSubmit }) {
                 Previous
               </button>
             )}
-            {currentStep < STEPS.length ? (
+            {currentStep < steps.length ? (
               <button
                 type="button"
                 onClick={handleNext}

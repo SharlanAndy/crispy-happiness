@@ -4,9 +4,9 @@ import { CheckCircle2, XCircle } from 'lucide-react';
 import { StatCard, InfoSection, DataTable, PageHeader, ProfitChart, TabButtons, Modal, Button, FormField } from '@/components/ui';
 import { PasswordInput, TextInput } from '@/components/form';
 
-import { t3Service } from '@/services/t3Service';
 import { api, T3SYSTEMADMIN_BASE } from '@/lib/api';
 import { useToast } from '@/contexts/ToastContext';
+import { useWeb3Wallet } from '@/hooks/useWeb3Wallet';
 
 
 export default function MerchantDetails() {
@@ -24,12 +24,21 @@ export default function MerchantDetails() {
   const [regularTransactionsPage, setRegularTransactionsPage] = useState(1);
   const [paymentTransactionsPage, setPaymentTransactionsPage] = useState(1);
   
+  // Web3 wallet connection
+  const {
+    address: web3Address,
+    formattedAddress: web3FormattedAddress,
+    walletName,
+    isConnected: isWeb3Connected,
+    isAvailable: isWeb3Available,
+    connect: connectWeb3Wallet
+  } = useWeb3Wallet();
+
   // Modal and form states for T3 Admin
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [walletAddress, setWalletAddress] = useState('');
   const [passwordForm, setPasswordForm] = useState({
-    current: '',
+    current: '', // Only used for System Admin
     new: '',
     confirm: ''
   });
@@ -40,24 +49,65 @@ export default function MerchantDetails() {
   // Fetch merchant details
   useEffect(() => {
     const fetchMerchantDetails = async () => {
-      if (!id) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        const result = isT3Admin 
-          ? await t3Service.getMerchantDetails(id)
-          : await api.systemadmin.getMerchantDetails(id);
-        
-        if (result.success && result.data) {
-          setMerchantData(result.data);
-          // Handle both PascalCase (from API) and snake_case (for backward compatibility)
-          setWalletAddress(result.data.WalletAddress || result.data.wallet_address || '');
+      if (isT3Admin) {
+        // For T3 Admin, fetch from profile endpoint
+        try {
+          setLoading(true);
+          const result = await api.t3admin.getProfile();
           
-          // Extract transactions and payment_transactions from merchant data (for system admin only)
-          if (!isT3Admin) {
+          if (result.success && result.data) {
+            const profileData = result.data;
+            // Transform profile data to merchant data format for consistency
+            // For T3 Admin, wallet_address comes from merchant object, not top-level
+            const transformedData = {
+              // Admin info
+              email: profileData.email,
+              first_name: profileData.first_name,
+              last_name: profileData.last_name,
+              phone: profileData.phone,
+              wallet_address: profileData.merchant?.wallet_address || '',
+              username: profileData.username,
+              // Merchant ID for API calls
+              merchant_id: profileData.merchant_id,
+              // Merchant info from nested merchant object
+              business_name: profileData.merchant?.business_name || profileData.merchant?.name || 'N/A',
+              name: profileData.merchant?.business_name || profileData.merchant?.name || 'N/A',
+              merchant_type: profileData.merchant?.merchant_type || 'N/A',
+              category: profileData.merchant?.category || 'N/A',
+              contact_email: profileData.merchant?.contact_email || 'N/A',
+              contact_phone: profileData.merchant?.contact_phone || 'N/A',
+              location: profileData.merchant?.location || 'N/A',
+              currency_code: profileData.merchant?.currency_code || 'N/A',
+              currency_name: profileData.merchant?.currency_name || 'N/A',
+              status: profileData.merchant?.status || 'active',
+              // Store full profile for reference
+              _profile: profileData
+            };
+            
+            setMerchantData(transformedData);
+            // Wallet address now comes from Web3 connection, not API
+          }
+        } catch (error) {
+          console.error('Failed to fetch T3 admin profile:', error);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        // For System Admin, use existing merchant details endpoint
+        if (!id) {
+          setLoading(false);
+          return;
+        }
+
+        try {
+          setLoading(true);
+          const result = await api.systemadmin.getMerchantDetails(id);
+          
+          if (result.success && result.data) {
+            setMerchantData(result.data);
+            // Wallet address now comes from Web3 connection, not API
+            
+            // Extract transactions and payment_transactions from merchant data
             // Regular transactions from transactions array
             const regularTrans = result.data.transactions || result.data.Transactions || [];
             setRegularTransactions(Array.isArray(regularTrans) ? regularTrans : []);
@@ -75,11 +125,11 @@ export default function MerchantDetails() {
               setT3Admins([]);
             }
           }
+        } catch (error) {
+          console.error('Failed to fetch merchant details:', error);
+        } finally {
+          setLoading(false);
         }
-      } catch (error) {
-        console.error('Failed to fetch merchant details:', error);
-      } finally {
-        setLoading(false);
       }
     };
     fetchMerchantDetails();
@@ -95,34 +145,45 @@ export default function MerchantDetails() {
   // Handle both PascalCase (from API) and snake_case (for backward compatibility)
   const merchantInfo = merchantData ? [
     { label: 'Business Name', value: merchantData.BusinessName || merchantData.business_name || merchantData.Name || merchantData.name || 'N/A' },
-    { label: 'SSM Number', value: merchantData.SSMNumber || merchantData.business_registration || merchantData.ssm_number || 'N/A' },
+    { label: 'Merchant Type', value: merchantData.merchant_type || merchantData.MerchantType || 'N/A' },
+    { label: 'Category', value: merchantData.category || merchantData.Category || 'N/A' },
+    { label: 'Contact Email', value: merchantData.contact_email || merchantData.contactEmail || 'N/A' },
+    { label: 'Contact Phone', value: merchantData.contact_phone || merchantData.contactPhone || 'N/A' },
+    { label: 'Currency', value: merchantData.currency_name || merchantData.currencyName || merchantData.currency_code || merchantData.currencyCode || 'N/A' },
     ...(isT3Admin ? [] : [
+      { label: 'SSM Number', value: merchantData.SSMNumber || merchantData.business_registration || merchantData.ssm_number || 'N/A' },
       { label: 'Email', value: merchantData.Email || merchantData.email || 'N/A' },
       { label: 'Password', value: '••••••••' },
       { label: 'Status', value: merchantData.Status || merchantData.status || 'Active', badge: true }
     ])
   ] : [];
 
-  // Email and Password info for T3 Admin
+  // Email info for T3 Admin (from profile, not merchant)
+  // Password field removed as per user request
   const credentialsInfo = merchantData ? [
-    { label: 'Email', value: merchantData.Email || merchantData.email || 'N/A' },
-    { label: 'Password', value: '••••••••' }
+    { label: 'Email', value: merchantData.email || merchantData.Email || 'N/A' }
   ] : [];
 
   // Format address info
-  // Handle both PascalCase (from API) and snake_case (for backward compatibility)
-  const addressInfo = merchantData ? [
+  // For T3 Admin, use location from merchant object; for System Admin, use structured address fields
+  const addressInfo = merchantData ? (isT3Admin ? [
+    { label: 'Address', value: merchantData.location || 'N/A' }
+  ] : [
     { label: 'Address Line 1', value: merchantData.AddressLine1 || merchantData.addressLine1 || merchantData.location || 'N/A' },
     { label: 'Address Line 2', value: merchantData.AddressLine2 || merchantData.addressLine2 || '' },
     { label: 'City', value: merchantData.City || merchantData.city || 'N/A' },
     { label: 'State', value: merchantData.State || merchantData.state || 'N/A' },
     { label: 'Country', value: merchantData.Country || merchantData.country || 'N/A' },
     { label: 'Postcode', value: merchantData.Postcode || merchantData.postcode || 'N/A' }
-  ].filter(item => item.value && item.value !== '') : [];
+  ]).filter(item => item.value && item.value !== '') : [];
 
-  // Format wallet info
-  // Handle both PascalCase (from API) and snake_case (for backward compatibility)
-  const walletInfo = [{ label: 'Wallet Address', value: walletAddress || merchantData?.WalletAddress || merchantData?.wallet_address || 'N/A' }];
+  // Format wallet info - now uses Web3 wallet connection
+  const walletInfo = [{
+    label: 'Wallet Address',
+    value: isWeb3Connected
+      ? (web3FormattedAddress || web3Address || 'N/A')
+      : (isWeb3Available ? 'Not Connected' : 'Web3 Wallet Not Available')
+  }];
 
   // Stats from merchant data
   // Handle both PascalCase (from API) and snake_case (for backward compatibility)
@@ -240,23 +301,94 @@ export default function MerchantDetails() {
   }, [id, handleApiResponse, showError]);
 
 
-  // Handle wallet address update
-  const handleWalletUpdate = () => {
-    // TODO: Add API call to update wallet address
-    console.log('Updating wallet address:', walletAddress);
-    setShowWalletModal(false);
+  // Handle wallet connection - now uses Web3 instead of API
+  const handleWalletConnect = async () => {
+    if (!isWeb3Available) {
+      showError('Web3 wallet is not available. Please install MetaMask or another Web3 wallet.');
+      return;
+    }
+
+    if (isWeb3Connected) {
+      // Already connected, just close modal
+      setShowWalletModal(false);
+      return;
+    }
+
+    try {
+      await connectWeb3Wallet();
+      setShowWalletModal(false);
+    } catch (error) {
+      console.error('Failed to connect wallet:', error);
+      showError(error.message || 'Failed to connect wallet. Please try again.');
+    }
   };
 
   // Handle password update
-  const handlePasswordUpdate = () => {
+  const handlePasswordUpdate = async () => {
+    if (!passwordForm.new || !passwordForm.new.trim()) {
+      showError('New password is required');
+      return;
+    }
+
     if (passwordForm.new !== passwordForm.confirm) {
       showError('Passwords do not match');
       return;
     }
-    // TODO: Add API call to update password
-    console.log('Updating password');
-    setShowPasswordModal(false);
-    setPasswordForm({ current: '', new: '', confirm: '' });
+
+    if (isT3Admin) {
+      // For T3 Admin, use merchant_id from profile
+      const merchantId = merchantData?.merchant_id;
+      
+      if (!merchantId) {
+        showError('Merchant ID not found. Please refresh the page.');
+        return;
+      }
+
+      try {
+        const result = await api.systemadmin.updateMerchantPassword(merchantId, {
+          new_password: passwordForm.new.trim(),
+          confirm_password: passwordForm.confirm.trim()
+        });
+
+        handleApiResponse(result, {
+          successMessage: result?.message || 'Password updated successfully',
+          errorMessage: result?.message || 'Failed to update password. Please try again.',
+          onSuccess: () => {
+            setShowPasswordModal(false);
+            setPasswordForm({ current: '', new: '', confirm: '' });
+          }
+        });
+      } catch (error) {
+        console.error('Failed to update password:', error);
+        showError('Failed to update password. Please try again.');
+      }
+    } else {
+      // For System Admin, use existing merchant details endpoint
+      if (!id) {
+        showError('Merchant ID not found');
+        return;
+      }
+
+      try {
+        const result = await api.systemadmin.updateMerchantPassword(id, {
+          current_password: passwordForm.current,
+          new_password: passwordForm.new.trim(),
+          confirm_password: passwordForm.confirm.trim()
+        });
+
+        handleApiResponse(result, {
+          successMessage: result?.message || 'Password updated successfully',
+          errorMessage: result?.message || 'Failed to update password. Please try again.',
+          onSuccess: () => {
+            setShowPasswordModal(false);
+            setPasswordForm({ current: '', new: '', confirm: '' });
+          }
+        });
+      } catch (error) {
+        console.error('Failed to update password:', error);
+        showError('Failed to update password. Please try again.');
+      }
+    }
   };
 
   // Reusable card with edit button for T3 Admin
@@ -264,12 +396,15 @@ export default function MerchantDetails() {
     <div className="bg-white rounded-[20px] border border-[#E5E5E5] p-5">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-black">{title}</h3>
-        <button
-          onClick={onEdit}
-          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm"
-        >
-          Edit
-        </button>
+        {/* Temporarily commented out edit button */}
+        {onEdit && (
+          <button
+            onClick={onEdit}
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm"
+          >
+            Edit
+          </button>
+        )}
       </div>
       {children}
     </div>
@@ -290,11 +425,14 @@ export default function MerchantDetails() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {stats.map((stat, idx) => (
-                <StatCard key={idx} {...stat} />
-              ))}
-            </div>
+            {/* Stats Section - Only show for System Admin */}
+            {!isT3Admin && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                {stats.map((stat, idx) => (
+                  <StatCard key={idx} {...stat} />
+                ))}
+              </div>
+            )}
 
         {/* Info Sections */}
         {isT3Admin ? (
@@ -306,7 +444,10 @@ export default function MerchantDetails() {
                 items={merchantInfo}
                 columns={1}
               />
-              <InfoCard title="Wallet Information" onEdit={() => setShowWalletModal(true)}>
+              <InfoCard 
+                title="Wallet Information" 
+                // onEdit={() => setShowWalletModal(true)}
+              >
                 <div className="space-y-3">
                   {walletInfo.map((item, idx) => (
                     <div key={idx} className="flex flex-col gap-1">
@@ -318,7 +459,10 @@ export default function MerchantDetails() {
               </InfoCard>
             </div>
             <div className="grid grid-cols-1 gap-6">
-              <InfoCard title="Email & Password" onEdit={() => setShowPasswordModal(true)}>
+              <InfoCard 
+                title="Email & Password" 
+                // onEdit={() => setShowPasswordModal(true)}
+              >
                 <div className="space-y-3">
                   {credentialsInfo.map((item, idx) => (
                     <div key={idx} className="flex flex-col gap-1">
@@ -546,36 +690,55 @@ export default function MerchantDetails() {
           </>
         )}
       </div>
-      {/* Wallet Address Edit Modal */}
+      {/* Wallet Connection Modal */}
       <Modal
         isOpen={showWalletModal}
         onClose={() => setShowWalletModal(false)}
-        title="Edit Wallet Address"
+        title="Connect Web3 Wallet"
         size="sm"
         footer={
           <>
             <Button variant="outline" onClick={() => setShowWalletModal(false)}>
               Cancel
             </Button>
-            <Button onClick={handleWalletUpdate}>
-              Save Changes
+            <Button onClick={handleWalletConnect} disabled={!isWeb3Available || isWeb3Connected}>
+              {isWeb3Connected ? 'Connected' : 'Connect Wallet'}
             </Button>
           </>
         }
       >
-        <FormField label="Wallet Address">
-          <TextInput
-            value={walletAddress}
-            onChange={(e) => setWalletAddress(e.target.value)}
-            placeholder="Enter wallet address"
-          />
-        </FormField>
+        <div className="space-y-4">
+          {isWeb3Connected ? (
+            <div className="text-center space-y-2">
+              <p className="text-sm text-gray-600">Wallet Connected</p>
+              <p className="text-sm font-mono text-gray-800">
+                {walletName && <span className="text-xs text-gray-500">({walletName}) </span>}
+                {web3FormattedAddress || web3Address}
+              </p>
+            </div>
+          ) : isWeb3Available ? (
+            <div className="text-center space-y-2">
+              <p className="text-sm text-gray-600">
+                Click "Connect Wallet" to connect your Web3 wallet (MetaMask, Trust Wallet, Token Pocket, imToken, etc.)
+              </p>
+            </div>
+          ) : (
+            <div className="text-center space-y-2">
+              <p className="text-sm text-red-600">
+                Web3 wallet not found. Please install MetaMask or another Web3 wallet extension.
+              </p>
+            </div>
+          )}
+        </div>
       </Modal>
 
       {/* Password Edit Modal */}
       <Modal
         isOpen={showPasswordModal}
-        onClose={() => setShowPasswordModal(false)}
+        onClose={() => {
+          setShowPasswordModal(false);
+          setPasswordForm({ current: '', new: '', confirm: '' });
+        }}
         title="Change Password"
         size="sm"
         footer={
@@ -590,29 +753,53 @@ export default function MerchantDetails() {
         }
       >
         <div className="space-y-6">
-          <FormField label="Current Password">
-            <PasswordInput
-              value={passwordForm.current}
-              onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })}
-              placeholder="Enter current password"
-            />
-          </FormField>
+          {isT3Admin ? (
+            // T3 Admin: Only new password and confirm password
+            <>
+              <FormField label="New Password">
+                <PasswordInput
+                  value={passwordForm.new}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, new: e.target.value })}
+                  placeholder="Enter new password"
+                />
+              </FormField>
 
-          <FormField label="New Password">
-            <PasswordInput
-              value={passwordForm.new}
-              onChange={(e) => setPasswordForm({ ...passwordForm, new: e.target.value })}
-              placeholder="Enter new password"
-            />
-          </FormField>
+              <FormField label="Confirm Password">
+                <PasswordInput
+                  value={passwordForm.confirm}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
+                  placeholder="Confirm new password"
+                />
+              </FormField>
+            </>
+          ) : (
+            // System Admin: Current, new, and confirm password
+            <>
+              <FormField label="Current Password">
+                <PasswordInput
+                  value={passwordForm.current}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })}
+                  placeholder="Enter current password"
+                />
+              </FormField>
 
-          <FormField label="Confirm Password">
-            <PasswordInput
-              value={passwordForm.confirm}
-              onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
-              placeholder="Confirm new password"
-            />
-          </FormField>
+              <FormField label="New Password">
+                <PasswordInput
+                  value={passwordForm.new}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, new: e.target.value })}
+                  placeholder="Enter new password"
+                />
+              </FormField>
+
+              <FormField label="Confirm Password">
+                <PasswordInput
+                  value={passwordForm.confirm}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
+                  placeholder="Confirm new password"
+                />
+              </FormField>
+            </>
+          )}
         </div>
       </Modal>
     </>

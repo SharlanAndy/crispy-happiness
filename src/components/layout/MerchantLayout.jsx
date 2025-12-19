@@ -38,7 +38,7 @@ export default function MerchantLayout() {
         onLogout={handleLogout}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title={currentTitle} walletAddress="0xF3A...Merch" />
+        <Header title={currentTitle} />
         <main className="flex-1 overflow-y-auto p-6 bg-secondary/20">
           <Outlet />
         </main>

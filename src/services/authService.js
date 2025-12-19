@@ -46,31 +46,33 @@ export const authService = {
         const response = await api.t3admin.login({ username, password });
         if (response && response.success && response.data) {
           const token = response.data.token;
+          const adminType = response.data.admin_type; // Get admin_type directly from login response
           localStorage.setItem('token', token);
+          
+          // Determine role from admin_type in login response
+          const adminTypeLower = adminType?.toLowerCase();
+          let role = 't3-admin'; // Default fallback
+          if (adminTypeLower === 'system' || adminTypeLower === 'systemadmin' || adminTypeLower === 'system_admin') {
+            role = 'system-admin';
+          } else if (adminTypeLower === 't3' || adminTypeLower === 't3admin' || adminTypeLower === 't3_admin') {
+            role = 't3-admin';
+          }
           
           // Fetch profile after login to get full user data
           try {
             const profileResponse = await api.t3admin.getProfile();
             if (profileResponse && profileResponse.success && profileResponse.data) {
               const profile = profileResponse.data;
-              // Determine role from admin_type
-              const adminType = profile.admin_type?.toLowerCase();
-              let role = 't3-admin'; // Default fallback
-              if (adminType === 'system' || adminType === 'systemadmin' || adminType === 'system_admin') {
-                role = 'system-admin';
-              } else if (adminType === 't3' || adminType === 't3admin' || adminType === 't3_admin') {
-                role = 't3-admin';
-              }
               
               const userData = {
                 id: profile.id || username,
                 username: profile.username || username,
-                role: role, // Use role determined from admin_type
+                role: role, // Use role determined from login response admin_type
                 email: profile.email || `${username}@nbn.com`,
                 first_name: profile.first_name,
                 last_name: profile.last_name,
                 phone: profile.phone,
-                admin_type: profile.admin_type,
+                admin_type: adminType || profile.admin_type, // Use admin_type from login response first
                 character: profile.character,
                 wallet_address: profile.wallet_address,
                 status: profile.status,
@@ -86,12 +88,13 @@ export const authService = {
             console.warn('Failed to fetch profile after login, using basic data:', profileError);
           }
           
-          // Fallback to basic data if profile fetch fails
+          // Fallback to basic data if profile fetch fails, but still use admin_type from login
           const userData = {
             id: username,
             username: username,
-            role: 't3-admin',
+            role: role, // Use role determined from login response admin_type
             email: `${username}@nbn.com`,
+            admin_type: adminType, // Store admin_type from login response
             token: token
           };
           localStorage.setItem('user', JSON.stringify(userData));
@@ -107,31 +110,33 @@ export const authService = {
         const response = await api.systemadmin.login({ username, password });
         if (response && response.success && response.data) {
           const token = response.data.token;
+          const adminType = response.data.admin_type; // Get admin_type directly from login response
           localStorage.setItem('token', token);
+          
+          // Determine role from admin_type in login response
+          const adminTypeLower = adminType?.toLowerCase();
+          let role = 'system-admin'; // Default fallback
+          if (adminTypeLower === 'system' || adminTypeLower === 'systemadmin' || adminTypeLower === 'system_admin') {
+            role = 'system-admin';
+          } else if (adminTypeLower === 't3' || adminTypeLower === 't3admin' || adminTypeLower === 't3_admin') {
+            role = 't3-admin';
+          }
           
           // Fetch profile after login to get full user data
           try {
             const profileResponse = await api.systemadmin.getProfile();
             if (profileResponse && profileResponse.success && profileResponse.data) {
               const profile = profileResponse.data;
-              // Determine role from admin_type
-              const adminType = profile.admin_type?.toLowerCase();
-              let role = 'system-admin'; // Default fallback
-              if (adminType === 'system' || adminType === 'systemadmin' || adminType === 'system_admin') {
-                role = 'system-admin';
-              } else if (adminType === 't3' || adminType === 't3admin' || adminType === 't3_admin') {
-                role = 't3-admin';
-              }
               
               const userData = {
                 id: profile.id || username,
                 username: profile.username || username,
-                role: role, // Use role determined from admin_type
+                role: role, // Use role determined from login response admin_type
                 email: profile.email || `${username}@nbn.com`,
                 first_name: profile.first_name,
                 last_name: profile.last_name,
                 phone: profile.phone,
-                admin_type: profile.admin_type,
+                admin_type: adminType || profile.admin_type, // Use admin_type from login response first
                 character: profile.character,
                 wallet_address: profile.wallet_address,
                 status: profile.status,
@@ -147,12 +152,13 @@ export const authService = {
             console.warn('Failed to fetch profile after login, using basic data:', profileError);
           }
           
-          // Fallback to basic data if profile fetch fails
+          // Fallback to basic data if profile fetch fails, but still use admin_type from login
           const userData = {
             id: username,
             username: username,
-            role: 'system-admin',
+            role: role, // Use role determined from login response admin_type
             email: `${username}@nbn.com`,
+            admin_type: adminType, // Store admin_type from login response
             token: token
           };
           localStorage.setItem('user', JSON.stringify(userData));

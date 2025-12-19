@@ -183,9 +183,16 @@ export default function UnifiedSettings() {
               walletAddress: normalized?.walletAddress || prev.walletAddress,
               accountStatus: normalized?.status ? normalizedUserStatus : prev.accountStatus,
               // Referred By - who referred this user (upline)
-              // This field will be added to the API response later
-              // Assumes field names: ReferredBy, referred_by, referredBy, sponsor_by, sponsorBy
-              referralBy: data.ReferredBy || data.referred_by || data.referredBy || data.sponsor_by || data.sponsorBy || prev.referralBy || '',
+              // Handle referred_by as object (from API) or string (legacy)
+              referralBy: (() => {
+                const referral = data.referred_by || data.ReferredBy || data.referredBy || data.sponsor_by || data.sponsorBy;
+                if (!referral) return prev.referralBy || '';
+                // If it's an object, extract email; otherwise use as string
+                if (typeof referral === 'object' && referral !== null) {
+                  return referral.email || referral.Email || referral.referral_id || referral.referralId || '';
+                }
+                return referral;
+              })(),
             }));
           } else if (entityType === 'merchant') {
             // For merchants, populate all fields including rebates
@@ -651,10 +658,10 @@ export default function UnifiedSettings() {
         };
       } else if (sectionKey === 'referral') {
         updateData = {
-          // Don't send referral_by if it's disabled (temporarily disabled for merchants)
-          // remarks: formData.referralRemarks || null,
+          // Don't send referral_by/referralBy - it's read-only and comes from API
+          // Only send remarks field
         };
-        // Only send remarks for now since referral_by is disabled
+        // Only send remarks - referralBy is disabled/read-only for both users and merchants
         if (formData.referralRemarks !== undefined && formData.referralRemarks !== null && formData.referralRemarks !== '') {
           updateData.remarks = formData.referralRemarks;
         }
@@ -992,8 +999,12 @@ export default function UnifiedSettings() {
           createField('text', 'Remarks', 'referralRemarks', { placeholder: 'Additional remarks' })
         ]
         : [
-          createField('text', 'Referral By', 'referralBy', { placeholder: 'Insert referral ID here' }),
-          createField('text', 'Remarks', 'referralRemarks', { placeholder: 'Additional remarks' })
+          // For users: Only show Referral By (read-only), no Remarks field, no save button
+          createField('text', 'Referral By', 'referralBy', { 
+            placeholder: 'Insert referral ID here',
+            disabled: true, // Disabled for users - read-only from API
+            readOnly: true
+          })
         ]
     },
     fees: {
@@ -1077,10 +1088,13 @@ export default function UnifiedSettings() {
           }
           return renderField(field);
         })}
-        <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
-          <Button onClick={() => handleSave(sectionKey)}>Save Changes</Button>
-        </div>
+        {/* Hide Save Changes button for users in referral section - no updates allowed */}
+        {!(entityType === 'user' && sectionKey === 'referral') && (
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
+            <Button onClick={() => handleSave(sectionKey)}>Save Changes</Button>
+          </div>
+        )}
       </div>
     );
   };
