@@ -92,15 +92,48 @@ export const getTokenBalance = async (tokenAddress, address) => {
  * @param {string} to - Recipient address
  * @param {string} amount - Amount to transfer (human-readable, e.g., "100.5")
  * @param {number} decimals - Token decimals (default: 18)
+ * @param {number} chainId - Chain ID to ensure correct network (optional, but recommended)
  * @returns {Promise<object>} Transaction response
  */
-export const transferTokens = async (tokenAddress, to, amount, decimals = 18) => {
+export const transferTokens = async (tokenAddress, to, amount, decimals = 18, chainId = null) => {
   try {
+    // Validate and normalize address - ensure it's not a display value or ENS name
+    if (!to || typeof to !== 'string') {
+      throw new Error('Invalid recipient address')
+    }
+    
+    // Check if it's a display value (contains "...")
+    if (to.includes('...')) {
+      throw new Error('Invalid address format: Display value detected. Please use full address.')
+    }
+    
+    // Validate using ethers.js built-in validation (more reliable)
+    if (!ethers.isAddress(to)) {
+      throw new Error(`Invalid address format: ${to}. Must be a valid Ethereum/BSC address.`)
+    }
+    
+    // Normalize address using ethers.js getAddress (checksummed)
+    const normalizedTo = ethers.getAddress(to)
+    
+    // Get provider and verify network
+    const { getEthersProvider } = await import('./web3Service.js')
+    const provider = await getEthersProvider()
+    
+    // Verify we're on the correct network if chainId is provided
+    if (chainId) {
+      const network = await provider.getNetwork()
+      const currentChainId = Number(network.chainId)
+      if (currentChainId !== chainId) {
+        throw new Error(`Network mismatch. Expected chain ID ${chainId}, but connected to ${currentChainId}. Please switch networks in your wallet.`)
+      }
+    }
+    
     const contract = await getERC20Contract(tokenAddress)
     const amountWei = ethers.parseUnits(amount.toString(), decimals)
     
     // This will trigger the wallet popup
-    const tx = await contract.transfer(to, amountWei)
+    // The transaction will be sent on the network that the provider is connected to
+    const tx = await contract.transfer(normalizedTo, amountWei)
     
     return {
       hash: tx.hash,
@@ -113,10 +146,21 @@ export const transferTokens = async (tokenAddress, to, amount, decimals = 18) =>
     if (error.code === 4001 || error.message?.includes('user rejected')) {
       throw new Error('Transaction cancelled. You rejected the transaction in your wallet.')
     }
+    
+    // Extract revert reason if available
+    if (error.reason) {
+      // Direct revert reason (e.g., "BEP20: transfer amount exceeds balance")
+      throw new Error(error.reason)
+    } else if (error.revert && error.revert.args && error.revert.args.length > 0) {
+      // Revert args array (first element is usually the message)
+      throw new Error(error.revert.args[0])
+    }
+    
     if (error.message?.includes('insufficient funds') || error.message?.includes('insufficient balance')) {
       throw new Error('Insufficient token balance.')
     }
     
+    // Re-throw with original error to preserve revert information
     throw error
   }
 }

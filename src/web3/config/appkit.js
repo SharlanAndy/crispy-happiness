@@ -1,7 +1,12 @@
 import { createAppKit } from '@reown/appkit/react'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
 import { QueryClient } from '@tanstack/react-query'
-import { bscMainnet } from './chains.js'
+import { 
+  ethereumMainnet, 
+  ethereumSepolia, 
+  bscMainnet, 
+  bscTestnetConfig 
+} from './chains.js'
 
 // Create React Query client
 export const queryClient = new QueryClient({
@@ -41,10 +46,20 @@ export const appMetadata = {
   ],
 }
 
-// Only show BSC Mainnet for compatibility
-export const networks = [
-  bscMainnet,
-]
+// Network configuration based on environment
+// Development: Ethereum Mainnet, Ethereum Sepolia, BSC Mainnet, BSC Testnet
+// Production: Ethereum Mainnet, BSC Mainnet only
+export const networks = import.meta.env.DEV
+  ? [
+      ethereumMainnet,
+      ethereumSepolia,
+      bscMainnet,
+      bscTestnetConfig,
+    ]
+  : [
+      ethereumMainnet,
+      bscMainnet,
+    ]
 
 // Wagmi adapter configuration
 export const wagmiAdapter = new WagmiAdapter({

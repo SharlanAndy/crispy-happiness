@@ -201,57 +201,72 @@ export default function CaptchaCheckbox({
           </label>
         </div>
 
-        <div className="flex flex-col items-center gap-1">
-          <div className="size-9">
+        <div className="flex flex-col items-center gap-1 flex-shrink-0 min-w-[120px]">
+          <div className="w-[43px] h-[51px] flex items-center justify-center">
             <Captcha />
           </div>
-          <div className="font-['Roboto',sans-serif] text-[#555555] text-xs text-center whitespace-nowrap flex items-center gap-1">
-            <a 
-              href="https://www.cloudflare.com/privacypolicy/" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-[#555555] hover:text-blue-600 underline"
-              onClick={(e) => e.stopPropagation()}
-            >
-              Privacy
-            </a>
-            <span className="text-[#555555]">Captcha</span>
-            <a 
-              href="https://www.cloudflare.com/website-terms/" 
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[#555555] hover:text-blue-600 underline"
-              onClick={(e) => e.stopPropagation()}
-            >
-              Terms
-            </a>
+          <div className="font-['Roboto',sans-serif] text-[#555555] text-xs text-center w-full">
+            <div className="flex items-center justify-center gap-1.5">
+              <a 
+                href="https://www.cloudflare.com/privacypolicy/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[#555555] hover:text-blue-600 underline whitespace-nowrap"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Privacy
+              </a>
+              <span className="text-[#555555] whitespace-nowrap">Captcha</span>
+              <a 
+                href="https://www.cloudflare.com/website-terms/" 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#555555] hover:text-blue-600 underline whitespace-nowrap"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Terms
+              </a>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Visual Challenge */}
+      {/* Visual Challenge - Separate Modal Overlay */}
       {showChallenge && targetPatterns.length > 0 && selectedCount < 3 && (
-        <div className="bg-white border border-blue-200 rounded-md p-4 flex flex-col gap-3">
-          <div className="text-center">
-            <p className="font-['Roboto',sans-serif] text-sm font-medium text-[#333] mb-2">
-              Click the pattern <span className="text-2xl">{targetPatterns[selectedCount]}</span> ({selectedCount + 1} of 3):
-            </p>
-            <p className="font-['Roboto',sans-serif] text-xs text-gray-600">
-              Progress: {selectedCount} / 3
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-3 gap-3">
-            {shuffledBoard.map((pattern, index) => (
-              <button
-                key={`${pattern}-${index}`}
-                type="button"
-                onClick={(e) => handlePatternClick(e, pattern)}
-                className="text-4xl p-4 border-2 border-gray-300 rounded-md hover:border-blue-500 hover:bg-blue-50 transition-all active:scale-95"
-              >
-                {pattern}
-              </button>
-            ))}
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4" onClick={(e) => e.stopPropagation()}>
+          <div 
+            className="bg-white rounded-[20px] shadow-[0px_16px_16px_0px_rgba(50,50,71,0.08),0px_24px_32px_0px_rgba(50,50,71,0.08)] p-6 w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col gap-4">
+              <div className="text-center">
+                <h3 className="font-['Roboto',sans-serif] text-lg font-semibold text-[#333] mb-2">
+                  Complete the Challenge
+                </h3>
+                <p className="font-['Roboto',sans-serif] text-sm font-medium text-[#333] mb-2">
+                  Click the pattern <span className="text-2xl">{targetPatterns[selectedCount]}</span> ({selectedCount + 1} of 3):
+                </p>
+                <p className="font-['Roboto',sans-serif] text-xs text-gray-600">
+                  Progress: {selectedCount} / 3
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-3">
+                {shuffledBoard.map((pattern, index) => (
+                  <button
+                    key={`${pattern}-${index}`}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePatternClick(e, pattern);
+                    }}
+                    className="text-4xl p-4 border-2 border-gray-300 rounded-md hover:border-blue-500 hover:bg-blue-50 transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {pattern}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}

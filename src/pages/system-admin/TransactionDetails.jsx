@@ -3,7 +3,6 @@ import { useParams, useLocation } from 'react-router-dom';
 import { InfoSection, PageHeader } from '../../components/ui';
 import { api, T3SYSTEMADMIN_BASE } from '../../lib/api';
 import { t3Service } from '../../services/t3Service';
-import { getTransactionInfoItems, getTransactionReceiver, getTransactionSender, getTransactionInfo, getTransactionReferral, getTransactionBonus, getTransactionOthers } from '../../constant/transactionMockData';
 
 export default function TransactionDetails() {
   const { id } = useParams();
@@ -56,52 +55,61 @@ export default function TransactionDetails() {
     fetchTransactionDetails();
   }, [id, isT3Admin]);
 
+  // Helper function to format number without rounding - display exact value
+  const formatExactValue = (value, currency) => {
+    if (value === null || value === undefined || value === '') return `0 ${currency}`;
+    // Convert to number if it's a string
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    // Check if it's a valid number
+    if (isNaN(numValue)) return `0 ${currency}`;
+    // Return as-is without rounding - just convert to string and add currency
+    return `${numValue} ${currency}`;
+  };
+
   // Transform API data to match InfoSection format
   const transformTransactionData = (data) => {
     if (!data) return null;
 
     const currency = data.currency || 'USDT';
-    const amount = parseFloat(data.amount || 0);
-    const formattedAmount = amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     return {
       // Transaction Information
       transactionInfo: {
-        id: id || data.id || data.transaction_id,
-        type: data.type || 'Payment',
+        id: data.transaction_id || id || data.id,
+        type: data.type ? data.type.charAt(0).toUpperCase() + data.type.slice(1).toLowerCase() : 'Payment',
         time: data.created_at ? new Date(data.created_at).toLocaleString('en-GB') : 'N/A',
         status: data.status === 'completed' ? 'Success' : data.status === 'pending' ? 'Pending' : data.status === 'failed' ? 'Failed' : data.status || 'Success',
       },
-      // Receiver Information
+      // Receiver Information - API doesn't have merchant data, show N/A
       receiverInfo: {
         merchantId: data.merchant_id || data.merchant?.id || 'N/A',
         companyName: data.merchant?.name || data.merchant?.company_name || 'N/A',
-        receiverWalletAddress: data.receiver_wallet_address || data.merchant?.wallet_address || 'N/A',
+        receiverWalletAddress: data.referral?.receiver_wallet_address || data.receiver_wallet_address || data.merchant?.wallet_address || 'N/A',
       },
-      // Sender Information
+      // Sender Information - use user object from API
       senderInfo: {
-        agentId: data.agent_id || data.agent?.id || 'N/A',
-        memberId: data.user_id || data.user?.id || 'N/A',
-        senderWalletAddress: data.sender_wallet_address || data.user?.wallet_address || 'N/A',
+        agentId: data.agent?.id || data.agent_id || null,
+        memberId: data.user?.id || data.user_id || null,
+        senderWalletAddress: data.user?.wallet_address || data.sender_wallet_address || 'N/A',
       },
-      // Amount Transaction
+      // Amount Transaction - use exact values from API
       amountInfo: {
-        amount: `${formattedAmount} ${currency}`,
-        platformFees: `${((amount * 0.005) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`,
-        processingFees: `${((amount * 0.005) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`,
-        netProfit: `${((amount * 0.01) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`,
+        amount: formatExactValue(data.amount, currency),
+        platformFees: formatExactValue(data.platform_fees, currency),
+        processingFees: formatExactValue(data.processing_fees, currency),
+        netProfit: formatExactValue(data.net_profit, currency),
       },
-      // Referral Information
+      // Referral Information - use referral object from API
       referralInfo: {
-        referralFees: `${((amount * 0.004) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`,
-        receiverWalletAddress: data.receiver_wallet_address || data.merchant?.wallet_address || 'N/A',
+        referralFees: formatExactValue(data.referral?.referral_fees, currency),
+        receiverWalletAddress: data.referral?.receiver_wallet_address || data.receiver_wallet_address || data.merchant?.wallet_address || 'N/A',
       },
-      // Bonus Distributed
+      // Bonus Distributed - use bonus object from API
       bonusInfo: {
-        level1: `${((amount * 0.002) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`,
-        level2: `${((amount * 0.001) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`,
-        agentlevel1: `${((amount * 0.0015) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`,
-        agentlevel2: `${((amount * 0.0005) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`,
+        level1: formatExactValue(data.bonus?.level1, currency),
+        level2: formatExactValue(data.bonus?.level2, currency),
+        agentlevel1: formatExactValue(data.bonus?.agent_level1, currency),
+        agentlevel2: formatExactValue(data.bonus?.agent_level2, currency),
       },
       // Other Information
       otherInfo: {
@@ -112,6 +120,51 @@ export default function TransactionDetails() {
   };
 
   const transformedData = transformTransactionData(transactionData);
+
+  // Build items arrays directly from transformed data (no mock functions)
+  const transactionInfoItems = transformedData ? [
+    { label: 'Transaction ID', value: transformedData.transactionInfo.id || id },
+    { label: 'Type of Transaction', value: transformedData.transactionInfo.type },
+    { label: 'Time', value: transformedData.transactionInfo.time },
+    { label: 'Status', value: transformedData.transactionInfo.status, badge: true },
+  ] : [];
+
+  const receiverInfoItems = transformedData ? [
+    { label: 'Merchant ID', value: transformedData.receiverInfo.merchantId },
+    { label: 'Company Name', value: transformedData.receiverInfo.companyName },
+    { label: 'Receiver Wallet Address', value: transformedData.receiverInfo.receiverWalletAddress },
+  ] : [];
+
+  const senderInfoItems = transformedData ? [
+    { label: 'Agent/Member ID', value: transformedData.senderInfo.agentId && transformedData.senderInfo.memberId 
+      ? `${transformedData.senderInfo.agentId} / ${transformedData.senderInfo.memberId}`
+      : transformedData.senderInfo.agentId || transformedData.senderInfo.memberId || 'N/A' },
+    { label: 'Sender Wallet Address', value: transformedData.senderInfo.senderWalletAddress },
+  ] : [];
+
+  const amountInfoItems = transformedData ? [
+    { label: 'Amount', value: transformedData.amountInfo.amount },
+    { label: 'Platform Fees', value: transformedData.amountInfo.platformFees },
+    { label: 'Processing Fees', value: transformedData.amountInfo.processingFees },
+    { label: 'Net Profit', value: transformedData.amountInfo.netProfit },
+  ] : [];
+
+  const referralInfoItems = transformedData ? [
+    { label: 'Referral Fees', value: transformedData.referralInfo.referralFees },
+    { label: 'Receiver Wallet Address', value: transformedData.referralInfo.receiverWalletAddress },
+  ] : [];
+
+  const bonusInfoItems = transformedData ? [
+    { label: 'Level 1', value: transformedData.bonusInfo.level1 },
+    { label: 'Level 2', value: transformedData.bonusInfo.level2 },
+    { label: 'Agent Level 1', value: transformedData.bonusInfo.agentlevel1 },
+    { label: 'Agent Level 2', value: transformedData.bonusInfo.agentlevel2 },
+  ] : [];
+
+  const otherInfoItems = transformedData ? [
+    { label: 'Merchant Order Number', value: transformedData.otherInfo.merchantOrderNumber },
+    { label: 'Reference', value: transformedData.otherInfo.reference },
+  ] : [];
 
   if (loading) {
     return (
@@ -152,42 +205,42 @@ export default function TransactionDetails() {
         <div className="grid grid-cols-1 gap-6">
           <InfoSection 
             title="Transaction Information" 
-            items={getTransactionInfoItems(id, transformedData.transactionInfo)} 
+            items={transactionInfoItems} 
             columns={1} 
           />
           <InfoSection 
             title="Receiver Information" 
-            items={getTransactionReceiver(id, transformedData.receiverInfo)} 
+            items={receiverInfoItems} 
             columns={1} 
           />
         </div>
         <div className="grid grid-cols-1 gap-6">
           <InfoSection 
             title="Amount Transaction" 
-            items={getTransactionInfo(id, transformedData.amountInfo)} 
+            items={amountInfoItems} 
             columns={1} 
           />
           <InfoSection 
             title="Sender Information" 
-            items={getTransactionSender(id, transformedData.senderInfo)} 
+            items={senderInfoItems} 
             columns={1} 
           />
         </div>
         <div className="grid grid-cols-1 gap-6">
           <InfoSection 
             title="Referral Information" 
-            items={getTransactionReferral(transformedData.referralInfo)} 
+            items={referralInfoItems} 
             columns={1} 
           />
           <InfoSection 
             title="Other Information" 
-            items={getTransactionOthers(id, transformedData.otherInfo)} 
+            items={otherInfoItems} 
             columns={1} 
           />
         </div>
         <InfoSection 
           title="Bonus Distributed" 
-          items={getTransactionBonus(id, transformedData.bonusInfo)} 
+          items={bonusInfoItems} 
           columns={1} 
         />
       </div>

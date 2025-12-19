@@ -1,4 +1,4 @@
-import { bsc, bscTestnet } from 'viem/chains'
+import { bsc, bscTestnet, mainnet, sepolia } from 'viem/chains'
 
 // Local Hardhat network configuration (for development/testing)
 const hardhatChainId = parseInt(import.meta.env.VITE_CHAIN_ID || '31337', 10)
@@ -93,8 +93,30 @@ export const bscTestnetConfig = {
   },
 }
 
+// Ethereum Mainnet configuration
+export const ethereumMainnet = {
+  ...mainnet,
+  name: 'Ethereum',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Ether',
+    symbol: 'ETH',
+  },
+}
+
+// Ethereum Sepolia Testnet configuration
+export const ethereumSepolia = {
+  ...sepolia,
+  name: 'Sepolia',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Ether',
+    symbol: 'ETH',
+  },
+}
+
 // Export all supported chains
-export const supportedChains = [hardhatLocal, bscMainnet, bscTestnetConfig]
+export const supportedChains = [hardhatLocal, ethereumMainnet, ethereumSepolia, bscMainnet, bscTestnetConfig]
 
 // Default chain - development uses Hardhat Local, production uses BSC Mainnet
 export const defaultChain = import.meta.env.DEV ? hardhatLocal : bscMainnet
@@ -103,6 +125,18 @@ export const defaultChain = import.meta.env.DEV ? hardhatLocal : bscMainnet
 export const chainMetadata = {
   [hardhatLocal.id]: {
     name: hardhatLocal.name,
+    symbol: 'ETH',
+    color: '#627EEA',
+    iconUrl: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png?1696501628',
+  },
+  [ethereumMainnet.id]: {
+    name: ethereumMainnet.name,
+    symbol: 'ETH',
+    color: '#627EEA',
+    iconUrl: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png?1696501628',
+  },
+  [ethereumSepolia.id]: {
+    name: ethereumSepolia.name,
     symbol: 'ETH',
     color: '#627EEA',
     iconUrl: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png?1696501628',

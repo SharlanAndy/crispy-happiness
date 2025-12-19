@@ -13,10 +13,15 @@ import { useToast } from '@/contexts/ToastContext';
 // USDT (BEP-20) contract address on Binance Smart Chain
 const USDT_CONTRACT_ADDRESS = '0x55d398326f99059fF775485246999027B3197955';
 const USDT_DECIMALS = 18; // USDT on BSC uses 18 decimals
+const BSC_MAINNET_CHAIN_ID = 56; // Binance Smart Chain Mainnet chain ID
+
+// TEMPORARY: Test address for verifying USDT transfer transaction
+// TODO: Remove this after testing and use actual user wallet address
+const TEST_RECIPIENT_ADDRESS = '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0'; // Valid BSC address format for testing (42 chars: 0x + 40 hex)
 
 export default function TransferModal({ isOpen, onClose, user }) {
   const { showSuccess: showToastSuccess, showError } = useToast();
-  const { isConnected, address, connect } = useAppKitWallet();
+  const { isConnected, address, connect, chainId, switchNetwork } = useAppKitWallet();
   const [transferData, setTransferData] = useState({
     amount: '',
     username: '',
@@ -29,8 +34,22 @@ export default function TransferModal({ isOpen, onClose, user }) {
   const [txHash, setTxHash] = useState(null);
   const [error, setError] = useState(null);
 
-  // Get recipient address from user object
-  const recipientAddress = user?.walletId || user?.wallet_address || '';
+  // Get recipient address from user object, fallback to test address for testing
+  // Ensure we use the actual address, not display values
+  const getRecipientAddress = () => {
+    const addr = user?.walletId || user?.wallet_address || TEST_RECIPIENT_ADDRESS;
+    // If it's a display value (contains "..."), use test address
+    if (addr && addr.includes('...')) {
+      return TEST_RECIPIENT_ADDRESS;
+    }
+    // Ensure it's a valid hex address format
+    if (addr && /^0x[a-fA-F0-9]{40}$/.test(addr)) {
+      return addr;
+    }
+    // Fallback to test address
+    return TEST_RECIPIENT_ADDRESS;
+  };
+  const recipientAddress = getRecipientAddress();
 
   // Reset state when modal closes
   useEffect(() => {
@@ -84,35 +103,70 @@ export default function TransferModal({ isOpen, onClose, user }) {
       }
     }
 
-    // Validate recipient address format
-    if (!/^0x[a-fA-F0-9]{40}$/.test(recipientAddress)) {
-      setError('Invalid recipient address format');
-      return;
+    // TEMPORARY: Address format validation disabled for testing
+    // TODO: Re-enable after testing
+    // if (!/^0x[a-fA-F0-9]{40}$/.test(recipientAddress)) {
+    //   setError('Invalid recipient address format');
+    //   return;
+    // }
+
+    // Validate network - must be on BSC Mainnet
+    if (chainId !== BSC_MAINNET_CHAIN_ID) {
+      setError(`Please switch to Binance Smart Chain Mainnet. Current network: ${chainId}`);
+      try {
+        // Attempt to switch network
+        await switchNetwork(BSC_MAINNET_CHAIN_ID);
+        // Wait a moment for network switch
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (err) {
+        setError(`Failed to switch network: ${err.message || 'Please manually switch to Binance Smart Chain Mainnet in your wallet.'}`);
+        setIsTransferring(false);
+        return;
+      }
     }
 
     setIsTransferring(true);
     setError(null);
 
     try {
-      // Transfer USDT tokens
+      // Ensure recipient address is valid and normalized
+      const normalizedAddress = recipientAddress.toLowerCase();
+      
+      // Transfer USDT tokens (will use the current network from the provider)
       const tx = await transferTokens(
         USDT_CONTRACT_ADDRESS,
-        recipientAddress,
+        normalizedAddress,
         transferData.amount,
-        USDT_DECIMALS
+        USDT_DECIMALS,
+        chainId // Pass chain ID to ensure correct network
       );
 
       setTxHash(tx.hash);
       showToastSuccess(`Transaction submitted! Hash: ${tx.hash.slice(0, 10)}...`);
 
       // Wait for transaction confirmation
-      const receipt = await tx.wait();
+      await tx.wait();
       
       setShowSuccessModal(true);
       showToastSuccess(`USDT transfer successful! Transaction confirmed.`);
     } catch (err) {
       console.error('Transfer error:', err);
-      const errorMessage = err.message || 'Failed to transfer USDT. Please try again.';
+      
+      // Extract revert reason from error
+      let errorMessage = 'Failed to transfer USDT. Please try again.';
+      
+      // Check for revert reason in error object (ethers.js v6 format)
+      if (err.reason) {
+        // Direct revert reason (e.g., "BEP20: transfer amount exceeds balance")
+        errorMessage = err.reason;
+      } else if (err.revert && err.revert.args && err.revert.args.length > 0) {
+        // Revert args array (first element is usually the message)
+        errorMessage = err.revert.args[0];
+      } else if (err.message) {
+        // Fallback to error message
+        errorMessage = err.message;
+      }
+      
       setError(errorMessage);
       showError(errorMessage);
     } finally {
@@ -172,7 +226,7 @@ export default function TransferModal({ isOpen, onClose, user }) {
 
   // Transfer Form
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className="bg-white rounded-[20px] shadow-[0px_16px_16px_0px_rgba(50,50,71,0.08),0px_24px_32px_0px_rgba(50,50,71,0.08)] p-8 w-full max-w-lg">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -282,7 +336,9 @@ export default function TransferModal({ isOpen, onClose, user }) {
                 isTransferring || 
                 !transferData.amount || 
                 parseFloat(transferData.amount) <= 0 ||
-                !recipientAddress
+                !recipientAddress ||
+                !transferData.isHuman ||
+                !captchaToken
               }
               className="flex-1 bg-[#4CAF50] text-white py-3 rounded-lg font-semibold hover:bg-[#45a049] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >

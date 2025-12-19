@@ -23,13 +23,13 @@ export default function InfoSection({ title, items, columns = 2, className = '' 
       <h2 className="text-lg font-semibold px-5 pt-4">{title}</h2>
       <div className={`grid ${columnClasses[columns]} gap-y-4 gap-x-10 px-5 py-4`}>
         {items.map((item, idx) => (
-          <div className="flex flex-col gap-2" key={idx}>
+          <div className="flex flex-col gap-2 min-w-0" key={idx}>
             <p className="text-sm text-muted-foreground">{item.label}</p>
             {item.badge ? (
               <StatusBadge status={item.value} small={false} />
             ) : (
-              <div className="flex px-3 py-2 bg-[#F3F3F5] rounded-md">
-                <p className={`font-medium text-md`}>
+              <div className="px-3 py-2 bg-[#F3F3F5] rounded-md min-w-0 w-full">
+                <p className={`font-medium text-md break-words break-all whitespace-normal overflow-wrap-anywhere`}>
                   {item.value || '-'}
                 </p>
               </div>

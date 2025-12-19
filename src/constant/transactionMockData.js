@@ -63,41 +63,46 @@ export function getTransactionInfoItems(id, transaction = MOCK_TRANSACTION_DETAI
 
 export function getTransactionReceiver(id, transaction = MOCK_TRANSACTION_RECEIVER) {
   return [
-    { label: 'Merchant ID', value: id || transaction.merchantId },
-    { label: 'Company Name', value: transaction.companyName },
-    { label: 'Receiver Wallet Address', value: transaction.receiverWalletAddress },
+    { label: 'Merchant ID', value: transaction.merchantId || 'N/A' },
+    { label: 'Company Name', value: transaction.companyName || 'N/A' },
+    { label: 'Receiver Wallet Address', value: transaction.receiverWalletAddress || 'N/A' },
   ];
 }
 
 export function getTransactionSender(id, transaction = MOCK_TRANSACTION_SENDER) {
+  // Show both Agent ID and Member ID if available, or show the one that exists
+  const agentMemberId = transaction.agentId && transaction.memberId 
+    ? `${transaction.agentId} / ${transaction.memberId}`
+    : transaction.agentId || transaction.memberId || 'N/A';
+  
   return [
-    { label: 'Agent/Member ID', value: id || transaction.agentId || transaction.memberId },
-    { label: 'Sender Wallet Address', value: transaction.senderWalletAddress },
+    { label: 'Agent/Member ID', value: agentMemberId },
+    { label: 'Sender Wallet Address', value: transaction.senderWalletAddress || 'N/A' },
   ];
 }
 
 export function getTransactionInfo(id, transaction = MOCK_TRANSACTION_INFO) {
   return [
-    { label: 'Amount', value: id || transaction.amount },
-    { label: 'Platform Fees', value: transaction.platformFees },
-    { label: 'Processing Fees', value: transaction.processingFees },
-    { label: 'Net Profit', value: transaction.netProfit },
+    { label: 'Amount', value: transaction.amount || '0 USDT' },
+    { label: 'Platform Fees', value: transaction.platformFees || '0 USDT' },
+    { label: 'Processing Fees', value: transaction.processingFees || '0 USDT' },
+    { label: 'Net Profit', value: transaction.netProfit || '0 USDT' },
   ];
 }
 
 export function getTransactionReferral(transaction = MOCK_TRANSACTION_REFERRAL) {
   return [
-    { label: 'Referral Fees', value: transaction.referralFees },
-    { label: 'Receiver Wallet Address', value: transaction.receiverWalletAddress },
+    { label: 'Referral Fees', value: transaction.referralFees || '0 USDT' },
+    { label: 'Receiver Wallet Address', value: transaction.receiverWalletAddress || 'N/A' },
   ];
 }
 
 export function getTransactionBonus(id, transaction = MOCK_TRANSACTION_BONUS) {
   return [
-    { label: 'Level 1', value: id || transaction.level1 },
-    { label: 'Level 2', value: transaction.level2 },
-    { label: 'Agent Level 1', value: transaction.agentlevel1 },
-    { label: 'Agent Level 2', value: transaction.agentlevel2 },
+    { label: 'Level 1', value: transaction.level1 || '0 USDT' },
+    { label: 'Level 2', value: transaction.level2 || '0 USDT' },
+    { label: 'Agent Level 1', value: transaction.agentlevel1 || '0 USDT' },
+    { label: 'Agent Level 2', value: transaction.agentlevel2 || '0 USDT' },
   ];
 }
 
