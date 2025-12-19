@@ -9,6 +9,7 @@ import CaptchaCheckbox from './CaptchaCheckbox';
 import { useAppKitWallet } from '@/web3/hooks';
 import { transferTokens } from '@/web3/services/erc20Service';
 import { useToast } from '@/contexts/ToastContext';
+import { api } from '@/lib/api';
 
 // USDT (BEP-20) contract address on Binance Smart Chain
 const USDT_CONTRACT_ADDRESS = '0x55d398326f99059fF775485246999027B3197955';
@@ -24,8 +25,8 @@ export default function TransferModal({ isOpen, onClose, user }) {
   const { isConnected, address, connect, chainId, switchNetwork } = useAppKitWallet();
   const [transferData, setTransferData] = useState({
     amount: '',
-    username: '',
-    password: '',
+    merchantOrderNo: '',
+    reference: '',
     isHuman: false,
   });
   const [captchaToken, setCaptchaToken] = useState(null);
@@ -51,13 +52,24 @@ export default function TransferModal({ isOpen, onClose, user }) {
   };
   const recipientAddress = getRecipientAddress();
 
+  // Generate random application_id
+  const generateApplicationId = () => {
+    // Generate a random alphanumeric string (similar to "3tg24g24t")
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 10; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
+
   // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
       setTransferData({
         amount: '',
-        username: '',
-        password: '',
+        merchantOrderNo: '',
+        reference: '',
         isHuman: false,
       });
       setCaptchaToken(null);
@@ -147,6 +159,44 @@ export default function TransferModal({ isOpen, onClose, user }) {
       // Wait for transaction confirmation
       await tx.wait();
       
+      // After successful transaction, create withdrawal record
+      try {
+        const applicationId = generateApplicationId();
+        const userId = user?.id || user?.user_id || null;
+        
+        if (!userId) {
+          console.warn('User ID not found in user object:', user);
+          // Still show success modal even if withdrawal API call fails
+        } else {
+          const withdrawalPayload = {
+            application_id: applicationId,
+            user_id: userId,
+            amount: parseFloat(transferData.amount),
+            wallet_address: recipientAddress,
+            merchant_order_no: transferData.merchantOrderNo || '',
+            reference: transferData.reference || '',
+            hash_key: tx.hash,
+          };
+
+          console.log('Creating withdrawal record:', withdrawalPayload);
+          
+          const withdrawalResult = await api.t3admin.createWithdrawal(withdrawalPayload);
+          
+          if (withdrawalResult && withdrawalResult.success) {
+            console.log('Withdrawal record created successfully:', withdrawalResult);
+            showToastSuccess('Withdrawal record created successfully!');
+          } else {
+            console.warn('Withdrawal API returned unsuccessful response:', withdrawalResult);
+            // Still show success modal - transaction was successful even if API call failed
+          }
+        }
+      } catch (withdrawalError) {
+        console.error('Failed to create withdrawal record:', withdrawalError);
+        // Don't block the success modal - transaction was successful
+        // Just log the error
+        showError('Transaction successful, but failed to create withdrawal record. Please contact support.');
+      }
+      
       setShowSuccessModal(true);
       showToastSuccess(`USDT transfer successful! Transaction confirmed.`);
     } catch (err) {
@@ -178,8 +228,8 @@ export default function TransferModal({ isOpen, onClose, user }) {
     setShowSuccessModal(false);
     setTransferData({
       amount: '',
-      username: '',
-      password: '',
+      merchantOrderNo: '',
+      reference: '',
       isHuman: false,
     });
     setCaptchaToken(null);
@@ -296,21 +346,21 @@ export default function TransferModal({ isOpen, onClose, user }) {
             </div>
           </div>
 
-          {/* Username */}
-          <FormField label="Username">
+          {/* Merchant Order No */}
+          <FormField label="Merchant Order No">
             <TextInput
-              value={transferData.username}
-              onChange={(e) => setTransferData({ ...transferData, username: e.target.value })}
-              placeholder="Insert username here"
+              value={transferData.merchantOrderNo}
+              onChange={(e) => setTransferData({ ...transferData, merchantOrderNo: e.target.value })}
+              placeholder="Insert merchant order number here"
             />
           </FormField>
 
-          {/* Password */}
-          <FormField label="Password">
-            <PasswordInput
-              value={transferData.password}
-              onChange={(e) => setTransferData({ ...transferData, password: e.target.value })}
-              placeholder="Insert password here"
+          {/* Reference */}
+          <FormField label="Reference">
+            <TextInput
+              value={transferData.reference}
+              onChange={(e) => setTransferData({ ...transferData, reference: e.target.value })}
+              placeholder="Insert reference here"
             />
           </FormField>
 

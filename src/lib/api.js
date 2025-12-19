@@ -704,6 +704,14 @@ export const api = {
      */
     rejectWithdrawal: (id) => request(`${T3SYSTEMADMIN_BASE}/withdrawals/${id}/reject`, { method: 'POST' }),
 
+    /**
+     * Create a withdrawal application.
+     * Headers: Authorization: Bearer <token>
+     * @param {Object} data - { application_id, user_id, amount, wallet_address, merchant_order_no, reference, hash_key }
+     * @returns {Promise<Object>} { success, message, data }
+     */
+    createWithdrawal: (data) => request(`${T3SYSTEMADMIN_BASE}/withdrawals`, { method: 'POST', body: JSON.stringify(data) }),
+
     // API Keys & Logs
     /**
      * Get API keys list.
