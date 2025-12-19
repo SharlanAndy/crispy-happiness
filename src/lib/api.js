@@ -5,24 +5,46 @@ import { toastManager } from './toastManager.js';
 // In production, VITE_API_URL should be set to the full API URL (e.g., https://nbn.iotareward.com/api)
 // In development, it can be '/api' to use Vite proxy
 const getBaseURL = () => {
+  // Get all VITE_ env vars for debugging
+  const allViteEnv = Object.keys(import.meta.env)
+    .filter(key => key.startsWith('VITE_'))
+    .reduce((obj, key) => {
+      obj[key] = import.meta.env[key];
+      return obj;
+    }, {});
+  
   const envURL = import.meta.env.VITE_API_URL;
+  const envURLType = typeof envURL;
+  const envURLLength = envURL ? envURL.length : 0;
   
-  // Log for debugging (always log in production to help diagnose issues)
-  if (import.meta.env.PROD) {
-    console.log('[API Config] Production build - VITE_API_URL:', envURL || 'NOT SET - WILL USE RELATIVE PATH');
-    console.log('[API Config] Using baseURL:', envURL || '/api');
-  } else if (import.meta.env.DEV) {
-    console.log('[API Config] Development - VITE_API_URL:', envURL || 'NOT SET - USING PROXY');
-    console.log('[API Config] Using baseURL:', envURL || '/api');
+  // Detailed logging for debugging
+  console.group('[API Config] Environment Variable Debug');
+  console.log('Mode:', import.meta.env.MODE);
+  console.log('Is Production:', import.meta.env.PROD);
+  console.log('Is Development:', import.meta.env.DEV);
+  console.log('VITE_API_URL value:', envURL);
+  console.log('VITE_API_URL type:', envURLType);
+  console.log('VITE_API_URL length:', envURLLength);
+  console.log('VITE_API_URL is truthy:', !!envURL);
+  console.log('All VITE_ env vars:', allViteEnv);
+  console.log('Full import.meta.env:', import.meta.env);
+  console.groupEnd();
+  
+  // Check if envURL is set and not empty
+  if (envURL && typeof envURL === 'string' && envURL.trim().length > 0) {
+    const trimmedURL = envURL.trim();
+    console.log('[API Config] ✅ Using VITE_API_URL:', trimmedURL);
+    return trimmedURL;
   }
   
-  // If VITE_API_URL is set, use it (should be full URL in production)
-  if (envURL) {
-    return envURL;
-  }
+  // Fallback warning
+  console.warn('[API Config] ⚠️ VITE_API_URL is not set or empty!');
+  console.warn('[API Config] ⚠️ Falling back to relative path "/api"');
+  console.warn('[API Config] ⚠️ This will cause API calls to go to:', window.location.origin + '/api');
+  console.warn('[API Config] ⚠️ To fix: Set VITE_API_URL in Netlify Dashboard > Site settings > Environment variables');
+  console.warn('[API Config] ⚠️ Value should be: https://nbn.iotareward.com/api');
+  console.warn('[API Config] ⚠️ After setting, trigger a new deployment!');
   
-  // Fallback to relative path (will use Netlify domain if env var not set in production)
-  // WARNING: This will cause API calls to go to Netlify domain instead of backend!
   return '/api';
 };
 

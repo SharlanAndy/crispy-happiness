@@ -1,11 +1,18 @@
 [build]
-  command = "npm run build"
+  command = "echo 'Building with VITE_API_URL=' && echo $VITE_API_URL && npm run build"
   publish = "dist"
 
 # IMPORTANT: Set VITE_API_URL in Netlify Dashboard
 # Go to: Site settings > Environment variables
 # Add: VITE_API_URL = https://nbn.iotareward.com/api
-# This is required for production builds to use the correct API endpoint
+# 
+# CRITICAL STEPS:
+# 1. Set the variable in Netlify Dashboard (Site settings > Environment variables)
+# 2. Variable name MUST be exactly: VITE_API_URL
+# 3. Variable value MUST be exactly: https://nbn.iotareward.com/api
+# 4. After setting, you MUST trigger a NEW deployment (the variable is embedded at BUILD time, not runtime!)
+# 5. Check the build logs to verify the variable is available during build
+#
 # The .env file is gitignored, so Netlify needs this set in the dashboard
 
 # SPA fallback - redirect all routes to index.html for client-side routing
