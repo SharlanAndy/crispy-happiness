@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { imgVector1, imgVector3 } from '../../constant/assets';
-import { useWeb3Wallet } from '@/hooks/useWeb3Wallet';
+import { useAppKitWallet } from '@/web3/hooks/useAppKit';
 
 // Title is intentionally fixed so it cannot be changed by pages/components.
 const Header = () => {
@@ -8,16 +8,19 @@ const Header = () => {
   const navigate = useNavigate();
   const {
     address,
-    formattedAddress,
-    walletName,
+    chainName,
+    connector,
     isConnected,
     isConnecting,
-    isAvailable,
-    error,
     connect,
     disconnect,
-    switchAccount
-  } = useWeb3Wallet();
+    openModal
+  } = useAppKitWallet();
+
+  // Format address for display
+  const formattedAddress = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '';
+  const walletName = connector || 'Wallet';
+  const isAvailable = typeof window !== 'undefined' && (window.ethereum || true); // Reown handles wallet detection
 
   const handleLogout = () => {
     localStorage.removeItem('isAuthenticated');
@@ -26,33 +29,15 @@ const Header = () => {
 
   const handleConnectWallet = async () => {
     try {
-      // Debug: Log all available wallet providers before connecting
-      console.log('=== CHECKING ALL WALLET PROVIDERS ===');
-      if (window.ethereum) {
-        console.log('window.ethereum:', window.ethereum);
-        console.log('Is MetaMask?', window.ethereum.isMetaMask);
-        console.log('Selected address:', window.ethereum.selectedAddress);
-        
-        if (Array.isArray(window.ethereum.providers)) {
-          console.log('Multiple providers found:', window.ethereum.providers.length);
-          window.ethereum.providers.forEach((p, i) => {
-            console.log(`Provider ${i}:`, {
-              isMetaMask: p.isMetaMask,
-              isTrust: p.isTrust,
-              isTokenPocket: p.isTokenPocket,
-              selectedAddress: p.selectedAddress
-            });
-          });
-        }
-      } else {
-        console.log('No window.ethereum found!');
-      }
-      console.log('=====================================');
-      
       await connect();
     } catch (err) {
       console.error('Failed to connect wallet:', err);
     }
+  };
+
+  const handleSwitchAccount = () => {
+    // Open Reown modal to switch account
+    openModal();
   };
 
   return (
@@ -75,7 +60,7 @@ const Header = () => {
                   <span>{formattedAddress || address}</span>
                 </div>
                 <button
-                  onClick={switchAccount}
+                  onClick={handleSwitchAccount}
                   disabled={isConnecting}
                   className="border border-black flex items-center gap-1.5 px-2.5 py-2 rounded-full hover:bg-black hover:text-white transition-colors group disabled:opacity-50"
                   title="Switch wallet account (will show popup)"
@@ -106,12 +91,6 @@ const Header = () => {
             )}
           </>
         ) : null}
-
-        {error && (
-          <div className="text-xs text-red-500 max-w-xs truncate" title={error}>
-            {error}
-          </div>
-        )}
         
         <button 
           onClick={handleLogout}

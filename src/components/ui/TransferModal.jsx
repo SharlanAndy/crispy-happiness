@@ -1,49 +1,164 @@
-import { useState } from 'react';
-import { X, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Check, Loader2, AlertCircle } from 'lucide-react';
 import Modal from './Modal';
 import Button from './Button';
 import FormField from './FormField';
 import TextInput from '../form/TextInput';
 import PasswordInput from '../form/PasswordInput';
-import Captcha from '../icons/Captcha';
+import CaptchaCheckbox from './CaptchaCheckbox';
+import { useAppKitWallet } from '@/web3/hooks';
+import { transferTokens } from '@/web3/services/erc20Service';
+import { useToast } from '@/contexts/ToastContext';
+
+// USDT (BEP-20) contract address on Binance Smart Chain
+const USDT_CONTRACT_ADDRESS = '0x55d398326f99059fF775485246999027B3197955';
+const USDT_DECIMALS = 18; // USDT on BSC uses 18 decimals
 
 export default function TransferModal({ isOpen, onClose, user }) {
+  const { showSuccess: showToastSuccess, showError } = useToast();
+  const { isConnected, address, connect } = useAppKitWallet();
   const [transferData, setTransferData] = useState({
-    amount: '100.00',
+    amount: '',
     username: '',
     password: '',
     isHuman: false,
   });
-  const [showSuccess, setShowSuccess] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [isTransferring, setIsTransferring] = useState(false);
+  const [txHash, setTxHash] = useState(null);
+  const [error, setError] = useState(null);
 
-  const handleConfirm = () => {
-    // TODO: Add API call to transfer funds
-    console.log('Transfer:', transferData);
-    setShowSuccess(true);
+  // Get recipient address from user object
+  const recipientAddress = user?.walletId || user?.wallet_address || '';
+
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setTransferData({
+        amount: '',
+        username: '',
+        password: '',
+        isHuman: false,
+      });
+      setCaptchaToken(null);
+      setShowSuccessModal(false);
+      setIsTransferring(false);
+      setTxHash(null);
+      setError(null);
+    }
+  }, [isOpen]);
+
+  const handleConfirm = async () => {
+    // Validate inputs
+    if (!recipientAddress) {
+      setError('Recipient address is required');
+      return;
+    }
+
+    if (!transferData.amount || parseFloat(transferData.amount) <= 0) {
+      setError('Please enter a valid amount');
+      return;
+    }
+
+    // Validate captcha
+    if (!transferData.isHuman || !captchaToken) {
+      setError('Please complete the captcha verification');
+      return;
+    }
+
+    // Check wallet connection
+    if (!isConnected) {
+      try {
+        await connect();
+        // Connection will be handled by Reown modal
+        // User needs to approve in wallet, so we'll proceed and let the transfer fail if not connected
+        // The error will be caught and shown to user
+      } catch (err) {
+        if (err.message?.includes('rejected') || err.message?.includes('denied')) {
+          setError('Wallet connection was cancelled. Please connect your wallet to proceed.');
+        } else {
+          setError('Failed to connect wallet. Please try again.');
+        }
+        return;
+      }
+    }
+
+    // Validate recipient address format
+    if (!/^0x[a-fA-F0-9]{40}$/.test(recipientAddress)) {
+      setError('Invalid recipient address format');
+      return;
+    }
+
+    setIsTransferring(true);
+    setError(null);
+
+    try {
+      // Transfer USDT tokens
+      const tx = await transferTokens(
+        USDT_CONTRACT_ADDRESS,
+        recipientAddress,
+        transferData.amount,
+        USDT_DECIMALS
+      );
+
+      setTxHash(tx.hash);
+      showToastSuccess(`Transaction submitted! Hash: ${tx.hash.slice(0, 10)}...`);
+
+      // Wait for transaction confirmation
+      const receipt = await tx.wait();
+      
+      setShowSuccessModal(true);
+      showToastSuccess(`USDT transfer successful! Transaction confirmed.`);
+    } catch (err) {
+      console.error('Transfer error:', err);
+      const errorMessage = err.message || 'Failed to transfer USDT. Please try again.';
+      setError(errorMessage);
+      showError(errorMessage);
+    } finally {
+      setIsTransferring(false);
+    }
   };
 
   const handleClose = () => {
-    setShowSuccess(false);
+    setShowSuccessModal(false);
     setTransferData({
-      amount: '100.00',
+      amount: '',
       username: '',
       password: '',
       isHuman: false,
     });
+    setCaptchaToken(null);
+    setTxHash(null);
+    setError(null);
+    setIsTransferring(false);
     onClose();
   };
 
   if (!isOpen) return null;
 
   // Success State
-  if (showSuccess) {
+  if (showSuccessModal) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-[11px] shadow-[0px_4px_10px_0px_rgba(0,0,0,0.15)] p-8 w-full max-w-sm flex flex-col items-center gap-6">
           <div className="w-12 h-12 bg-[#4CAF50] rounded-full flex items-center justify-center">
             <Check size={28} className="text-white" strokeWidth={3} />
           </div>
-          <h2 className="text-xl font-semibold text-black">Done Transfer</h2>
+          <h2 className="text-xl font-semibold text-black">Transfer Successful</h2>
+          {txHash && (
+            <div className="text-center">
+              <p className="text-sm text-gray-600 mb-2">Transaction Hash:</p>
+              <a
+                href={`https://bscscan.com/tx/${txHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-600 hover:underline break-all"
+              >
+                {txHash}
+              </a>
+            </div>
+          )}
           <button
             onClick={handleClose}
             className="w-full bg-[#4CAF50] text-white py-3 rounded-lg font-semibold hover:bg-[#45a049] transition-colors"
@@ -77,10 +192,37 @@ export default function TransferModal({ isOpen, onClose, user }) {
             <label className="block text-sm font-medium text-black mb-2">
               Transfer to
             </label>
-            <div className="bg-[#F3F3F5] px-4 py-3 rounded-md font-medium text-md text-black">
-              {user?.walletId || '0x467A0a1a715EC0b48d043013e1e70ABe3d4B3c58'}
+            <div className="bg-[#F3F3F5] px-4 py-3 rounded-md font-medium text-md text-black break-all">
+              {recipientAddress || 'No address available'}
             </div>
           </div>
+
+          {/* Wallet Connection Status */}
+          {!isConnected && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-yellow-600" />
+              <p className="text-sm text-yellow-800">
+                Please connect your wallet to proceed with the transfer.
+              </p>
+            </div>
+          )}
+
+          {isConnected && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
+              <Check className="w-5 h-5 text-green-600" />
+              <p className="text-sm text-green-800">
+                Wallet connected: {address?.slice(0, 6)}...{address?.slice(-4)}
+              </p>
+            </div>
+          )}
+
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+              <p className="text-sm text-red-800">{error}</p>
+            </div>
+          )}
 
           {/* Amount */}
           <div>
@@ -118,29 +260,13 @@ export default function TransferModal({ isOpen, onClose, user }) {
             />
           </FormField>
 
-          {/* hCaptcha */}
-          <div className="border border-gray-300 rounded-lg px-4 py-2 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                id="human-check"
-                checked={transferData.isHuman}
-                onChange={(e) => setTransferData({ ...transferData, isHuman: e.target.checked })}
-                className="w-5 h-5"
-              />
-              <label htmlFor="human-check" className="text-base text-black cursor-pointer">
-                I am human
-              </label>
-            </div>
-            <div className="flex flex-col items-center">
-              <Captcha />
-              <div className="flex items-center gap-1 text-[10px] text-gray-500">
-                <span className="cursor-pointer hover:underline">Privacy</span>
-                <span>-</span>
-                <span className="cursor-pointer hover:underline">Terms</span>
-              </div>
-            </div>
-          </div>
+          {/* Captcha Checkbox */}
+          <CaptchaCheckbox
+            checked={transferData.isHuman}
+            onChange={(checked) => setTransferData({ ...transferData, isHuman: checked })}
+            onTokenChange={(token) => setCaptchaToken(token)}
+            label="I am human"
+          />
 
           {/* Action Buttons */}
           <div className="flex gap-4 pt-2">
@@ -152,10 +278,24 @@ export default function TransferModal({ isOpen, onClose, user }) {
             </button>
             <button
               onClick={handleConfirm}
-              disabled={!transferData.isHuman || !transferData.username || !transferData.password}
-              className="flex-1 bg-[#4CAF50] text-white py-3 rounded-lg font-semibold hover:bg-[#45a049] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              disabled={
+                isTransferring || 
+                !transferData.amount || 
+                parseFloat(transferData.amount) <= 0 ||
+                !recipientAddress
+              }
+              className="flex-1 bg-[#4CAF50] text-white py-3 rounded-lg font-semibold hover:bg-[#45a049] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
-              Confirm
+              {isTransferring ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Processing...
+                </>
+              ) : !isConnected ? (
+                'Connect Wallet & Transfer'
+              ) : (
+                'Confirm Transfer'
+              )}
             </button>
           </div>
         </div>

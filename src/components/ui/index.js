@@ -23,3 +23,4 @@ export { default as BonusListCard } from './BonusListCard';
 export { default as TransferModal } from './TransferModal';
 export { default as VerificationModal } from './VerificationModal';
 export { default as Toast } from './Toast';
+export { default as CaptchaCheckbox } from './CaptchaCheckbox';

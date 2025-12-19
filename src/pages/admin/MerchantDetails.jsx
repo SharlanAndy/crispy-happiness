@@ -6,7 +6,7 @@ import { PasswordInput, TextInput } from '@/components/form';
 
 import { api, T3SYSTEMADMIN_BASE } from '@/lib/api';
 import { useToast } from '@/contexts/ToastContext';
-import { useWeb3Wallet } from '@/hooks/useWeb3Wallet';
+import { useAppKitWallet } from '@/web3/hooks/useAppKit';
 
 
 export default function MerchantDetails() {
@@ -27,12 +27,13 @@ export default function MerchantDetails() {
   // Web3 wallet connection
   const {
     address: web3Address,
-    formattedAddress: web3FormattedAddress,
-    walletName,
+    connector: walletName,
     isConnected: isWeb3Connected,
-    isAvailable: isWeb3Available,
     connect: connectWeb3Wallet
-  } = useWeb3Wallet();
+  } = useAppKitWallet();
+  
+  const web3FormattedAddress = web3Address ? `${web3Address.slice(0, 6)}...${web3Address.slice(-4)}` : '';
+  const isWeb3Available = typeof window !== 'undefined';
 
   // Modal and form states for T3 Admin
   const [showWalletModal, setShowWalletModal] = useState(false);
