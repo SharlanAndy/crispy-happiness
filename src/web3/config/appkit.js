@@ -29,19 +29,41 @@ if (projectId === 'YOUR_PROJECT_ID' && typeof window !== 'undefined') {
 }
 
 // Get current origin for domain whitelist validation
-const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://nbnadmin.iotareward.com'
+// This MUST match exactly what you whitelisted in Reown Dashboard
+// For Netlify: https://nbnadmin.netlify.app
+// For production domain: https://nbnadmin.iotareward.com
+// For development: http://localhost:5173
+const getCurrentOrigin = () => {
+  if (typeof window === 'undefined') {
+    // SSR fallback - use production domain
+    return 'https://nbnadmin.iotareward.com';
+  }
+  
+  const origin = window.location.origin;
+  
+  // Log for debugging
+  console.log('[Reown AppKit] Detected origin:', origin);
+  console.log('[Reown AppKit] Make sure this domain is whitelisted in Reown Dashboard');
+  
+  return origin;
+};
+
+const currentOrigin = getCurrentOrigin();
 const originWithSlash = currentOrigin.endsWith('/') ? currentOrigin : `${currentOrigin}/`
 
 // App metadata for Reown AppKit
 // Icons must be accessible via HTTPS and match the whitelisted domain
+// The URL and icon URLs MUST match the domain whitelisted in Reown Dashboard
 export const appMetadata = {
   name: 'NBN Management System',
   description: 'NBN Decentralized Finance Platform - Professional Lending and Asset Management',
   url: originWithSlash,
   icons: [
     // Favicon from public directory - will be served at /favicon.svg
-    // In production: https://nbnadmin.iotareward.com/favicon.svg
-    // In development: http://localhost:5173/favicon.svg
+    // IMPORTANT: This URL must be accessible and match the whitelisted domain
+    // For Netlify: https://nbnadmin.netlify.app/favicon.svg
+    // For production: https://nbnadmin.iotareward.com/favicon.svg
+    // For development: http://localhost:5173/favicon.svg
     `${originWithSlash}favicon.svg`,
   ],
 }
